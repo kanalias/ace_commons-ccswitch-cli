@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   ccswitch setup (Windows / PowerShell).
 

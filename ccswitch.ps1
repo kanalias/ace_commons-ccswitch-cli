@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   ccswitch — swap Claude Code auth profile (Windows / PowerShell port).
 
@@ -70,8 +70,9 @@ function Test-Profile($name) {
   $headers = @{}
   if ($auth) { $headers["Authorization"] = "Bearer $auth" }
   try {
+    # NOTE: no -SkipHttpErrorCheck (PS7-only). On PS 5.1 non-2xx throws; catch reads the status.
     $resp = Invoke-WebRequest -Uri $url -Headers $headers -TimeoutSec 4 `
-              -UseBasicParsing -SkipHttpErrorCheck
+              -UseBasicParsing
     return [string]$resp.StatusCode
   } catch {
     if ($_.Exception.Response) { return [string][int]$_.Exception.Response.StatusCode }
@@ -139,7 +140,8 @@ function Set-ProfileEnv($rawName) {
 
   Copy-Item $Settings "$Settings.bak" -Force
   $s = Get-Content $Settings -Raw | ConvertFrom-Json
-  $s.env = $profObj
+  # PS 5.1: cannot assign to a property that does not exist yet -> use Add-Member (-Force overwrites).
+  $s | Add-Member -NotePropertyName env -NotePropertyValue $profObj -Force
   # depth 10 preserves nested hooks/permissions objects
   $s | ConvertTo-Json -Depth 10 | Set-Content $Settings -Encoding UTF8
 
