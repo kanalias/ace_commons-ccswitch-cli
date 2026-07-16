@@ -70,8 +70,9 @@ function Test-Profile($name) {
   $headers = @{}
   if ($auth) { $headers["Authorization"] = "Bearer $auth" }
   try {
+    # NOTE: no -SkipHttpErrorCheck (PS7-only). On PS 5.1 non-2xx throws; catch reads the status.
     $resp = Invoke-WebRequest -Uri $url -Headers $headers -TimeoutSec 4 `
-              -UseBasicParsing -SkipHttpErrorCheck
+              -UseBasicParsing
     return [string]$resp.StatusCode
   } catch {
     if ($_.Exception.Response) { return [string][int]$_.Exception.Response.StatusCode }
