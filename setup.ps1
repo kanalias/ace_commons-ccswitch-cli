@@ -92,6 +92,17 @@ if (-not $already) {
   Write-Host "  • SessionStart hook already wired — skipped"
 }
 
+# 3b. default model — set only if the user hasn't already chosen one (never clobber a pref).
+$s = Get-Content $Settings -Raw | ConvertFrom-Json
+if (-not (Get-Member -InputObject $s -Name model -MemberType NoteProperty)) {
+  Copy-Item $Settings "$Settings.bak" -Force
+  $s | Add-Member -NotePropertyName model -NotePropertyValue "sonnet" -Force
+  $s | ConvertTo-Json -Depth 10 | Set-Content $Settings -Encoding UTF8
+  Write-Host "  ✓ set default model to sonnet in settings.json"
+} else {
+  Write-Host "  • settings.json already has a model preference — skipped"
+}
+
 # 4. register `ccswitch` function in PowerShell profile
 $psProfile = $PROFILE.CurrentUserAllHosts
 $profileDir = Split-Path -Parent $psProfile

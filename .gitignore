@@ -1,6 +1,7 @@
 # never commit real profiles with keys — only the placeholder templates in profiles/ are tracked
 *.bak
 *.tmp
+.env.pro
 # guard against accidentally dropping a filled-in settings.json here
 settings.json
 # macOS noise

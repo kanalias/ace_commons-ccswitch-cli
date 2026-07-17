@@ -29,7 +29,12 @@
 #   ccswitch check          # probe router health (all profiles) + verify subscription OAuth credential
 #   ccswitch fallback       # active router profile if healthy, else fall back to subscription
 #   ccswitch set-key [p]    # prompt (hidden) for a new key, write it into profile p (default claude), then apply
+#   ccswitch set-host <url> [p]  # write a new base URL into profile p (default claude), then apply
 #   ccswitch clear          # alias of subscription (remove env block)
+#
+# Every apply() to a router profile (claude/deepseek/set-key/set-host/fallback) ends with
+# ping_verify(): a real /v1/messages "Ping" request using the profile's own base URL + token,
+# confirming the just-written env actually authenticates end-to-end (probe() only checks /models).
 set -euo pipefail
 
 CLAUDE_DIR="$HOME/.claude"
@@ -177,6 +182,42 @@ apply() {
   mv "$SETTINGS.tmp" "$SETTINGS"
   echo "✅ switched to '$name' profile (backup: $SETTINGS.bak)"
   echo "↻ restart Claude Code (quit + reopen) to load new env."
+  ping_verify "$prof"
+}
+
+# ping_verify <profile-json> — send a real "Ping" chat completion to /v1/messages using the
+# profile's own base URL + token + haiku model (cheapest tier), to prove the just-applied
+# env actually authenticates end-to-end — not just that the endpoint is up (probe() only
+# checks /models). Never prints the token; redacts it even from curl -v style diagnostics.
+ping_verify() {
+  local prof="$1"
+  local base tok model
+  base=$(jq -r '.ANTHROPIC_BASE_URL // empty' "$prof" 2>/dev/null || true)
+  tok=$(jq -r '.ANTHROPIC_AUTH_TOKEN // empty' "$prof" 2>/dev/null || true)
+  model=$(jq -r '.ANTHROPIC_DEFAULT_HAIKU_MODEL // .ANTHROPIC_DEFAULT_SONNET_MODEL // empty' "$prof" 2>/dev/null || true)
+  if [ -z "$base" ] || [ -z "$tok" ] || [ -z "$model" ]; then
+    echo "⏭  ping skipped: profile missing base URL / token / model"
+    return
+  fi
+
+  echo "📡 pinging '$model' via ${base%/}/v1/messages …"
+  local body http_code text tmp_resp
+  tmp_resp=$(mktemp) || { echo "⏭  ping skipped: mktemp failed"; return; }
+  body=$(jq -n --arg m "$model" '{model:$m, max_tokens:16, messages:[{role:"user",content:"Ping"}]}')
+  http_code=$(curl -s -m 15 "${base%/}/messages" \
+    -H "Authorization: Bearer $tok" \
+    -H "content-type: application/json" \
+    -H "anthropic-version: 2023-06-01" \
+    -d "$body" \
+    -o "$tmp_resp" -w "%{http_code}" 2>/dev/null)
+
+  if [ "$http_code" = "200" ]; then
+    text=$(jq -r '.content[0].text // empty' "$tmp_resp" 2>/dev/null || true)
+    echo "✅ ping OK (HTTP 200) — reply: ${text:-<empty>}"
+  else
+    echo "❌ ping FAILED (HTTP $http_code) — env may not actually be usable; check key/host"
+  fi
+  rm -f "$tmp_resp"
 }
 
 # which router profile is currently applied? echoes claude|deepseek (default claude)
@@ -215,6 +256,29 @@ set_key() {
     || { rm -f "$prof.tmp"; die "failed to write key (profile unchanged, see $prof.bak)"; }
   unset key
   echo "✅ key updated in profiles/$name.json (backup: $prof.bak)"
+  apply "$name"
+}
+
+# set-host <url> [profile] — write a new ANTHROPIC_BASE_URL directly into the profile, then apply.
+# URL is a required positional arg (not prompted): unlike a key, a base URL isn't a secret,
+# so it's safe to pass on the command line / have it sit in shell history.
+set_host() {
+  local host="${1:-}"
+  [ -n "$host" ] || die "usage: ccswitch set-host <url> [profile]"
+  local name; name=$(canon "${2:-claude}")
+  [ "$name" = "subscription" ] && \
+    die "subscription uses Claude Code's OAuth login — no host to set."
+  local prof="$PROFILES/$name.json"
+  [ -f "$prof" ] || die "profile not found: $prof (run setup first)"
+  jq empty "$prof" 2>/dev/null || die "profile $prof is not valid JSON"
+
+  local field="ANTHROPIC_BASE_URL"
+
+  cp "$prof" "$prof.bak"
+  jq --arg f "$field" --arg u "$host" '.[$f] = $u' "$prof" > "$prof.tmp" \
+    && mv "$prof.tmp" "$prof" \
+    || { rm -f "$prof.tmp"; die "failed to write host (profile unchanged, see $prof.bak)"; }
+  echo "✅ host updated in profiles/$name.json (backup: $prof.bak)"
   apply "$name"
 }
 
@@ -285,6 +349,8 @@ case "${1:-status}" in
     spawn "${2:-claude}" "${@:3}" ;;
   set-key)
     set_key "${2:-claude}" ;;
+  set-host)
+    set_host "${2:-}" "${3:-claude}" ;;
   help|--help|-h)
     cat <<'EOF'
 ccswitch — swap Claude Code auth (edits only the `env` block in ~/.claude/settings.json)
@@ -298,6 +364,10 @@ TARGETS (switch-in-place; RESTART Claude Code after — env loads at launch)
   subscription        remove env block → Claude Code OAuth login  (safe-harbor, no key)
                       aliases: original | direct | clear
 
+  every apply (claude|deepseek|set-key|set-host|fallback) sends a REAL "Ping" chat
+  request to the profile's own base URL + token, proving the env is actually usable —
+  not just that the endpoint responds to /models.
+
   claude + deepseek share ONE 9router base URL AND ONE token
   (fill the same key into both profiles). Router down → both down → subscription.
 
@@ -307,10 +377,12 @@ COMMANDS
   fallback            keep active router if healthy, else drop to subscription
   spawn <target> [..] launch a SEPARATE pinned instance (settings.json untouched)
   set-key [profile]   paste a key (hidden) into a profile, then apply  (default: claude)
+  set-host <url> [p]  write a base URL into a profile, then apply      (default: claude)
   help | -h           this help
 
 KEYS
   ccswitch set-key claude       # then: set-key deepseek with the SAME token
+  ccswitch set-host https://9router.acegalaxy.co/v1 claude   # then: same URL for deepseek
   profiles live at ~/.claude/profiles/*.json  (local, never committed)
 EOF
     exit 0 ;;
@@ -322,5 +394,5 @@ EOF
     echo "  subscription: $(probe_subscription)"
     echo "profiles: $(ls "$PROFILES" 2>/dev/null | sed 's/\.json//' | tr '\n' ' ')" ;;
   *)
-    die "usage: ccswitch [claude|deepseek|subscription|spawn <target>|check|fallback|set-key [profile]|clear|status|help]" ;;
+    die "usage: ccswitch [claude|deepseek|subscription|spawn <target>|check|fallback|set-key [profile]|set-host <url> [profile]|clear|status|help]" ;;
 esac

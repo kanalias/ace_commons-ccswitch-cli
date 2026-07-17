@@ -71,6 +71,18 @@ setup() {
   [[ "$output" == *"OAuth login"* ]]
 }
 
+@test "set-host on subscription is rejected" {
+  run "$CC" set-host https://example.com/v1 subscription
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"OAuth login"* ]]
+}
+
+@test "set-host with no URL fails with usage message" {
+  run "$CC" set-host
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"usage:"* ]]
+}
+
 @test "spawn on subscription is rejected" {
   run "$CC" spawn subscription
   [ "$status" -ne 0 ]

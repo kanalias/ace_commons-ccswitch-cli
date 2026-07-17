@@ -87,6 +87,15 @@ else
   echo "  • SessionStart hook already wired — skipped"
 fi
 
+# 3b. default model — set only if the user hasn't already chosen one (never clobber a pref).
+if ! jq -e '.model' "$SETTINGS" >/dev/null 2>&1; then
+  cp "$SETTINGS" "$SETTINGS.bak"
+  jq '.model = "sonnet"' "$SETTINGS.bak" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+  echo "  ✓ set default model to sonnet in settings.json"
+else
+  echo "  • settings.json already has a model preference — skipped"
+fi
+
 # 4. shell alias — pick rc by the user's LOGIN shell ($SHELL), not the interpreter running
 #    this script (setup.sh always runs under bash, so $BASH_VERSION is a false signal → it
 #    would always pick .bashrc even for zsh users). Fall back to .zshrc (macOS default).

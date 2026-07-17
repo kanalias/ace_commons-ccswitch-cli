@@ -3,7 +3,7 @@
 Repo này gồm 3 phần độc lập, cài theo thứ tự:
 
 1. **[`install-9router-proxy.sh`](#phần-1--ccswitch-endpoint-switcher)** — `ccswitch` CLI, đổi endpoint auth của Claude Code (9router / subscription).
-2. **[`install-claude-memory.sh`](#phần-2--global-claude-rules)** — copy 7 rule cá nhân (cross-project) vào `~/.claude/rules/`.
+2. **[`install-claude-memory.sh`](#phần-2--global-claude-rules)** — copy 8 rule cá nhân (cross-project) vào `~/.claude/rules/`.
 3. **[`install-hooks.sh`](#phần-3--git-hooks--push-to-github)** — git hook pre-push (gitleaks scan) cho *repo này*.
 
 Mỗi phần tự detect OS (macOS/Linux chạy bash trực tiếp; Windows qua Git Bash/WSL/Cygwin tự gọi PowerShell) — không cần chọn `.sh` hay `.ps1` thủ công.
@@ -41,8 +41,9 @@ Windows: chạy lệnh trên trong Git Bash / WSL / Cygwin — script tự gọi
 Installer sẽ:
 1. Copy `ccswitch` + hook + **profile template** vào `~/.claude/`.
 2. Wire hook `SessionStart` (probe endpoint, cảnh báo nếu DOWN) — idempotent.
-3. Thêm alias/function `ccswitch` vào shell profile.
-4. **KHÔNG ghi đè** profile đã có key thật (chỉ copy template khi file thiếu).
+3. Set `settings.json` field `model` = `sonnet` **chỉ khi chưa có** (không ghi đè nếu bạn đã tự chọn model khác).
+4. Thêm alias/function `ccswitch` vào shell profile.
+5. **KHÔNG ghi đè** profile đã có key thật (chỉ copy template khi file thiếu).
 
 ### 1.2 Điền key (mỗi target 1 key riêng — chỉ điền cái bạn xài)
 
@@ -164,7 +165,7 @@ cp ~/.claude/settings.json.bak ~/.claude/settings.json
 
 ## Phần 2 — global Claude rules
 
-Copy 7 file rule cá nhân (cross-project — orchestrator, delegate-llm, budget, vault guard...) từ `rules/*.md` vào `~/.claude/rules/`, để mọi project mở Claude Code đều load cùng bộ convention.
+Copy 8 file rule cá nhân (cross-project — orchestrator, delegate-llm, budget, vault guard, secrets...) từ `rules/*.md` vào `~/.claude/rules/`, để mọi project mở Claude Code đều load cùng bộ convention.
 
 ### 2.1 Cài đặt
 
@@ -190,6 +191,7 @@ rules/
 ├── delegate-llm.md         # 3 delegate subagent (deepseek/gemini/codex/sonnet), anti-pattern
 ├── meta-2tier.md            # rule 2 tầng global vs project, cách thêm rule mới
 ├── vault-no-mcp.md          # cấm dùng MCP Notion connector cho vault chứa secret
+├── secrets-no-printout.md  # cấm in secret ra chat/output, cách redact đúng
 ├── feature-redflags.md      # safe minimal changes + bảng "red flags" rationalization
 ├── token-budget.md          # ngưỡng context cần compact/delegate
 └── rule-loading-policy.md   # always-load vs lazy (paths:) cho project rule
@@ -261,7 +263,7 @@ ccswitch-cli/
 │
 ├── install-claude-memory.sh     # Phần 2 — entry point, tự detect OS
 ├── setup-rules.sh / setup-rules.ps1  # Phần 2 — installer chạy bên dưới wrapper
-├── rules/*.md                    # Phần 2 — 7 rule cá nhân, copy nguyên văn
+├── rules/*.md                    # Phần 2 — 8 rule cá nhân, copy nguyên văn
 │
 ├── install-hooks.sh              # Phần 3 — cài git hook của repo này
 ├── git-hooks/pre-push             # Phần 3 — gitleaks scan trước push
