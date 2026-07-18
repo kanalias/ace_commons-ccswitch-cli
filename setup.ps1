@@ -29,42 +29,118 @@ Copy-Item (Join-Path $Src "ccswitch.ps1") (Join-Path $ClaudeDir "ccswitch.ps1") 
 Copy-Item (Join-Path $Src "hooks\check-router.sh") (Join-Path $Hooks "check-router.sh") -Force
 Write-Host "  ✓ ccswitch.ps1 + hooks\check-router.sh"
 
-# 2. profile template — copy ONLY if missing (never clobber a real key).
-# NOTE (.ps1 parity lag): this installer wires only the `claude` profile. The deepseek profile
-# is copied on macOS/Linux by setup.sh; on Windows, add it by hand (copy profiles\deepseek.json)
-# then `ccswitch set-key deepseek` (same 9router key as claude). TODO: loop $Order.
-$dst9 = Join-Path $Profiles "claude.json"
-if (Test-Path $dst9) {
-  Write-Host "  • profiles\claude.json exists — kept (edit manually or run: ccswitch set-key)"
-} else {
-  Copy-Item (Join-Path $Src "profiles\claude.json") $dst9 -Force
-  Write-Host "  ✓ profiles\claude.json (template — fill in your key)"
+# 2. profile templates — copy ONLY if missing (never clobber a real key).
+# 3 router profiles (claude, codex, deepseek), all via 9router, sharing ONE token.
+$ProfileTargets = @("claude", "codex", "deepseek")
+foreach ($t in $ProfileTargets) {
+  $dst = Join-Path $Profiles "$t.json"
+  if (Test-Path $dst) {
+    Write-Host "  • profiles\$t.json exists — kept (edit manually or run: ccswitch set-key $t)"
+  } else {
+    Copy-Item (Join-Path $Src "profiles\$t.json") $dst -Force
+    Write-Host "  ✓ profiles\$t.json (template — fill in your key)"
+  }
 }
 
-# 2b. prompt for the router key (interactive only — never echoed, never clobbers silently)
-$dst9 = Join-Path $Profiles "claude.json"
-if (-not [Environment]::UserInteractive) {
-  Write-Host "  • non-interactive session — skipped key prompt (edit profiles\claude.json manually)"
+# 2b. fill credentials into all 3 profiles (claude/codex/deepseek share ONE 9router token).
+# Preferred source: `.env.pro` next to this script (gitignored) holding `proxy_host=` +
+# `proxy_key=`. When both are present we ask ONCE — Enter / yes (default) writes host + key
+# into all three profiles; no falls back to the manual prompts (host, then key). Key values
+# are never echoed. Non-interactive: .env.pro is applied only while the profiles still hold
+# placeholders — a real key is never clobbered without a terminal to confirm.
+$EnvPro = Join-Path $Src ".env.pro"
+
+function Test-AnyRealKey {
+  foreach ($t in $ProfileTargets) {
+    $p = Get-Content (Join-Path $Profiles "$t.json") -Raw | ConvertFrom-Json
+    if ($p.ANTHROPIC_AUTH_TOKEN -and $p.ANTHROPIC_AUTH_TOKEN -notmatch '<your-9router-key>') { return $true }
+  }
+  return $false
+}
+
+function Get-EnvProValue([string]$name) {
+  foreach ($line in Get-Content $EnvPro) {
+    if ($line -match "^\s*$name\s*=\s*(.*)$") {
+      return $Matches[1].Trim().Trim('"').Trim("'")
+    }
+  }
+  return ""
+}
+
+function Set-AllProfiles([string]$url, [string]$key) {
+  $failed = $false
+  foreach ($t in $ProfileTargets) {
+    $dst = Join-Path $Profiles "$t.json"
+    Copy-Item $dst "$dst.bak" -Force
+    try {
+      $p = Get-Content $dst -Raw | ConvertFrom-Json
+      if ($url) { $p.ANTHROPIC_BASE_URL = $url }
+      if ($key) { $p.ANTHROPIC_AUTH_TOKEN = $key }
+      $p | ConvertTo-Json -Depth 10 | Set-Content $dst -Encoding UTF8
+    } catch {
+      Write-Host "  ❌ failed to write profiles\$t.json (profile unchanged)"
+      $failed = $true
+    }
+  }
+  return -not $failed
+}
+
+$envProHost = ""; $envProKey = ""
+if (Test-Path $EnvPro) {
+  $envProHost = Get-EnvProValue "proxy_host"
+  $envProKey  = Get-EnvProValue "proxy_key"
+}
+
+$useEnvPro = $false
+if ($envProHost -and $envProKey) {
+  if ([Environment]::UserInteractive) {
+    if (Test-AnyRealKey) { Write-Host "  • profiles already hold a key — answering Yes overwrites all three." }
+    $ans = Read-Host "  ▸ Use proxy_host + proxy_key from .env.pro for all profiles (claude/codex/deepseek)? [Y/n]"
+    if ($ans -notmatch '^(n|no)$') { $useEnvPro = $true }
+  } else {
+    if (Test-AnyRealKey) {
+      Write-Host "  • .env.pro found but profiles already hold a key — kept (overwrite: re-run interactively, or ccswitch set-key)"
+    } else {
+      $useEnvPro = $true
+      Write-Host "  • non-interactive session — using proxy_host + proxy_key from .env.pro (default Yes)"
+    }
+  }
+} elseif (Test-Path $EnvPro) {
+  Write-Host "  • .env.pro found but missing proxy_host/proxy_key — ignored"
+}
+
+if ($useEnvPro) {
+  if (Set-AllProfiles $envProHost $envProKey) {
+    Write-Host "  ✓ .env.pro proxy_host + proxy_key applied to profiles\{$($ProfileTargets -join ',')}.json"
+  }
+} elseif (-not [Environment]::UserInteractive) {
+  Write-Host "  • non-interactive session — skipped key prompt (edit profiles\*.json manually)"
 } else {
-  $p9  = Get-Content $dst9 -Raw | ConvertFrom-Json
-  $cur = $p9.ANTHROPIC_AUTH_TOKEN
+  $cur = (Get-Content (Join-Path $Profiles "claude.json") -Raw | ConvertFrom-Json).ANTHROPIC_BASE_URL
+  $host_ = Read-Host "  ▸ Router base URL [$cur] (Enter to keep)"
+  if ($host_) {
+    if (Set-AllProfiles $host_ "") { Write-Host "  ✓ base URL saved to profiles\{$($ProfileTargets -join ',')}.json" }
+  } else {
+    Write-Host "    kept current base URL."
+  }
+
+  $anyReal = Test-AnyRealKey
   $ask = $true
-  if ($cur -and $cur -notmatch '<your-9router-key>') {
-    $ans = Read-Host "  • profiles\claude.json already holds a key. Overwrite? [y/N]"
-    if ($ans -notmatch '^(y|yes)$') { Write-Host "    kept existing key."; $ask = $false }
+  if ($anyReal) {
+    $ans = Read-Host "  • one or more profiles already hold a key. Overwrite all with a new shared key? [y/N]"
+    if ($ans -notmatch '^(y|yes)$') { Write-Host "    kept existing keys."; $ask = $false }
   }
   if ($ask) {
-    $secure = Read-Host "  ▸ Paste your router key (input hidden, Enter to skip)" -AsSecureString
+    $secure = Read-Host "  ▸ Paste the shared 9router key (input hidden, Enter to skip)" -AsSecureString
     $bstr   = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
     $key    = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
     [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
     if ([string]::IsNullOrEmpty($key)) {
-      Write-Host "    no key entered — kept placeholder (edit profiles\claude.json later)."
+      Write-Host "    no key entered — kept placeholders (edit profiles\*.json later)."
     } else {
-      Copy-Item $dst9 "$dst9.bak" -Force
-      $p9.ANTHROPIC_AUTH_TOKEN = $key
-      $p9 | ConvertTo-Json -Depth 10 | Set-Content $dst9 -Encoding UTF8
-      Write-Host "  ✓ router key saved to profiles\claude.json"
+      if (Set-AllProfiles "" $key) {
+        Write-Host "  ✓ shared router key saved to profiles\{$($ProfileTargets -join ',')}.json"
+      }
     }
     $key = $null
   }
@@ -118,8 +194,8 @@ if (-not (Select-String -Path $psProfile -SimpleMatch "function ccswitch" -Quiet
 
 # 4b. parallel-launcher functions — one per target. Each spawns a SEPARATE Claude Code
 #     instance pinned to that vendor via process env. Run N in N terminals = N vendors in parallel.
-$short = @{ claude = "cc"; deepseek = "ds" }
-foreach ($t in @("claude", "deepseek")) {
+$short = @{ claude = "cc"; codex = "cx"; deepseek = "ds" }
+foreach ($t in @("claude", "codex", "deepseek")) {
   $fn = "claude-$($short[$t])"
   $line = "function $fn { & powershell -ExecutionPolicy Bypass -File `"`$env:USERPROFILE\.claude\ccswitch.ps1`" spawn $t @args }"
   if (-not (Select-String -Path $psProfile -SimpleMatch "function $fn " -Quiet)) {
@@ -132,7 +208,7 @@ foreach ($t in @("claude", "deepseek")) {
 
 Write-Host ""
 Write-Host "✅ Installed. Next steps:" -ForegroundColor Green
-Write-Host "   1. (if you skipped the prompt) Fill your key:  notepad `$env:USERPROFILE\.claude\profiles\claude.json"
+Write-Host "   1. (if you skipped the prompt) Fill a key:  ccswitch set-key <claude|codex|deepseek>  (same 9router key for all three)"
 Write-Host "   2. Reload profile:  . `$PROFILE   then run: ccswitch claude"
 Write-Host "   3. Restart Claude Code (quit + reopen) to load the new env."
 Write-Host "   4. Parallel:  open 3 terminals -> claude-cc / claude-cx / claude-ds (shared 9router quota)"

@@ -7,12 +7,12 @@
 
   Targets (priority order):
     claude        (DEFAULT)  https://9router.acegalaxy.co/v1  cc/* claude   — Claude via 9router
+    codex                    (same base)                      cx/* gpt      — Codex/GPT via 9router
     deepseek                 (same base)                      ds/* deepseek — DeepSeek via 9router
     subscription             (no env block)                   — Claude Code OAuth login (safe-harbor)
 
-  claude / deepseek share the SAME base URL (9router); they differ only in the model prefix
-  (cc/ vs ds/) and SHARE ONE 9router key (fill the same token into both). One router → one fallback: subscription.
-  (codex/gpt via cx/* removed: 9router returns raw OpenAI wire format for cx/*, unparseable by Claude Code.)
+  claude / codex / deepseek share the SAME base URL (9router); they differ only in the model prefix
+  (cc/ vs cx/ vs ds/) and SHARE ONE 9router key (fill the same token into all three). One router → one fallback: subscription.
 
   `subscription` is NOT a profile file: it removes the env block so Claude Code falls back to its
   own OAuth subscription login. No key, never probed — the guaranteed terminal.
@@ -21,6 +21,7 @@
 .EXAMPLE
   ccswitch                # show current target + router-family health + subscription note
   ccswitch claude         # Claude via 9router (default)
+  ccswitch codex          # Codex/GPT via 9router (cx/* models)
   ccswitch deepseek       # DeepSeek via 9router (ds/* models)
   ccswitch subscription   # remove env block -> Claude Code OAuth subscription
   ccswitch spawn <target> # launch a separate instance pinned to <target> via process env
@@ -28,6 +29,8 @@
   ccswitch check          # probe router health (all profiles)
   ccswitch fallback       # active router profile if healthy, else fall back to subscription
   ccswitch set-key [p]    # prompt (hidden) for a new key for profile p (default claude), then apply
+  ccswitch update [src]   # sync host+key from profile src (default claude) into the others,
+                          #   asking [y/N] before overwriting each target profile
 #>
 [CmdletBinding()]
 param(
@@ -41,7 +44,7 @@ $ErrorActionPreference = "Stop"
 $ClaudeDir = Join-Path $env:USERPROFILE ".claude"
 $Settings  = Join-Path $ClaudeDir "settings.json"
 $Profiles  = Join-Path $ClaudeDir "profiles"
-$Order     = @("claude", "deepseek")   # profile files (share one 9router key); subscription is env-clear
+$Order     = @("claude", "codex", "deepseek")   # profile files (share one 9router key); subscription is env-clear
 
 function Die($msg) { Write-Host "❌ $msg" -ForegroundColor Red; exit 1 }
 
@@ -80,11 +83,12 @@ function Test-Profile($name) {
   }
 }
 
-# claude / deepseek share one base URL (9router) → tell them apart by model prefix.
+# claude / codex / deepseek share one base URL (9router) → tell them apart by model prefix.
 function Get-Tag($base, $model) {
   if (-not $base) { return "subscription" }
   if ($base -like "*9router.acegalaxy.co*") {
     switch -Wildcard ($model) {
+      "cx/*"  { return "codex" }
       "ds/*"  { return "deepseek" }
       "cc/*"  { return "claude" }
       default { return "claude" }
@@ -175,6 +179,41 @@ function Set-ProfileKey($rawName) {
   Set-ProfileEnv $name
 }
 
+# update [src] — sync ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN from profile `src` (default claude)
+# into every other profile in $Order. Only these two fields are copied — the model-prefix fields
+# stay untouched, since that's what makes claude/codex/deepseek distinct despite sharing one
+# host+token. Asks [y/N] before overwriting each target profile.
+function Update-Profiles($rawSrc) {
+  $src = Get-Canon $rawSrc
+  if ($src -eq "subscription") { Die "subscription has no host/key to copy from." }
+  $srcProf = Join-Path $Profiles "$src.json"
+  if (-not (Test-Path $srcProf)) { Die "profile not found: $srcProf" }
+  try { $srcObj = Get-Content $srcProf -Raw | ConvertFrom-Json } catch { Die "profile $srcProf is not valid JSON" }
+
+  $base = $srcObj.ANTHROPIC_BASE_URL
+  $tok  = $srcObj.ANTHROPIC_AUTH_TOKEN
+  if (-not $base) { Die "profile $srcProf has no ANTHROPIC_BASE_URL to copy." }
+  if (-not $tok)  { Die "profile $srcProf has no ANTHROPIC_AUTH_TOKEN to copy." }
+
+  $updated = 0
+  foreach ($p in $Order) {
+    if ($p -eq $src) { continue }
+    $dst = Join-Path $Profiles "$p.json"
+    if (-not (Test-Path $dst)) { Write-Host "  • profiles\$p.json not found — skipped"; continue }
+    $ans = Read-Host "  overwrite host+key in profiles\$p.json from '$src'? [y/N]"
+    if ($ans -notmatch '^(y|yes)$') { Write-Host "    skipped $p."; continue }
+    Copy-Item $dst "$dst.bak" -Force
+    $dstObj = Get-Content $dst -Raw | ConvertFrom-Json
+    $dstObj.ANTHROPIC_BASE_URL = $base
+    $dstObj.ANTHROPIC_AUTH_TOKEN = $tok
+    $dstObj | ConvertTo-Json -Depth 10 | Set-Content $dst -Encoding UTF8
+    $updated++
+    Write-Host "  ✓ profiles\$p.json synced from '$src' (backup: $dst.bak)"
+  }
+  if ($updated -eq 0) { Write-Host "no profiles updated."; return }
+  Write-Host "✅ synced host+key from '$src' into $updated profile(s)." -ForegroundColor Green
+}
+
 # spawn <target> [claude-args…] — launch a SEPARATE Claude Code instance pinned to <target> via
 # PROCESS ENV, leaving settings.json untouched. Open N terminals + spawn N targets = N vendors in
 # parallel (a single instance reads one env → one model). subscription is env-clear → rejected.
@@ -182,7 +221,7 @@ function Set-ProfileKey($rawName) {
 function Spawn-Target($rawName, $childArgs) {
   $name = Get-Canon $rawName
   if ($name -eq "subscription") {
-    Die "spawn needs a real router target (claude|deepseek). subscription is env-clear — run: ccswitch subscription, then plain 'claude'."
+    Die "spawn needs a real router target (claude|codex|deepseek). subscription is env-clear — run: ccswitch subscription, then plain 'claude'."
   }
   $prof = Join-Path $Profiles "$name.json"
   if (-not (Test-Path $prof)) { Die "profile not found: $prof (run setup first)" }
@@ -202,8 +241,8 @@ function Spawn-Target($rawName, $childArgs) {
 }
 
 switch ($Command) {
-  { $_ -in @("claude", "deepseek") } {
-    # both route through 9router (differ only by model prefix) and share one token.
+  { $_ -in @("claude", "codex", "deepseek") } {
+    # all route through 9router (differ only by model prefix) and share one token.
     $c = Test-Profile $Command
     if ($c -ne "200") { Write-Host "⚠️  '$Command' health=$c (not 200) — switching anyway, may be down" -ForegroundColor Yellow }
     Set-ProfileEnv $Command
@@ -219,6 +258,7 @@ switch ($Command) {
     # `subscription` is the guaranteed SAFE-HARBOR terminal — env-clear OAuth, always reachable.
     $s = Get-Content $Settings -Raw | ConvertFrom-Json
     $t = switch -Wildcard ($s.env.ANTHROPIC_DEFAULT_OPUS_MODEL) {
+      "cx/*"  { "codex" }
       "ds/*"  { "deepseek" }
       "cc/*"  { "claude" }
       default { "claude" }
@@ -239,6 +279,10 @@ switch ($Command) {
     $prof = if ($Rest.Count -ge 1) { $Rest[0] } else { "claude" }
     Set-ProfileKey $prof
   }
+  "update" {
+    $src = if ($Rest.Count -ge 1) { $Rest[0] } else { "claude" }
+    Update-Profiles $src
+  }
   { $_ -in @("status", "") } {
     Show-Current
     Show-Health
@@ -254,12 +298,13 @@ USAGE
 
 TARGETS (switch-in-place; RESTART Claude Code after — env loads at launch)
   claude              Claude via 9router          (cc/* models)   ⭐ default
+  codex               Codex/GPT via 9router       (cx/* models)
   deepseek            DeepSeek via 9router         (ds/* models)
   subscription        remove env block → Claude Code OAuth login  (safe-harbor, no key)
                       aliases: original | direct | clear
 
-  claude + deepseek share ONE 9router base URL AND ONE token
-  (fill the same key into both profiles). Router down → both down → subscription.
+  claude + codex + deepseek share ONE 9router base URL AND ONE token
+  (fill the same key into all three profiles). Router down → all down → subscription.
 
 COMMANDS
   status  (default)   show active target (by model prefix) + health + subscription
@@ -267,13 +312,16 @@ COMMANDS
   fallback            keep active router if healthy, else drop to subscription
   spawn <target> [..] launch a SEPARATE pinned instance (settings.json untouched)
   set-key [profile]   paste a key (hidden) into a profile, then apply  (default: claude)
+  update [src]        sync host+key from profile src into the others  (default: claude)
+                      asks [y/N] before overwriting each target profile
   help | -h           this help
 
 KEYS
-  ccswitch set-key claude       # then: set-key deepseek with the SAME token
+  ccswitch set-key claude       # then: set-key codex, set-key deepseek with the SAME token
+  ccswitch update claude        # or just re-sync: copies claude's host+key into codex + deepseek
   profiles live at ~/.claude/profiles/*.json  (local, never committed)
 "@ | Write-Host
     exit 0
   }
-  default { Die "usage: ccswitch [claude|deepseek|subscription|spawn <target>|check|fallback|set-key [profile]|clear|status|help]" }
+  default { Die "usage: ccswitch [claude|codex|deepseek|subscription|spawn <target>|check|fallback|set-key [profile]|update [src]|clear|status|help]" }
 }

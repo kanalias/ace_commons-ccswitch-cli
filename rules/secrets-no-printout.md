@@ -1,3 +1,12 @@
+---
+name: secrets-no-printout
+description: P0 GLOBAL mọi turn — KHÔNG expose secret (API key/token/password/private key/connection string/cookie) ra chat/output/log; redact tại lệnh, phát hiện lộ → coi compromised + rotate
+status: live
+updated: 2026-07-18
+metadata:
+  type: reference
+---
+
 # Secrets — KHÔNG expose ra chat/output (cross-project, P0)
 
 ⭐⭐⭐ Áp dụng MỌI project, MỌI turn. Ngang [[vault-no-mcp]].

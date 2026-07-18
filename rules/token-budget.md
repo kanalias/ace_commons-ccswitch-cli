@@ -1,25 +1,26 @@
 ---
 name: token-budget
-description: Context window budget per-conversation — ngưỡng 195K cảnh báo trước khi Claude Code auto-compact (~200K) tự trigger
+description: Context window budget — auto-compact luôn bật, tự trigger khi context gần đầy (~200K), không cần compact tay
 status: live
-updated: 2026-07-16
+updated: 2026-07-18
 metadata:
   type: reference
 ---
 
 # Context Window Budget (P0, cross-project)
 
-Session %/Weekly % không có API đọc thật (chỉ ước lượng mơ hồ) nên bỏ, không track. Chỉ giữ context window vì đo được trực tiếp (độ dài conversation).
+Chỉ track context window (đo được trực tiếp qua độ dài conversation). Session %/Weekly % không đo được → bỏ.
 
-| Context | Mode |
-|---|---|
-| < 100K | Normal |
-| 100–195K | Cautious (ưu tiên đọc memory/reference vs re-read source) |
-| ≥ 195K | **Warning**: chủ động `/compact` HOẶC new session HOẶC delegate remaining — trước khi Claude Code auto-compact (~200K) tự trigger và mất control point chọn giữ gì |
-| > 300K | Critical: commit + report + HARD recommend /compact |
+**Auto-compact:** luôn bật mặc định, tự trigger khi context gần đầy (~200K) — KHÔNG phải trước mỗi task, và chỉ chạy giữa các turn (không cắt ngang task). Hệ thống tự quyết giữ gì. Không cần can thiệp thủ công.
 
-Empirical: quality degrade rõ > 200K (recall yếu, tool selection sai, repeat work). KHÔNG hard cutoff — silent degrade. Ngưỡng 195K canh sớm hơn auto-compact built-in (~200K) để chủ động chọn compact tay hoặc delegate phần còn lại thay vì bị tool tự cắt.
+| Context | Hành động |
+| --- | --- |
+| < 100K | Bình thường |
+| ≥ 100K | Hạn chế re-read source; ưu tiên memory/reference; phần việc lớn còn lại → delegate hoặc new session |
+| ~200K | Auto-compact tự chạy — không cần làm gì |
 
-Size-S (4 case Opus tự làm) và routing S/M/L: xem [[orchestrator]] — không lặp lại ở đây.
+Quality degrade rõ khi context gần đầy (recall yếu, chọn sai tool, lặp việc) — degrade âm thầm, không hard cutoff. Vì vậy vẫn giữ discipline ở ≥ 100K thay vì dựa hoàn toàn vào auto-compact.
 
-> **Project-specific:** repo có thể extend file này (hook enforcement, env var check). Xem `.claude/rules/token-budget-<project>.md` nếu có.
+Routing S/M/L: xem [[orchestrator]].
+
+> **Project-specific:** extend qua `.claude/rules/token-budget-<project>.md` nếu có.

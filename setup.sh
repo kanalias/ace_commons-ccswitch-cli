@@ -24,9 +24,9 @@ chmod +x "$CLAUDE_DIR/ccswitch.sh" "$HOOKS/check-router.sh"
 echo "  ✓ ccswitch.sh + hooks/check-router.sh"
 
 # 2. profile templates — copy ONLY if missing (never clobber a real key).
-# 2 router profiles (claude, deepseek), both via 9router, sharing ONE token (fill the same key into both).
+# 3 router profiles (claude, codex, deepseek), all via 9router, sharing ONE token (fill the same key into all three).
 # `subscription` is the env-clear fallback (no file, no key).
-PROFILE_TARGETS=(claude deepseek)
+PROFILE_TARGETS=(claude codex deepseek)
 for p in "${PROFILE_TARGETS[@]}"; do
   if [ -f "$PROFILES/$p.json" ]; then
     echo "  • profiles/$p.json exists — kept (edit manually or run: ccswitch set-key $p)"
@@ -36,39 +36,121 @@ for p in "${PROFILE_TARGETS[@]}"; do
   fi
 done
 
-# 2b. prompt for each target's key (interactive only — never echoed, never clobbers silently).
-# Each target is INDEPENDENT: a user who only uses one can skip the others with Enter.
-prompt_key() {
-  local target="$1" dst="$PROFILES/$1.json"
-  local cur
-  cur=$(jq -r '.ANTHROPIC_AUTH_TOKEN // empty' "$dst" 2>/dev/null || true)
+# 2b. fill credentials into all 3 profiles (claude/codex/deepseek share ONE 9router token).
+# Preferred source: `.env.pro` next to this script (gitignored) holding `proxy_host=` +
+# `proxy_key=`. When both are present we ask ONCE — Enter / yes (default) writes host + key
+# into all three profiles; no falls back to the manual prompts (host, then key). Key values
+# are never echoed. Non-interactive: .env.pro is applied only while the profiles still hold
+# placeholders — a real key is never clobbered without a terminal to confirm.
+ENV_PRO="$SRC/.env.pro"
 
-  # A real key = non-empty and not the placeholder. Ask to overwrite; default No.
-  if [ -n "$cur" ] && ! printf '%s' "$cur" | grep -q '<your-9router-key>'; then
-    printf "  • profiles/%s.json already holds a key. Overwrite? [y/N] " "$target"
+env_pro_val() {  # env_pro_val <name> — first `name=value` line; strips CR + optional quotes
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$ENV_PRO" 2>/dev/null \
+    | head -n1 | tr -d '\r' | sed -e 's/^["'\'']//' -e 's/["'\'']$//'
+}
+
+any_real_key() {  # true if any profile already holds a non-placeholder token
+  local target cur
+  for target in "${PROFILE_TARGETS[@]}"; do
+    cur=$(jq -r '.ANTHROPIC_AUTH_TOKEN // empty' "$PROFILES/$target.json" 2>/dev/null || true)
+    if [ -n "$cur" ] && ! printf '%s' "$cur" | grep -q '<your-9router-key>'; then return 0; fi
+  done
+  return 1
+}
+
+apply_env_pro() {  # write proxy_host + proxy_key from .env.pro into all 3 profiles
+  local failed=0 target dst
+  for target in "${PROFILE_TARGETS[@]}"; do
+    dst="$PROFILES/$target.json"
+    cp "$dst" "$dst.bak" 2>/dev/null || true
+    jq --arg u "$ENV_PRO_HOST" --arg k "$ENV_PRO_KEY" \
+      '.ANTHROPIC_BASE_URL = $u | .ANTHROPIC_AUTH_TOKEN = $k' "$dst" > "$dst.tmp" \
+      && mv "$dst.tmp" "$dst" \
+      || { echo "  ❌ failed to write .env.pro values to profiles/$target.json (profile unchanged)"; rm -f "$dst.tmp"; failed=1; }
+  done
+  [ "$failed" -eq 0 ] && echo "  ✓ .env.pro proxy_host + proxy_key applied to profiles/{$(IFS=,; echo "${PROFILE_TARGETS[*]}")}.json"
+}
+
+prompt_host() {  # manual base-URL prompt — Enter keeps whatever the profiles already have
+  local cur host failed=0 target dst
+  cur=$(jq -r '.ANTHROPIC_BASE_URL // empty' "$PROFILES/claude.json" 2>/dev/null || true)
+  printf "  ▸ Router base URL [%s] (Enter to keep): " "${cur:-none}"
+  read -r host
+  if [ -z "$host" ]; then echo "    kept current base URL."; return; fi
+  for target in "${PROFILE_TARGETS[@]}"; do
+    dst="$PROFILES/$target.json"
+    cp "$dst" "$dst.bak" 2>/dev/null || true
+    jq --arg u "$host" '.ANTHROPIC_BASE_URL = $u' "$dst" > "$dst.tmp" \
+      && mv "$dst.tmp" "$dst" \
+      || { echo "  ❌ failed to write base URL to profiles/$target.json (profile unchanged)"; rm -f "$dst.tmp"; failed=1; }
+  done
+  [ "$failed" -eq 0 ] && echo "  ✓ base URL saved to profiles/{$(IFS=,; echo "${PROFILE_TARGETS[*]}")}.json"
+}
+
+prompt_shared_key() {
+  # A real key already exists somewhere. Ask to overwrite ALL THREE at once; default No.
+  if any_real_key; then
+    printf "  • one or more profiles already hold a key. Overwrite all with a new shared key? [y/N] "
     local ans; read -r ans
-    case "$ans" in y|Y|yes|YES) ;; *) echo "    kept existing key."; return ;; esac
+    case "$ans" in y|Y|yes|YES) ;; *) echo "    kept existing keys."; return ;; esac
   fi
 
   local key
-  printf "  ▸ Paste key for '%s' (input hidden, Enter to skip): " "$target"
+  printf "  ▸ Paste the shared 9router key (input hidden, Enter to skip): "
   read -rs key; echo
-  [ -n "$key" ] || { echo "    skipped — kept placeholder (fill later: ccswitch set-key $target)."; return; }
+  if [ -z "$key" ]; then
+    echo "    skipped — kept placeholders (fill later: ccswitch set-key <target>)."
+    return
+  fi
 
-  cp "$dst" "$dst.bak" 2>/dev/null || true
-  jq --arg k "$key" '.ANTHROPIC_AUTH_TOKEN = $k' "$dst" > "$dst.tmp" \
-    && mv "$dst.tmp" "$dst" \
-    && echo "  ✓ key saved to profiles/$target.json" \
-    || { echo "  ❌ failed to write key (profile unchanged)"; rm -f "$dst.tmp"; }
+  local failed=0
+  for target in "${PROFILE_TARGETS[@]}"; do
+    local dst="$PROFILES/$target.json"
+    cp "$dst" "$dst.bak" 2>/dev/null || true
+    jq --arg k "$key" '.ANTHROPIC_AUTH_TOKEN = $k' "$dst" > "$dst.tmp" \
+      && mv "$dst.tmp" "$dst" \
+      || { echo "  ❌ failed to write key to profiles/$target.json (profile unchanged)"; rm -f "$dst.tmp"; failed=1; }
+  done
   unset key
+  [ "$failed" -eq 0 ] && echo "  ✓ shared key saved to profiles/{$(IFS=,; echo "${PROFILE_TARGETS[*]}")}.json"
 }
-if [ -t 0 ]; then
-  echo "  ── enter tokens (each independent — Enter to skip a target you don't use) ──"
-  for p in "${PROFILE_TARGETS[@]}"; do prompt_key "$p"; done
+
+ENV_PRO_HOST=""; ENV_PRO_KEY=""
+if [ -f "$ENV_PRO" ]; then
+  ENV_PRO_HOST=$(env_pro_val proxy_host)
+  ENV_PRO_KEY=$(env_pro_val proxy_key)
+fi
+
+USE_ENV_PRO=0
+if [ -n "$ENV_PRO_HOST" ] && [ -n "$ENV_PRO_KEY" ]; then
+  if [ -t 0 ]; then
+    any_real_key && echo "  • profiles already hold a key — answering Yes overwrites all three."
+    printf "  ▸ Use proxy_host + proxy_key from .env.pro for all profiles (claude/codex/deepseek)? [Y/n] "
+    read -r ans
+    case "$ans" in n|N|no|NO) ;; *) USE_ENV_PRO=1 ;; esac
+  else
+    if any_real_key; then
+      echo "  • .env.pro found but profiles already hold a key — kept (overwrite: re-run in a terminal, or ccswitch set-key)"
+    else
+      USE_ENV_PRO=1
+      echo "  • non-interactive shell — using proxy_host + proxy_key from .env.pro (default Yes)"
+    fi
+  fi
+elif [ -f "$ENV_PRO" ]; then
+  echo "  • .env.pro found but missing proxy_host/proxy_key — ignored"
+fi
+
+if [ "$USE_ENV_PRO" -eq 1 ]; then
+  apply_env_pro
+elif [ -t 0 ]; then
+  echo "  ── enter router base URL + one shared key for claude+codex+deepseek ──"
+  prompt_host
+  prompt_shared_key
 else
   # non-interactive (piped install / CI) — keep template placeholders.
-  echo "  • non-interactive shell — skipped key prompts (fill later: ccswitch set-key <target>)"
+  echo "  • non-interactive shell — skipped key prompt (fill later: ccswitch set-key <target>)"
 fi
+unset ENV_PRO_KEY
 
 # 3. ensure settings.json exists + wire SessionStart hook idempotently
 SETTINGS="$CLAUDE_DIR/settings.json"
@@ -116,7 +198,7 @@ fi
 #     instance pinned to that vendor via process env. Open N terminals + run N of these
 #     = N vendors in parallel (single-instance switch can only hold one at a time).
 # (bash 3.2 compat — macOS ships old bash; no associative arrays)
-for pair in claude:cc deepseek:ds; do
+for pair in claude:cc codex:cx deepseek:ds; do
   t=${pair%%:*}; short=${pair##*:}
   spawn_line="alias claude-${short}='bash ~/.claude/ccswitch.sh spawn ${t}'"
   if ! grep -qF "$spawn_line" "$SHELL_RC" 2>/dev/null; then
@@ -129,8 +211,8 @@ done
 
 echo
 echo "✅ Installed. Next steps:"
-echo "   1. (if you skipped a prompt) Fill a key:  ccswitch set-key <claude|deepseek>  (same 9router key for both)"
-echo "   2. Activate:        source $SHELL_RC && ccswitch claude   (or: deepseek)"
+echo "   1. (if you skipped the prompt) Fill a key:  ccswitch set-key <claude|codex|deepseek>  (same 9router key for all three)"
+echo "   2. Activate:        source $SHELL_RC && ccswitch claude   (or: codex / deepseek)"
 echo "   3. Restart Claude Code (quit + reopen) to load the new env."
 echo "   4. Parallel:        open 3 terminals → claude-cc / claude-cx / claude-ds"
-echo "                       (2 vendors at once — same 9router account = shared quota)"
+echo "                       (3 vendors at once — same 9router account = shared quota)"

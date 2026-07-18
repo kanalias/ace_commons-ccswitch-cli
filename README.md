@@ -3,7 +3,7 @@
 Repo này gồm 3 phần độc lập, cài theo thứ tự:
 
 1. **[`install-9router-proxy.sh`](#phần-1--ccswitch-endpoint-switcher)** — `ccswitch` CLI, đổi endpoint auth của Claude Code (9router / subscription).
-2. **[`install-claude-memory.sh`](#phần-2--global-claude-rules)** — copy 8 rule cá nhân (cross-project) vào `~/.claude/rules/`.
+2. **[`install-claude-memory.sh`](#phần-2--global-claude-rules)** — copy 7 rule cá nhân (cross-project) vào `~/.claude/rules/`.
 3. **[`install-hooks.sh`](#phần-3--git-hooks--push-to-github)** — git hook pre-push (gitleaks scan) cho *repo này*.
 
 Mỗi phần tự detect OS (macOS/Linux chạy bash trực tiếp; Windows qua Git Bash/WSL/Cygwin tự gọi PowerShell) — không cần chọn `.sh` hay `.ps1` thủ công.
@@ -17,12 +17,12 @@ Mỗi phần tự detect OS (macOS/Linux chạy bash trực tiếp; Windows qua 
 | Target | Cơ chế | Vai trò |
 |---|---|---|
 | **`claude`** | `env` = 9router + model `cc/*` (claude) | ⭐ **DEFAULT** — Claude qua 9router |
+| `codex` | 9router + model `cx/*` | Codex/GPT qua 9router |
 | `deepseek` | 9router + model `ds/*` | DeepSeek qua 9router |
 | `subscription` | **gỡ block `env`** | Safe-harbor fallback — Claude Code dùng OAuth subscription login (không cần key) |
 
-> `claude` / `deepseek` **chung 1 base URL** `https://9router.acegalaxy.co/v1` **và chung 1 key** (điền cùng 1 token 9router vào cả 2 profile); khác nhau **chỉ ở model prefix** (`cc/` vs `ds/`).
+> `claude` / `codex` / `deepseek` **chung 1 base URL** `https://9router.acegalaxy.co/v1` **và chung 1 key** (điền cùng 1 token 9router vào cả 3 profile); khác nhau **chỉ ở model prefix** (`cc/` vs `cx/` vs `ds/`).
 >
-> *(Đã bỏ `codex`/GPT (`cx/*`): 9router trả raw OpenAI wire format cho `cx/*`, Claude Code không parse được. Thêm lại khi 9router có lớp dịch sang Anthropic format.)*
 > `subscription` KHÔNG phải profile file: nó xóa block `env` để Claude Code quay về OAuth login gốc.
 > Alias tương thích ngược: `original` / `direct` / `clear` → `subscription`.
 
@@ -45,13 +45,29 @@ Installer sẽ:
 4. Thêm alias/function `ccswitch` vào shell profile.
 5. **KHÔNG ghi đè** profile đã có key thật (chỉ copy template khi file thiếu).
 
-### 1.2 Điền key (mỗi target 1 key riêng — chỉ điền cái bạn xài)
+### 1.2 Điền key (1 key dùng chung cho cả 3 profile)
 
-`setup.sh` (chạy qua wrapper ở trên) hỏi key từng target (Enter để bỏ qua cái không dùng). Hoặc điền sau:
+**Cách nhanh nhất — `.env.pro`:** tạo file `.env.pro` (gitignored) ở gốc repo, cạnh `setup.sh`:
 
 ```bash
-# mac/linux — nhập ẩn rồi apply luôn. claude + deepseek dùng CÙNG 1 key 9router.
+proxy_host=https://9router.acegalaxy.co/v1
+proxy_key=<your-9router-key>
+```
+
+(mẫu có sẵn ở `.env.example`). Khi `setup.sh`/`setup.ps1` chạy và thấy file này có đủ cả 2 biến, nó hỏi:
+
+```text
+▸ Use proxy_host + proxy_key from .env.pro for all profiles (claude/codex/deepseek)? [Y/n]
+```
+
+**Enter (hoặc `y`) = mặc định Yes** → ghi thẳng `proxy_host` + `proxy_key` vào cả 3 file (`claude.json` / `codex.json` / `deepseek.json`). Trả lời `n` → rơi về flow nhập tay như cũ (hỏi base URL rồi hỏi key, từng cái). Chạy non-interactive (piped install, CI) cũng áp dụng mặc định Yes — **trừ khi** một profile đã có key thật (khi đó `.env.pro` bị bỏ qua để không ghi đè âm thầm, cần chạy lại trong terminal thật hoặc dùng `set-key`).
+
+Không có `.env.pro`, hoặc thiếu 1 trong 2 biến → bỏ qua bước này, dùng flow nhập tay:
+
+```bash
+# mac/linux — nhập ẩn rồi apply luôn. claude + codex + deepseek dùng CÙNG 1 key 9router.
 ccswitch set-key claude       # key cho Claude qua 9router
+ccswitch set-key codex        # Codex/GPT qua 9router — điền cùng token với claude
 ccswitch set-key deepseek     # DeepSeek qua 9router — điền cùng token với claude
 ```
 
@@ -64,19 +80,28 @@ $EDITOR ~/.claude/profiles/deepseek.json     # thay <your-9router-key>
 notepad $env:USERPROFILE\.claude\profiles\deepseek.json
 ```
 
-> 🔑 Xin key từ lead. `claude` + `deepseek` **chung 1 token** (điền giống nhau vào cả 2 file). **Không commit key** — file `~/.claude/profiles/*.json` là local, không đẩy git.
+> 🔑 Xin key từ lead. `claude` + `codex` + `deepseek` **chung 1 token** (điền giống nhau vào cả 3 file). **Không commit key** — `~/.claude/profiles/*.json` và `.env.pro` đều local, không đẩy git.
+
+Đã đổi key/host của `claude` và muốn đồng bộ lại `codex`/`deepseek` cho khớp (không phải setup lần đầu)? Dùng `update`:
+
+```bash
+ccswitch update claude    # copy ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN từ claude.json sang codex.json + deepseek.json
+                           # hỏi [y/N] trước khi ghi đè từng file — model prefix (cc/cx/ds) giữ nguyên
+```
 
 ### 1.3 Dùng
 
 ```bash
 ccswitch                # xem target đang active (theo model prefix) + health + subscription note
 ccswitch claude         # → Claude qua 9router (default)
+ccswitch codex          # → Codex/GPT qua 9router
 ccswitch deepseek       # → DeepSeek qua 9router
 ccswitch subscription   # → gỡ env block, dùng OAuth subscription login
 ccswitch spawn <target> # → mở 1 instance RIÊNG ghim target đó (settings.json không đổi)
-ccswitch check          # probe health cả 2 profile + verify subscription OAuth
+ccswitch check          # probe health cả 3 profile + verify subscription OAuth
 ccswitch fallback       # giữ target đang active nếu router healthy; router chết → subscription
 ccswitch set-key [t]    # nhập key mới (ẩn) cho target t (default claude) rồi apply
+ccswitch update [src]   # đồng bộ host+key từ profile src (default claude) sang các profile còn lại — hỏi [y/N] từng cái
 ccswitch clear          # alias của subscription (gỡ block env)
 ccswitch help           # (hoặc -h) in bảng lệnh + target đầy đủ
 ```
@@ -99,24 +124,26 @@ Ví dụ output `ccswitch`:
 ▶ ③ settings.json  →  claude (https://9router.acegalaxy.co/v1, cc/claude-opus-4-8)
 ── các tầng khác ──
   claude: 200 OK
+  codex: 200 OK
   deepseek: 200 OK
   subscription: ✓ logged in (you@acegalaxy.co, max) [keychain] → safe-harbor OK
-profiles: claude deepseek
+profiles: claude codex deepseek
 ```
 
 #### Chạy nhiều vendor SONG SONG
 
-`ccswitch <target>` chỉ đổi **1 instance** — 1 process Claude Code đọc 1 block `env` → 1 model. Muốn **cả 2 vendor cùng active** thì cần **2 process riêng**. Dùng `spawn` (hoặc 2 alias `setup` tạo sẵn):
+`ccswitch <target>` chỉ đổi **1 instance** — 1 process Claude Code đọc 1 block `env` → 1 model. Muốn **nhiều vendor cùng active** thì cần **nhiều process riêng**. Dùng `spawn` (hoặc 3 alias `setup` tạo sẵn):
 
 ```
-# mỗi lệnh trong 1 terminal riêng → 2 vendor chạy đồng thời
+# mỗi lệnh trong 1 terminal riêng → 3 vendor chạy đồng thời
 claude-cc      # = ccswitch spawn claude    → Claude (cc/*)
+claude-cx      # = ccswitch spawn codex     → Codex/GPT (cx/*)
 claude-ds      # = ccswitch spawn deepseek  → DeepSeek (ds/*)
 ```
 
 `spawn` export model vào **process env** (tầng ① — thắng mọi settings file) rồi gọi `claude`, nên **KHÔNG đụng `settings.json`** — target đang switch-in-place của bạn giữ nguyên. Không cần restart: mỗi instance sinh ra đã pin sẵn vendor.
 
-> ⚠️ **Quota chung.** 2 target cùng đi qua 1 account 9router (chung 1 key) → **share chung 1 quota**. Chạy 2 song song = đốt quota nhanh gấp ~2. Chung 1 token, KHÔNG tách quota (1 email = 1 quota); tách thật cần account 9router khác email.
+> ⚠️ **Quota chung.** Cả 3 target cùng đi qua 1 account 9router (chung 1 key) → **share chung 1 quota**. Chạy song song = đốt quota nhanh hơn tương ứng số instance. Chung 1 token, KHÔNG tách quota (1 email = 1 quota); tách thật cần account 9router khác email.
 >
 > `spawn subscription` bị từ chối — subscription là env-clear (gỡ block), không có gì để export. Muốn subscription thì `ccswitch subscription` rồi chạy `claude` thường.
 
@@ -127,6 +154,7 @@ Model qua 9router **phải** có prefix. Mỗi profile map sẵn 4 tier (Opus/So
 | Target | Prefix | Ví dụ (Opus tier) |
 |---|---|---|
 | `claude` | `cc/` (claude) | `cc/claude-opus-4-8` |
+| `codex` | `cx/` | `cx/gpt-5.6-sol` |
 | `deepseek` | `ds/` | `ds/deepseek-v4-pro-max` |
 
 Thiếu prefix → lỗi `model_not_found`. Xem model id đầy đủ trong `~/.claude/profiles/<target>.json`, hoặc list live: `curl -s https://9router.acegalaxy.co/v1/models -H "Authorization: Bearer <key>" | jq -r '.data[].id'`. (Ở `subscription` — không có env block — Claude Code tự dùng model mặc định của tài khoản, không cần prefix.)
@@ -141,7 +169,7 @@ curl -4 --resolve 9router.acegalaxy.co:443:172.66.43.28 https://9router.acegalax
 Nếu IPv4 trả `200` → endpoint OK, bỏ qua cảnh báo. Muốn dứt điểm: pin IPv4 vào `/etc/hosts`.
 
 **`No active credentials for provider` / `model_not_found`**
-Sai model id — thêm prefix đúng target (`cc/` claude, `ds/` deepseek — xem mục 1.4).
+Sai model id — thêm prefix đúng target (`cc/` claude, `cx/` codex, `ds/` deepseek — xem mục 1.4).
 
 **`API key required for remote API access`**
 Key trong profile là placeholder hoặc key local nhầm sang remote. Điền đúng key 9router.
@@ -165,7 +193,7 @@ cp ~/.claude/settings.json.bak ~/.claude/settings.json
 
 ## Phần 2 — global Claude rules
 
-Copy 8 file rule cá nhân (cross-project — orchestrator, delegate-llm, budget, vault guard, secrets...) từ `rules/*.md` vào `~/.claude/rules/`, để mọi project mở Claude Code đều load cùng bộ convention.
+Copy 7 file rule cá nhân (cross-project — orchestrator, delegate-llm, budget, vault guard, secrets...) từ `rules/*.md` vào `~/.claude/rules/`, để mọi project mở Claude Code đều load cùng bộ convention.
 
 ### 2.1 Cài đặt
 
@@ -175,7 +203,9 @@ bash install-claude-memory.sh
 
 Windows: chạy trong Git Bash / WSL / Cygwin — tự gọi `powershell.exe -File setup-rules.ps1`.
 
-Script hỏi `[y/N]`, trả lời `y` sẽ **copy và ghi đè** toàn bộ `rules/*.md` vào `~/.claude/rules/` — kể cả file đã tồn tại. Không có mode symlink (symlink trỏ ngược vào file trong repo là rủi ro rò rỉ nếu repo này từng bị share/fork cho người khác). Mỗi lần chạy lại = refresh toàn bộ rule về đúng bản trong repo.
+Script hỏi `[y/N]`, trả lời `y` sẽ **mirror toàn bộ thư mục**: ghi đè mọi `rules/*.md` vào `~/.claude/rules/` (kể cả file đã tồn tại), **và xoá** bất kỳ `*.md` nào ở `~/.claude/rules/` không còn tồn tại trong `rules/` của repo — kể cả file không phải do repo này tạo ra ban đầu. Không có mode symlink (symlink trỏ ngược vào file trong repo là rủi ro rò rỉ nếu repo này từng bị share/fork cho người khác). Mỗi lần chạy lại = đồng bộ `~/.claude/rules/` khớp chính xác với `rules/` trong repo.
+
+> ⚠️ Nếu `~/.claude/rules/` có rule khác không thuộc repo này (vd cài từ nguồn khác), mirror sẽ **xoá luôn** — kiểm tra output `✗ rules/<name>.md (removed — not in repo)` sau khi chạy.
 
 ### 2.2 Nội dung
 
@@ -183,7 +213,6 @@ Script hỏi `[y/N]`, trả lời `y` sẽ **copy và ghi đè** toàn bộ `rul
 rules/
 ├── orchestrator.md         # Opus giữ vai pure orchestrator, routing S/M/L/XL qua delegate
 ├── delegate-llm.md         # 3 delegate subagent (deepseek/gemini/codex/sonnet), anti-pattern
-├── meta-2tier.md            # rule 2 tầng global vs project, cách thêm rule mới
 ├── vault-no-mcp.md          # cấm dùng MCP Notion connector cho vault chứa secret
 ├── secrets-no-printout.md  # cấm in secret ra chat/output, cách redact đúng
 ├── feature-redflags.md      # safe minimal changes + bảng "red flags" rationalization
@@ -252,12 +281,13 @@ ccswitch-cli/
 ├── hooks/check-router.sh         # Phần 1 — SessionStart health probe
 ├── profiles/                     # Phần 1 — TEMPLATE (placeholder key, an toàn để commit)
 │   ├── claude.json                # claude cc/*
+│   ├── codex.json                 # codex cx/*  (same key as claude.json)
 │   └── deepseek.json              # deepseek ds/*  (same key as claude.json)
 │                                   # subscription không có file — nó là env-clear
 │
 ├── install-claude-memory.sh     # Phần 2 — entry point, tự detect OS
 ├── setup-rules.sh / setup-rules.ps1  # Phần 2 — installer chạy bên dưới wrapper
-├── rules/*.md                    # Phần 2 — 8 rule cá nhân, copy nguyên văn
+├── rules/*.md                    # Phần 2 — 7 rule cá nhân, copy nguyên văn
 │
 ├── install-hooks.sh              # Phần 3 — cài git hook của repo này
 ├── git-hooks/pre-push             # Phần 3 — gitleaks scan trước push

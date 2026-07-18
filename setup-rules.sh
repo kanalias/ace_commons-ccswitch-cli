@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Install global Claude Code rules (rules/*.md) into ~/.claude/rules/.
-# Always copies and overwrites — no symlinks (symlinking personal rules into a
-# repo-tracked path is a leak risk if the repo is ever shared/forked).
+# Mirrors the directory: always copies and overwrites, and removes any *.md in
+# the destination that no longer exists in rules/ (e.g. a rule deleted from
+# this repo). No symlinks — symlinking personal rules into a repo-tracked path
+# is a leak risk if the repo is ever shared/forked.
 # Run standalone: bash setup-rules.sh
 set -e
 
@@ -13,7 +15,7 @@ if [ ! -d "$SRC" ]; then
   exit 0
 fi
 
-printf "── copy global rules into %s/rules/ (overwrites existing)? [y/N]: " "$CLAUDE_DIR"
+printf "── mirror global rules into %s/rules/ (overwrites + removes anything not in rules/)? [y/N]: " "$CLAUDE_DIR"
 read -r ans || ans=""
 
 case "$ans" in
@@ -22,6 +24,16 @@ case "$ans" in
 esac
 
 mkdir -p "$CLAUDE_DIR/rules"
+
+for f in "$CLAUDE_DIR/rules"/*.md; do
+  [ -e "$f" ] || [ -L "$f" ] || continue
+  name="$(basename "$f")"
+  if [ ! -e "$SRC/$name" ]; then
+    rm -f "$f"
+    echo "  ✗ rules/$name (removed — not in repo)"
+  fi
+done
+
 for f in "$SRC"/*.md; do
   [ -e "$f" ] || continue
   name="$(basename "$f")"

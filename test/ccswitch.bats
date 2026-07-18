@@ -11,6 +11,7 @@ setup() {
   CC="$ROOT/ccswitch.sh"
   mkdir -p "$HOME/.claude/profiles"
   cp "$ROOT/profiles/claude.json" "$HOME/.claude/profiles/claude.json"
+  cp "$ROOT/profiles/codex.json" "$HOME/.claude/profiles/codex.json"
   cp "$ROOT/profiles/deepseek.json" "$HOME/.claude/profiles/deepseek.json"
   echo '{}' > "$HOME/.claude/settings.json"
 }
@@ -20,6 +21,13 @@ setup() {
   [ "$status" -eq 0 ]
   model=$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL' "$HOME/.claude/settings.json")
   [ "$model" = "cc/claude-opus-4-8" ]
+}
+
+@test "apply codex writes codex env block" {
+  run "$CC" codex
+  [ "$status" -eq 0 ]
+  model=$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL' "$HOME/.claude/settings.json")
+  [ "$model" = "cx/gpt-5.6-sol" ]
 }
 
 @test "apply deepseek writes deepseek env block" {
@@ -81,6 +89,62 @@ setup() {
   run "$CC" set-host
   [ "$status" -ne 0 ]
   [[ "$output" == *"usage:"* ]]
+}
+
+@test "update on subscription is rejected" {
+  run "$CC" update subscription
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no host/key to copy from"* ]]
+}
+
+@test "update requires an interactive terminal (no TTY under bats run)" {
+  run "$CC" update claude
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"interactive terminal"* ]]
+}
+
+@test "update syncs host+key from claude into codex+deepseek, preserving model prefixes (interactive pty)" {
+  command -v expect >/dev/null 2>&1 || skip "expect not installed"
+  jq '.ANTHROPIC_AUTH_TOKEN = "claude-real-key"' "$HOME/.claude/profiles/claude.json" > /tmp/claude.json.$$ \
+    && mv /tmp/claude.json.$$ "$HOME/.claude/profiles/claude.json"
+  run expect -c "
+    set timeout 10
+    spawn \"$CC\" update claude
+    expect \"overwrite host+key in profiles/codex.json*\"
+    send \"y\r\"
+    expect \"overwrite host+key in profiles/deepseek.json*\"
+    send \"y\r\"
+    expect eof
+  "
+  [ "$status" -eq 0 ]
+  codex_token=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/codex.json")
+  codex_model=$(jq -r '.ANTHROPIC_DEFAULT_OPUS_MODEL' "$HOME/.claude/profiles/codex.json")
+  ds_token=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/deepseek.json")
+  [ "$codex_token" = "claude-real-key" ]
+  [ "$codex_model" = "cx/gpt-5.6-sol" ]
+  [ "$ds_token" = "claude-real-key" ]
+}
+
+@test "update declining a target leaves that profile unchanged" {
+  command -v expect >/dev/null 2>&1 || skip "expect not installed"
+  jq '.ANTHROPIC_AUTH_TOKEN = "claude-real-key"' "$HOME/.claude/profiles/claude.json" > /tmp/claude.json.$$ \
+    && mv /tmp/claude.json.$$ "$HOME/.claude/profiles/claude.json"
+  jq '.ANTHROPIC_AUTH_TOKEN = "codex-existing"' "$HOME/.claude/profiles/codex.json" > /tmp/codex.json.$$ \
+    && mv /tmp/codex.json.$$ "$HOME/.claude/profiles/codex.json"
+  run expect -c "
+    set timeout 10
+    spawn \"$CC\" update claude
+    expect \"overwrite host+key in profiles/codex.json*\"
+    send \"N\r\"
+    expect \"overwrite host+key in profiles/deepseek.json*\"
+    send \"y\r\"
+    expect eof
+  "
+  [ "$status" -eq 0 ]
+  codex_token=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/codex.json")
+  ds_token=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/deepseek.json")
+  [ "$codex_token" = "codex-existing" ]
+  [ "$ds_token" = "claude-real-key" ]
 }
 
 @test "spawn on subscription is rejected" {

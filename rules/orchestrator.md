@@ -1,67 +1,63 @@
 ---
 name: orchestrator
-description: Opus main = pure orchestrator; phân rã S/M/L, delegate execution (L/XL→Sonnet, M→DeepSeek, read-only→Gemini, S→tự làm); Opus tự làm reasoning (architecture design, debug chẩn đoán, code review) nhưng KHÔNG tự code/edit L/XL
+description: Opus main = pure orchestrator; phân rã S/M/L, delegate execution (L/XL→Sonnet, M-mechanical→DeepSeek, read-only→Gemini, S→tự làm); Opus tự làm reasoning (architecture design, debug chẩn đoán, code review) nhưng KHÔNG tự code/edit L/XL
 status: live
-updated: 2026-07-16
+updated: 2026-07-18
 metadata:
   type: reference
 ---
 
 # Opus Orchestrator Mode (cross-project)
 
-Opus main (Claude Code) LUÔN giữ vai **pure orchestrator** — always-on, mọi task, bất kể quota %.
+Opus main (Claude Code) LUÔN giữ vai **pure orchestrator** — always-on mọi task, bất kể quota %. Lý do: delegate (Gemini/DeepSeek/Codex) dùng API key riêng → 0 token Claude; Opus chỉ phân rã + review nên tốn ít token hơn tự execute (không nuốt tool result dài vào context).
 
-Lý do always-on: delegate (Gemini/DeepSeek/Codex) dùng API key riêng → 0 token Claude. Opus chỉ phân rã + review = ít token hơn tự execute (không nuốt tool result dài vào context).
+Ranh giới cố định: **size-S** và **reasoning-only** → Opus tự làm; mọi execution còn lại → MUST delegate.
 
-Ranh giới cố định ở **size-S** + nhóm **reasoning-only**: hai loại này Opus tự làm; mọi execution còn lại → MUST delegate.
+**Chi phí:** Sonnet ăn quota Claude subscription; Gemini/DeepSeek/Codex chạy API riêng. Sonnet chỉ dùng cho L/XL hoặc last-resort fallback — không rải đều làm default.
 
-## Size-S (4 case, Opus làm trực tiếp)
+## Size-S — Opus làm trực tiếp (4 case)
 
 1. TodoWrite / planning
 2. 1-line edit + 0 read context (commit, push, rename, config tweak)
-3. Read file < 50 dòng, single file
+3. Read < 50 dòng, single file
 4. Synthesize delegate output → user report
 
-## Routing chuẩn (size + loại)
+## Routing (size + loại → delegate + fallback chain)
 
-| Size | Loại | Giao cho | Fallback |
+| Nhãn | Loại | Giao cho | Fallback (theo thứ tự, không quay vòng) |
 |---|---|---|---|
-| **S** | 4 case ở trên | **Opus main** | — |
-| **reasoning-only** | architecture design, debug chẩn đoán root cause, code review (KHÔNG kèm code/edit) | **Opus main** | — |
-| **M** | mechanical / boilerplate / batch edit | `delegate-deepseek` | `delegate-sonnet` |
-| **M/L** | read-only audit, cross-file summary, grep rộng, risk analysis | `delegate-gemini` | `delegate-deepseek` |
-| **L/XL** | code/edit thật: algo implement, refactor subtle invariant, fix bug sau khi đã chẩn đoán | `delegate-sonnet` | `delegate-codex` |
+| **S** | 4 case trên | **Opus main** | — |
+| **reasoning-only** | architecture design, debug chẩn đoán root cause, code review (KHÔNG kèm edit) | **Opus main** | — |
+| **M-mechanical** | boilerplate / batch edit | `delegate-deepseek` | → sonnet → re-classify L/XL (1 lần) → STOP + báo user |
+| **read-only** | audit, cross-file summary, grep rộng, risk analysis | `delegate-gemini` | → deepseek → sonnet (last resort) → STOP + báo user |
+| **L/XL** | code/edit thật: algo, refactor subtle invariant, fix bug sau chẩn đoán | `delegate-sonnet` | → codex → STOP: Opus re-decompose spec (KHÔNG tự code, KHÔNG rơi về DeepSeek) |
 
-Nguyên tắc cho nhóm **L/XL**: task càng khó → subagent càng mạnh (Sonnet primary, Codex fallback), **không phải Opus tự ôm**. Nhóm M vẫn ưu tiên DeepSeek trước (rẻ hơn), chỉ fallback Sonnet khi DeepSeek fail.
+Nguyên tắc L/XL: task càng khó → subagent càng mạnh (Sonnet→Codex), **không phải Opus tự ôm**. M-mechanical ưu tiên DeepSeek trước (rẻ hơn), chỉ fallback Sonnet khi DeepSeek fail.
 
-## Opus KHÔNG execute code L/XL — nhưng TỰ làm reasoning
+## Reasoning vs execution (ranh giới thật, không phải "khó vs dễ")
 
-Ranh giới là **reasoning vs execution**, không phải "khó vs dễ":
+- **Opus tự làm reasoning:** thiết kế architecture (đưa approach, không viết code triển khai), chẩn đoán debug (tìm root cause, không tự sửa), review diff/PR (đưa findings, không tự apply fix).
+- Diff > ~500 dòng: `delegate-gemini` first-pass summary + hotspot list trước, Opus review trên summary (tránh nuốt diff dài vào context).
+- Reasoning xong cần code/edit thật → giao delegate (L/XL), kết quả reasoning làm spec đầu vào cho sub-task prompt.
+- Opus KHÔNG tự viết/sửa code L/XL dù đã tự chẩn đoán root cause — chẩn đoán và implement là 2 bước tách biệt.
 
-- Opus tự làm: thiết kế architecture (đưa ra approach, không viết code triển khai), chẩn đoán debug (tìm root cause, không tự sửa), review diff/PR (đưa ra findings, không tự apply fix).
-- Ngay sau khi reasoning xong và cần code/edit thật → giao delegate (size L/XL) với kết quả reasoning làm spec đầu vào cho sub-task prompt.
-- Opus KHÔNG tự viết/sửa code cho task L/XL dù đã tự chẩn đoán ra root cause — chẩn đoán và implement là hai bước tách biệt.
+## Loop guard (hard rules)
 
-## Fallback chain
-
-```
-delegate-sonnet   FAIL → delegate-codex
-delegate-codex    FAIL → delegate-deepseek
-delegate-gemini   FAIL → delegate-deepseek
-delegate-deepseek FAIL (task M)   → delegate-sonnet
-delegate-deepseek FAIL (task M/L) → STOP + báo user (KHÔNG escalate về Opus tự code L/XL)
-```
+- Mỗi task tối đa **2 lần fallback**; hết chain → STOP + báo user, KHÔNG quay lại model đã fail.
+- Cả 2 model đầu chain L/XL fail → mặc định lỗi nằm ở **spec/prompt** → re-decompose trước khi retry.
+- Re-classify (M → L/XL) chỉ được **1 lần** per task.
 
 ## Sub-task prompt (orchestrator → delegate) — self-contained
 
-Delegate KHÔNG có session context. Mỗi prompt PHẢI có: (1) repo path + branch absolute, (2) spec đầy đủ, (3) file paths, (4) acceptance criteria, (5) verify command, (6) NO commit — produce diff only, (7) worktree isolation cho edit task, (8) return summary <300 words.
+Delegate KHÔNG có session context. Mỗi prompt PHẢI đủ: (1) repo path + branch absolute, (2) spec đầy đủ, (3) file paths, (4) acceptance criteria, (5) verify command, (6) NO commit — produce diff only, (7) worktree isolation cho edit task, (8) return summary <300 words, (9) timeout mặc định 10 phút (wrapper kill quá hạn = FAIL → sang fallback).
 
 ## Hard constraints
 
-- Không gọi trực tiếp `aider`/`gemini`/`codex` CLI từ shell để bypass delegate wrapper (xem [[delegate-llm]]).
-- Không để delegate auto-commit; Opus review diff trước, commit sau.
-- Không merge delegate worktree nếu diff chạm ngoài scope.
+- KHÔNG gọi trực tiếp `aider`/`gemini`/`codex` CLI từ shell để bypass delegate wrapper (xem [[delegate-llm]]).
+- KHÔNG để delegate auto-commit; Opus review diff trước, commit sau.
+- KHÔNG merge delegate worktree nếu diff chạm ngoài scope.
+- KHÔNG dùng Sonnet làm fallback mặc định cho mọi nhánh — chỉ theo chain khai báo ở trên.
 
-Context window per-conversation (≥195K cần compact/delegate) xem [[token-budget]] — không liên quan orchestrator on/off, orchestrator luôn bật.
+Context window per-conversation (≥195K cần compact/delegate): xem [[token-budget]] — orchestrator luôn bật, không liên quan on/off.
 
 > **Project-specific:** delegate wrapper path (`scripts/delegate/`), persona (`.claude/agents/delegate-*`) khai báo trong repo. Xem `.claude/rules/orchestrator-<project>.md` nếu có.
