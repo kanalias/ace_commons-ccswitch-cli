@@ -19,7 +19,7 @@ metadata:
 
 ## Cách đúng
 
-1. **Direct Notion REST API** qua bootstrap token LOCAL (`curl` + `Authorization: Bearer $<VAULT_BOOTSTRAP_TOKEN>`, `Notion-Version: 2022-06-28`). Đọc value từ file vault (không paste inline), `unset` sau dùng.
+1. **Direct Notion REST API** qua bootstrap token LOCAL (`curl` + `Authorization: Bearer $<VAULT_BOOTSTRAP_TOKEN>`, header `Notion-Version` lấy version stable mới nhất — khai báo trong `.env`/config repo, không hardcode ở rule). Đọc value từ file vault (không paste inline), `unset` sau dùng.
 2. **Script Node** `scripts/vault/update-row.js` — dùng `@notionhq/client` + bootstrap token, không print value, chỉ OK/FAIL.
 3. **User tự update qua Notion UI** (an toàn nhất) — AI chỉ cung cấp direct URL row + tên field + source value reference.
 

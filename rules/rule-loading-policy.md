@@ -26,19 +26,7 @@ Mọi rule khác → **LAZY**. Kể cả P0 nếu chỉ chạm 1 vùng (vd test-
 
 ## Gán `paths:` — cách làm
 
-```yaml
----
-paths:
-  - "src/app/schedulers/**"   # glob, quote từng dòng
-  - "server.js"
----
-```
-
-- Rule về convention code vùng X → `paths: <vùng X>`.
-- Rule về infra/CI → `paths: infra/**,Dockerfile*,.github/**,*.yml`.
-- Rule về cách viết rule (meta) → `paths: .claude/rules/**`.
-- Rule về delegate infra → `paths: scripts/delegate/**`.
-- Rule về team/skill ownership → `paths: <skill dir>`.
+Frontmatter `paths:` là list glob (quote từng dòng); rule chỉ load khi task chạm file khớp. Gán theo vùng rule điều chỉnh: convention code vùng X → glob vùng X; infra/CI → `infra/**,Dockerfile*,.github/**,*.yml`; meta (cách viết rule) → `.claude/rules/**`; delegate infra → `scripts/delegate/**`.
 
 Không chắc rule chạm đâu → hỏi user, KHÔNG mặc định always (mặc định always = rò rỉ context âm thầm).
 
@@ -50,7 +38,9 @@ Global (`~/.claude/rules/`) luôn always mọi project — đó là bản chất
 
 ```bash
 cd <repo>/.claude/rules
-for f in *.md; do head -5 "$f" | grep -q "^paths:" && echo "LAZY  $f" || echo "ALWAYS $f"; done
+# head -20: frontmatter chuẩn (name/description/status/updated/metadata) đã ~8 dòng,
+# paths: nằm sau đó — head -5 sẽ báo nhầm rule lazy thành ALWAYS.
+for f in *.md; do head -20 "$f" | grep -q "^paths:" && echo "LAZY  $f" || echo "ALWAYS $f"; done
 ```
 
 `ALWAYS` list dài hơn ~4-5 file → soi lại: file nào không vượt gate P0-mọi-turn → chuyển lazy. Cập nhật cột Load trong `00-index.md` khớp.

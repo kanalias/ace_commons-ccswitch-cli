@@ -193,7 +193,7 @@ cp ~/.claude/settings.json.bak ~/.claude/settings.json
 
 ## Phần 2 — global Claude rules
 
-Copy 7 file rule cá nhân (cross-project — orchestrator, delegate-llm, budget, vault guard, secrets...) từ `rules/*.md` vào `~/.claude/rules/`, để mọi project mở Claude Code đều load cùng bộ convention.
+Copy 8 file rule cá nhân (cross-project — orchestrator, delegate-llm, budget, vault guard, secrets...) từ `rules/*.md` vào `~/.claude/rules/`, để mọi project mở Claude Code đều load cùng bộ convention.
 
 ### 2.1 Cài đặt
 
@@ -212,7 +212,8 @@ Script hỏi `[y/N]`, trả lời `y` sẽ **mirror toàn bộ thư mục**: ghi
 ```
 rules/
 ├── orchestrator.md         # Opus giữ vai pure orchestrator, routing S/M/L/XL qua delegate
-├── delegate-llm.md         # 3 delegate subagent (deepseek/gemini/codex/sonnet), anti-pattern
+├── delegate-llm.md         # 4 delegate subagent (deepseek/gemini/codex/sonnet), anti-pattern
+├── git-conventions.md      # push/publish GitHub dưới org acegalaxy-co
 ├── vault-no-mcp.md          # cấm dùng MCP Notion connector cho vault chứa secret
 ├── secrets-no-printout.md  # cấm in secret ra chat/output, cách redact đúng
 ├── feature-redflags.md      # safe minimal changes + bảng "red flags" rationalization

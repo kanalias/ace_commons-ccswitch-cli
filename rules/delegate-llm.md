@@ -9,7 +9,7 @@ metadata:
 
 # Delegate LLM Subagents (cross-project)
 
-Offload work từ main Claude (Opus) → 3 pre-built delegate subagent. **KHÔNG** call `aider`/`gemini`/`codex` CLI trực tiếp từ main agent.
+Offload work từ main Claude (Opus) → 4 pre-built delegate subagent. **KHÔNG** call `aider`/`gemini`/`codex` CLI trực tiếp từ main agent.
 
 | Subagent | Backend | Strength | Khi dùng |
 |---|---|---|---|
@@ -35,10 +35,6 @@ Routing chi tiết (size S/M/L, fallback chain): [[orchestrator]].
 - ❌ Pass `$*_API_KEY` vào task prompt.
 - ❌ Auto-merge worktree về branch chính không diff review.
 
-Routing S/M/L đầy đủ: [[orchestrator]]. Budget gate: [[token-budget]].
-
-## GitHub org default
-
-Mọi repo publish/push GitHub PHẢI dưới org **`acegalaxy-co`**, không username cá nhân. Remote `git@github.com:acegalaxy-co/<repo>.git`. KHÔNG tạo dưới `lanhnk/` hoặc username khác.
+Routing S/M/L đầy đủ: [[orchestrator]]. Budget gate: [[token-budget]]. Org push default: [[git-conventions]].
 
 > **Project-specific:** wrapper path (`scripts/delegate/`), persona file khai báo trong repo.

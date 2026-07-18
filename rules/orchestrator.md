@@ -34,6 +34,10 @@ Ranh giới cố định: **size-S** và **reasoning-only** → Opus tự làm; 
 
 Nguyên tắc L/XL: task càng khó → subagent càng mạnh (Sonnet→Codex), **không phải Opus tự ôm**. M-mechanical ưu tiên DeepSeek trước (rẻ hơn), chỉ fallback Sonnet khi DeepSeek fail.
 
+**Heuristic M vs L/XL** (ranh giới routing quan trọng nhất): chạm ≤3 file + pattern lặp lại + KHÔNG đổi logic/behavior (rename, đổi signature hàng loạt, format, boilerplate) → **M-mechanical**. Đổi behavior, thêm/sửa algo, refactor đụng invariant, fix bug cần suy luận → **L/XL**. Nghi ngờ giữa 2 nhãn → chọn nhãn cao hơn (L/XL) vì under-provision subagent tốn 1 vòng fallback.
+
+**Repo KHÔNG có delegate wrapper** (`scripts/delegate/` vắng): chỉ `delegate-sonnet` (in-harness) chạy được — mọi nhánh cần execute route thẳng sang in-harness subagent (Sonnet), KHÔNG STOP, KHÔNG Opus tự ôm. Ghi rõ trong report là repo thiếu wrapper.
+
 ## Reasoning vs execution (ranh giới thật, không phải "khó vs dễ")
 
 - **Opus tự làm reasoning:** thiết kế architecture (đưa approach, không viết code triển khai), chẩn đoán debug (tìm root cause, không tự sửa), review diff/PR (đưa findings, không tự apply fix).
@@ -58,6 +62,6 @@ Delegate KHÔNG có session context. Mỗi prompt PHẢI đủ: (1) repo path + 
 - KHÔNG merge delegate worktree nếu diff chạm ngoài scope.
 - KHÔNG dùng Sonnet làm fallback mặc định cho mọi nhánh — chỉ theo chain khai báo ở trên.
 
-Context window per-conversation (≥195K cần compact/delegate): xem [[token-budget]] — orchestrator luôn bật, không liên quan on/off.
+Context window per-conversation (~200K auto-compact tự chạy): xem [[token-budget]] — orchestrator luôn bật, không liên quan on/off.
 
 > **Project-specific:** delegate wrapper path (`scripts/delegate/`), persona (`.claude/agents/delegate-*`) khai báo trong repo. Xem `.claude/rules/orchestrator-<project>.md` nếu có.
