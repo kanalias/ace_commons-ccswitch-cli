@@ -175,13 +175,7 @@ bash install-claude-memory.sh
 
 Windows: chạy trong Git Bash / WSL / Cygwin — tự gọi `powershell.exe -File setup-rules.ps1`.
 
-Script hỏi `[c]opy / [s]ymlink / [N]o`:
-
-- **copy** — nhân bản file, độc lập với repo (cập nhật sau phải copy lại).
-- **symlink** — link tới file trong repo (`cd` vào repo `git pull` là mọi máy đã cài symlink nhận rule mới ngay). Trên Windows cần Admin/Developer Mode, tự fallback về copy nếu không tạo được symlink.
-- **N** — bỏ qua, không cài gì.
-
-Idempotent — file đã tồn tại ở `~/.claude/rules/` (kể cả symlink hỏng/dangling) **không bị đè**, script chỉ báo "exists — kept".
+Script hỏi `[y/N]`, trả lời `y` sẽ **copy và ghi đè** toàn bộ `rules/*.md` vào `~/.claude/rules/` — kể cả file đã tồn tại. Không có mode symlink (symlink trỏ ngược vào file trong repo là rủi ro rò rỉ nếu repo này từng bị share/fork cho người khác). Mỗi lần chạy lại = refresh toàn bộ rule về đúng bản trong repo.
 
 ### 2.2 Nội dung
 

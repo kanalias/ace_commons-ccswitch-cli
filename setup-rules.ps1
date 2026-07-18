@@ -3,9 +3,9 @@
   Install global Claude Code rules (Windows / PowerShell).
 
 .DESCRIPTION
-  Copies or symlinks rules\*.md into %USERPROFILE%\.claude\rules\. Existing files are
-  never clobbered. Symlink mode requires Administrator (or Developer Mode) on Windows —
-  falls back to copy with a warning if link creation fails.
+  Copies rules\*.md into %USERPROFILE%\.claude\rules\, always overwriting any existing
+  file (no symlink mode — symlinking personal rules into a repo-tracked path is a leak
+  risk if the repo is ever shared/forked).
 
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\setup-rules.ps1
@@ -24,16 +24,15 @@ if (-not (Test-Path $Src)) {
 }
 
 try {
-  $ans = Read-Host "── install global rules into $DestDir ? [c]opy / [s]ymlink / [N]o"
+  $ans = Read-Host "── copy global rules into $DestDir (overwrites existing)? [y/N]"
 } catch {
   Write-Host "skipped (no input available)"
   exit 0
 }
 
-switch ($ans.ToLower()) {
-  "c" { $mode = "copy" }
-  "s" { $mode = "symlink" }
-  default { Write-Host "skipped"; exit 0 }
+if ($ans.ToLower() -ne "y") {
+  Write-Host "skipped"
+  exit 0
 }
 
 New-Item -ItemType Directory -Force -Path $DestDir | Out-Null
@@ -41,20 +40,10 @@ New-Item -ItemType Directory -Force -Path $DestDir | Out-Null
 Get-ChildItem (Join-Path $Src "*.md") | ForEach-Object {
   $name = $_.Name
   $dest = Join-Path $DestDir $name
-  if ((Test-Path $dest) -or (Get-Item -Path $dest -Force -ErrorAction SilentlyContinue)) {
-    Write-Host "  • rules\$name exists — kept"
-    return
+  $existing = Get-Item -Path $dest -Force -ErrorAction SilentlyContinue
+  if ($existing -and ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    Remove-Item -Path $dest -Force
   }
-  if ($mode -eq "copy") {
-    Copy-Item $_.FullName $dest -Force
-    Write-Host "  ✓ rules\$name (copied)"
-  } else {
-    try {
-      New-Item -ItemType SymbolicLink -Path $dest -Target $_.FullName -ErrorAction Stop | Out-Null
-      Write-Host "  ✓ rules\$name (symlinked → $($_.FullName))"
-    } catch {
-      Copy-Item $_.FullName $dest -Force
-      Write-Host "  ✓ rules\$name (copied — symlink needs Administrator/Developer Mode)"
-    }
-  }
+  Copy-Item $_.FullName $dest -Force
+  Write-Host "  ✓ rules\$name (copied)"
 }

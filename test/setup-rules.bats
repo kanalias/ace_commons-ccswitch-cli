@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
-# setup-rules.sh: install rules/*.md into $HOME/.claude/rules/ via copy or symlink,
-# never clobbering existing files.
+# setup-rules.sh: copy rules/*.md into $HOME/.claude/rules/, always overwriting
+# (no symlink mode).
 
 load test_helper.bash
 
@@ -11,7 +11,7 @@ setup() {
 }
 
 @test "copy mode installs all rules/*.md" {
-  run bash -c "echo c | '$SCRIPT'"
+  run bash -c "echo y | '$SCRIPT'"
   [ "$status" -eq 0 ]
   count=$(ls "$HOME/.claude/rules"/*.md 2>/dev/null | wc -l | tr -d ' ')
   expected=$(ls "$ROOT/rules"/*.md | wc -l | tr -d ' ')
@@ -19,32 +19,28 @@ setup() {
 }
 
 @test "copy mode produces regular files, not symlinks" {
-  bash -c "echo c | '$SCRIPT'" >/dev/null
+  bash -c "echo y | '$SCRIPT'" >/dev/null
   [ ! -L "$HOME/.claude/rules/orchestrator.md" ]
   [ -f "$HOME/.claude/rules/orchestrator.md" ]
 }
 
-@test "symlink mode installs rules as symlinks to source" {
-  run bash -c "echo s | '$SCRIPT'"
-  [ "$status" -eq 0 ]
-  [ -L "$HOME/.claude/rules/orchestrator.md" ]
-}
-
-@test "existing file is kept, not overwritten" {
+@test "existing file is overwritten with repo content" {
   mkdir -p "$HOME/.claude/rules"
   echo "MY CUSTOM CONTENT" > "$HOME/.claude/rules/orchestrator.md"
-  run bash -c "echo c | '$SCRIPT'"
+  run bash -c "echo y | '$SCRIPT'"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"exists — kept"* ]]
-  grep -q "MY CUSTOM CONTENT" "$HOME/.claude/rules/orchestrator.md"
+  [[ "$output" == *"orchestrator.md (copied)"* ]]
+  ! grep -q "MY CUSTOM CONTENT" "$HOME/.claude/rules/orchestrator.md"
+  diff -q "$HOME/.claude/rules/orchestrator.md" "$ROOT/rules/orchestrator.md"
 }
 
-@test "dangling symlink at destination is treated as existing, not crashed on" {
+@test "dangling symlink at destination is replaced with a real file" {
   mkdir -p "$HOME/.claude/rules"
   ln -s "/nonexistent/target" "$HOME/.claude/rules/orchestrator.md"
-  run bash -c "echo c | '$SCRIPT'"
+  run bash -c "echo y | '$SCRIPT'"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"exists — kept"* ]]
+  [ ! -L "$HOME/.claude/rules/orchestrator.md" ]
+  [ -f "$HOME/.claude/rules/orchestrator.md" ]
 }
 
 @test "no input (EOF) skips install without crashing" {
@@ -61,8 +57,11 @@ setup() {
 }
 
 @test "is idempotent across two copy runs" {
-  bash -c "echo c | '$SCRIPT'" >/dev/null
-  run bash -c "echo c | '$SCRIPT'"
+  bash -c "echo y | '$SCRIPT'" >/dev/null
+  run bash -c "echo y | '$SCRIPT'"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"exists — kept"* ]]
+  [[ "$output" == *"(copied)"* ]]
+  count=$(ls "$HOME/.claude/rules"/*.md 2>/dev/null | wc -l | tr -d ' ')
+  expected=$(ls "$ROOT/rules"/*.md | wc -l | tr -d ' ')
+  [ "$count" -eq "$expected" ]
 }
