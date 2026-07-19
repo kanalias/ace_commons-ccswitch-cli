@@ -38,10 +38,10 @@ done
 
 # 2b. fill credentials into all 3 profiles (claude/codex/deepseek share ONE 9router token).
 # Preferred source: `.env.pro` next to this script (gitignored) holding `proxy_host=` +
-# `proxy_key=`. When both are present we ask ONCE — Enter / yes (default) writes host + key
-# into all three profiles; no falls back to the manual prompts (host, then key). Key values
-# are never echoed. Non-interactive: .env.pro is applied only while the profiles still hold
-# placeholders — a real key is never clobbered without a terminal to confirm.
+# `proxy_key=`. When both are present, ALWAYS overwrite host + key in all three profiles —
+# no prompt, no placeholder check, interactive or not. `.env.pro` is the source of truth;
+# re-run this script any time it changes to resync. No `.env.pro` (or missing fields) falls
+# back to the manual prompts (host, then key). Key values are never echoed.
 ENV_PRO="$SRC/.env.pro"
 
 env_pro_val() {  # env_pro_val <name> — first `name=value` line; strips CR + optional quotes
@@ -58,6 +58,11 @@ any_real_key() {  # true if any profile already holds a non-placeholder token
   return 1
 }
 
+mask_secret() {  # mask_secret <value> — first4...last4 + length; never the full value
+  local v="$1" len=${#1}
+  if [ "$len" -le 8 ]; then printf '%s' "****"; else printf '%s...%s (len=%d)' "${v:0:4}" "${v: -4}" "$len"; fi
+}
+
 apply_env_pro() {  # write proxy_host + proxy_key from .env.pro into all 3 profiles
   local failed=0 target dst
   for target in "${PROFILE_TARGETS[@]}"; do
@@ -68,7 +73,15 @@ apply_env_pro() {  # write proxy_host + proxy_key from .env.pro into all 3 profi
       && mv "$dst.tmp" "$dst" \
       || { echo "  ❌ failed to write .env.pro values to profiles/$target.json (profile unchanged)"; rm -f "$dst.tmp"; failed=1; }
   done
-  [ "$failed" -eq 0 ] && echo "  ✓ .env.pro proxy_host + proxy_key applied to profiles/{$(IFS=,; echo "${PROFILE_TARGETS[*]}")}.json"
+  if [ "$failed" -eq 0 ]; then
+    echo "  ✓ .env.pro proxy_host + proxy_key applied to profiles/{$(IFS=,; echo "${PROFILE_TARGETS[*]}")}.json"
+    echo "    1. proxy_key : $(mask_secret "$ENV_PRO_KEY")"
+    echo "    2. proxy_host: $ENV_PRO_HOST"
+    echo "    3. updated  : ${#PROFILE_TARGETS[@]} profile(s)"
+    for target in "${PROFILE_TARGETS[@]}"; do
+      echo "       - $PROFILES/$target.json"
+    done
+  fi
 }
 
 prompt_host() {  # manual base-URL prompt — Enter keeps whatever the profiles already have
@@ -123,19 +136,8 @@ fi
 
 USE_ENV_PRO=0
 if [ -n "$ENV_PRO_HOST" ] && [ -n "$ENV_PRO_KEY" ]; then
-  if [ -t 0 ]; then
-    any_real_key && echo "  • profiles already hold a key — answering Yes overwrites all three."
-    printf "  ▸ Use proxy_host + proxy_key from .env.pro for all profiles (claude/codex/deepseek)? [Y/n] "
-    read -r ans
-    case "$ans" in n|N|no|NO) ;; *) USE_ENV_PRO=1 ;; esac
-  else
-    if any_real_key; then
-      echo "  • .env.pro found but profiles already hold a key — kept (overwrite: re-run in a terminal, or ccswitch set-key)"
-    else
-      USE_ENV_PRO=1
-      echo "  • non-interactive shell — using proxy_host + proxy_key from .env.pro (default Yes)"
-    fi
-  fi
+  USE_ENV_PRO=1
+  any_real_key && echo "  • profiles already hold a key — .env.pro always overrides host+key (by design, no prompt)."
 elif [ -f "$ENV_PRO" ]; then
   echo "  • .env.pro found but missing proxy_host/proxy_key — ignored"
 fi
@@ -169,14 +171,9 @@ else
   echo "  • SessionStart hook already wired — skipped"
 fi
 
-# 3b. default model — set only if the user hasn't already chosen one (never clobber a pref).
-if ! jq -e '.model' "$SETTINGS" >/dev/null 2>&1; then
-  cp "$SETTINGS" "$SETTINGS.bak"
-  jq '.model = "sonnet"' "$SETTINGS.bak" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
-  echo "  ✓ set default model to sonnet in settings.json"
-else
-  echo "  • settings.json already has a model preference — skipped"
-fi
+# 3b. default model — intentionally NOT set. Let Claude Code pick per its own default
+#     (last-used / account default). Forcing a `.model` here caused a stale pin (e.g. sonnet)
+#     to be requested even after the active endpoint changed. The user chooses via /model.
 
 # 4. shell alias — pick rc by the user's LOGIN shell ($SHELL), not the interpreter running
 #    this script (setup.sh always runs under bash, so $BASH_VERSION is a false signal → it
@@ -209,10 +206,31 @@ for pair in claude:cc codex:cx deepseek:ds; do
   fi
 done
 
+# 5. auto-activate 'claude' — only if it now holds a real (non-placeholder) key, so
+#    settings.json is ready to use without a separate manual `ccswitch claude` step.
+echo
+AUTO_SWITCHED=0
+claude_tok=$(jq -r '.ANTHROPIC_AUTH_TOKEN // empty' "$PROFILES/claude.json" 2>/dev/null || true)
+if [ -n "$claude_tok" ] && ! printf '%s' "$claude_tok" | grep -q '<your-9router-key>'; then
+  echo "▶ auto-activating 'claude' profile into settings.json ..."
+  if bash "$CLAUDE_DIR/ccswitch.sh" claude; then
+    AUTO_SWITCHED=1
+  else
+    echo "  ⚠️  auto-switch failed — activate manually: ccswitch claude"
+  fi
+else
+  echo "  • profiles/claude.json still has a placeholder key — skipping auto-switch"
+fi
+unset claude_tok
+
 echo
 echo "✅ Installed. Next steps:"
 echo "   1. (if you skipped the prompt) Fill a key:  ccswitch set-key <claude|codex|deepseek>  (same 9router key for all three)"
-echo "   2. Activate:        source $SHELL_RC && ccswitch claude   (or: codex / deepseek)"
+if [ "$AUTO_SWITCHED" -eq 1 ]; then
+  echo "   2. Activate:        already done above (claude profile applied to settings.json)"
+else
+  echo "   2. Activate:        source $SHELL_RC && ccswitch claude   (or: codex / deepseek)"
+fi
 echo "   3. Restart Claude Code (quit + reopen) to load the new env."
 echo "   4. Parallel:        open 3 terminals → claude-cc / claude-cx / claude-ds"
 echo "                       (3 vendors at once — same 9router account = shared quota)"

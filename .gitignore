@@ -2,7 +2,10 @@
 *.bak
 *.tmp
 .env.pro
+.env.aws
 # guard against accidentally dropping a filled-in settings.json here
 settings.json
 # macOS noise
 .DS_Store
+# local-only deploy skill (aws-prod specifics, not for the public repo)
+.claude/skills/deploy-aws-9router/
