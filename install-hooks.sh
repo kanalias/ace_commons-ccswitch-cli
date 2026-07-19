@@ -3,14 +3,14 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOOK_SRC="$ROOT/git-hooks/pre-push"
+HOOK_SRC="$ROOT/dev-hooks/git-hooks/pre-push"
 HOOK_DST="$ROOT/.git/hooks/pre-push"
 
 [ -f "$HOOK_SRC" ] || { echo "❌ không thấy $HOOK_SRC"; exit 1; }
 chmod +x "$HOOK_SRC"
 mkdir -p "$ROOT/.git/hooks"
 
-if ln -sf "../../git-hooks/pre-push" "$HOOK_DST" 2>/dev/null; then
+if ln -sf "../../dev-hooks/git-hooks/pre-push" "$HOOK_DST" 2>/dev/null; then
   echo "✅ symlinked .git/hooks/pre-push → git-hooks/pre-push"
 else
   cp "$HOOK_SRC" "$HOOK_DST" && chmod +x "$HOOK_DST"

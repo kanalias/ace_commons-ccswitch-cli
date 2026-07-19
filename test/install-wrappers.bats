@@ -47,7 +47,7 @@ setup() {
 
 @test "setup.sh sets default model to sonnet on a fresh install" {
   setup_fake_home
-  run bash -c "cd '$ROOT' && echo N | bash setup.sh"
+  run bash -c "cd '$ROOT' && echo N | bash ai-proxy/setup.sh"
   [ "$status" -eq 0 ]
   model=$(jq -r '.model' "$HOME/.claude/settings.json")
   [ "$model" = "sonnet" ]
@@ -57,7 +57,7 @@ setup() {
   setup_fake_home
   mkdir -p "$HOME/.claude"
   echo '{"model":"opus"}' > "$HOME/.claude/settings.json"
-  run bash -c "cd '$ROOT' && echo N | bash setup.sh"
+  run bash -c "cd '$ROOT' && echo N | bash ai-proxy/setup.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"already has a model preference"* ]]
   model=$(jq -r '.model' "$HOME/.claude/settings.json")

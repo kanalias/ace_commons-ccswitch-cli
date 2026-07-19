@@ -52,18 +52,27 @@ Hệ quả thực tế:
 
 ```
 ccswitch-cli-claude/
-├── README.md              # quickstart người dùng
-├── MECHANISM.md           # tài liệu này (dev handoff)
-├── ccswitch.sh            # CLI mac/linux — target ~/.claude/settings.json
-├── ccswitch.ps1           # CLI windows (PowerShell) — parity với .sh
-├── setup.sh               # installer mac/linux
-├── setup.ps1              # installer windows
-├── hooks/
-│   └── check-router.sh    # SessionStart hook: probe + AUTO-SWITCH khi down
-└── profiles/              # TEMPLATE placeholder key (an toàn commit)
-    ├── claude.json       # claude cc/*
-    ├── codex.json        # codex cx/*  (cùng key với claude.json)
-    └── deepseek.json     # deepseek ds/*  (cùng key với claude.json; subscription không có file — env-clear)
+├── README.md                    # quickstart người dùng
+├── MECHANISM.md                 # tài liệu này (dev handoff)
+├── install-9router-proxy.sh     # entry point Phần 1, tự detect OS
+├── install-claude-memory.sh     # entry point Phần 2, tự detect OS
+├── install-hooks.sh             # entry point Phần 3
+├── ai-proxy/
+│   ├── ccswitch.sh            # CLI mac/linux — target ~/.claude/settings.json
+│   ├── ccswitch.ps1           # CLI windows (PowerShell) — parity với .sh
+│   ├── setup.sh               # installer mac/linux
+│   ├── setup.ps1              # installer windows
+│   ├── hooks/
+│   │   └── check-router.sh    # SessionStart hook: probe + AUTO-SWITCH khi down
+│   └── profiles/              # TEMPLATE placeholder key (an toàn commit)
+│       ├── claude.json       # claude cc/*
+│       ├── codex.json        # codex cx/*  (cùng key với claude.json)
+│       └── deepseek.json     # deepseek ds/*  (cùng key với claude.json; subscription không có file — env-clear)
+├── ai-memory-rules/
+│   ├── setup-rules.sh / setup-rules.ps1  # installer Phần 2
+│   └── rules/*.md                         # rule cá nhân, copy nguyên văn
+└── dev-hooks/
+    └── git-hooks/pre-push     # gitleaks scan trước push (Phần 3)
 ```
 
 Sau `setup.sh`, các file được cài vào `~/.claude/`:
@@ -222,7 +231,7 @@ Terminal 3: claude-ds   (spawn deepseek) → process env ds/*  → DeepSeek  }
 
 ```bash
 cd ccswitch-cli-claude
-bash setup.sh
+bash ai-proxy/setup.sh
 # điền token: $EDITOR ~/.claude/profiles/claude.json
 source ~/.zshrc && ccswitch claude
 # restart Claude Code
@@ -230,7 +239,7 @@ source ~/.zshrc && ccswitch claude
 
 Yêu cầu: `jq` + `curl` (`brew install jq` / `apt install -y jq curl`).
 
-**Điền key nhanh qua `.env.pro`** (gitignored, đặt cạnh `setup.sh`):
+**Điền key nhanh qua `.env.pro`** (gitignored, đặt trong `ai-proxy/`, cạnh `ai-proxy/setup.sh`):
 
 ```bash
 proxy_host=https://9router.acegalaxy.co/v1
@@ -243,7 +252,7 @@ Nếu file có đủ cả 2 biến, `setup.sh`/`setup.ps1` hỏi `[Y/n]` — **E
 
 ```powershell
 cd ccswitch-cli-claude
-powershell -ExecutionPolicy Bypass -File .\setup.ps1
+powershell -ExecutionPolicy Bypass -File .\ai-proxy\setup.ps1
 ```
 
 > Hook health-check dùng `bash` (Git Bash / WSL). Không có bash → hook tự bỏ qua, `ccswitch` vẫn chạy (mất auto-switch).
@@ -259,7 +268,7 @@ Test **không đụng `~/.claude` thật** — dùng `HOME` sandbox tạm. Đây
 ### 8.1 Syntax
 
 ```bash
-bash -n ccswitch.sh && bash -n hooks/check-router.sh
+bash -n ai-proxy/ccswitch.sh && bash -n ai-proxy/hooks/check-router.sh
 ```
 
 ### 8.2 Fallback tới safe-harbor: 9router chết → gỡ env block
@@ -268,8 +277,8 @@ bash -n ccswitch.sh && bash -n hooks/check-router.sh
 
 ```bash
 T=$(mktemp -d)/home; mkdir -p "$T/.claude/profiles" "$T/.claude/hooks"
-cp ccswitch.sh "$T/.claude/ccswitch.sh"; chmod +x "$T/.claude/ccswitch.sh"
-cp hooks/check-router.sh "$T/.claude/hooks/"; chmod +x "$T/.claude/hooks/check-router.sh"
+cp ai-proxy/ccswitch.sh "$T/.claude/ccswitch.sh"; chmod +x "$T/.claude/ccswitch.sh"
+cp ai-proxy/hooks/check-router.sh "$T/.claude/hooks/"; chmod +x "$T/.claude/hooks/check-router.sh"
 printf '{"ANTHROPIC_BASE_URL":"https://9router.acegalaxy.co:9/v1","ANTHROPIC_AUTH_TOKEN":"x"}\n' > "$T/.claude/profiles/9router.json"
 printf '{"permissions":{"allow":["Bash(*)"]},"env":{"ANTHROPIC_BASE_URL":"https://9router.acegalaxy.co:9/v1"}}\n' > "$T/.claude/settings.json"
 
@@ -300,8 +309,8 @@ HOME="$T" CCSWITCH_NO_AUTO=1 bash "$T/.claude/hooks/check-router.sh"
 
 ```bash
 T=$(mktemp -d)/home; mkdir -p "$T/.claude/profiles"
-cp ccswitch.sh "$T/.claude/ccswitch.sh"; chmod +x "$T/.claude/ccswitch.sh"
-for p in claude codex deepseek; do cp profiles/$p.json "$T/.claude/profiles/"; done
+cp ai-proxy/ccswitch.sh "$T/.claude/ccswitch.sh"; chmod +x "$T/.claude/ccswitch.sh"
+for p in claude codex deepseek; do cp ai-proxy/profiles/$p.json "$T/.claude/profiles/"; done
 printf '{"permissions":{"allow":["Bash(*)"]}}\n' > "$T/.claude/settings.json"
 
 # apply claude → settings.json có model cc/*
@@ -326,10 +335,10 @@ Kết quả mong đợi: 5 dòng PASS. Xác nhận target phân biệt bằng mo
 
 ```bash
 T=$(mktemp -d)/home; mkdir -p "$T/.claude/profiles" "$T/bin"
-cp profiles/deepseek.json "$T/.claude/profiles/"
+cp ai-proxy/profiles/deepseek.json "$T/.claude/profiles/"
 sed -i '' 's/<your-9router-key>/sk-test/' "$T/.claude/profiles/deepseek.json" 2>/dev/null || \
   sed -i 's/<your-9router-key>/sk-test/' "$T/.claude/profiles/deepseek.json"
-cp ccswitch.sh "$T/.claude/ccswitch.sh"
+cp ai-proxy/ccswitch.sh "$T/.claude/ccswitch.sh"
 
 # stub `claude` in dumps ANTHROPIC_* env → chứng minh spawn export ds/*
 printf '#!/usr/bin/env bash\nenv | grep ^ANTHROPIC_ | sort\n' > "$T/bin/claude"; chmod +x "$T/bin/claude"

@@ -13,4 +13,10 @@ metadata:
 
 Mọi repo publish/push GitHub PHẢI dưới org **`acegalaxy-co`**, không username cá nhân. Remote `git@github.com:acegalaxy-co/<repo>.git`. KHÔNG tạo dưới `lanhnk/` hoặc username khác.
 
+## Commit format
+
+```text
+feat|fix|refactor|chore|docs: <mô tả>
+```
+
 Liên quan: [[delegate-llm]] (delegate infra), [[orchestrator]] (routing).

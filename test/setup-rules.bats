@@ -7,14 +7,14 @@ load test_helper.bash
 setup() {
   setup_fake_home
   ROOT="$(repo_root)"
-  SCRIPT="$ROOT/setup-rules.sh"
+  SCRIPT="$ROOT/ai-memory-rules/setup-rules.sh"
 }
 
 @test "copy mode installs all rules/*.md" {
   run bash -c "echo y | '$SCRIPT'"
   [ "$status" -eq 0 ]
   count=$(ls "$HOME/.claude/rules"/*.md 2>/dev/null | wc -l | tr -d ' ')
-  expected=$(ls "$ROOT/rules"/*.md | wc -l | tr -d ' ')
+  expected=$(ls "$ROOT/ai-memory-rules/rules"/*.md | wc -l | tr -d ' ')
   [ "$count" -eq "$expected" ]
 }
 
@@ -31,7 +31,7 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"orchestrator.md (copied)"* ]]
   ! grep -q "MY CUSTOM CONTENT" "$HOME/.claude/rules/orchestrator.md"
-  diff -q "$HOME/.claude/rules/orchestrator.md" "$ROOT/rules/orchestrator.md"
+  diff -q "$HOME/.claude/rules/orchestrator.md" "$ROOT/ai-memory-rules/rules/orchestrator.md"
 }
 
 @test "dangling symlink at destination is replaced with a real file" {
@@ -62,7 +62,7 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"(copied)"* ]]
   count=$(ls "$HOME/.claude/rules"/*.md 2>/dev/null | wc -l | tr -d ' ')
-  expected=$(ls "$ROOT/rules"/*.md | wc -l | tr -d ' ')
+  expected=$(ls "$ROOT/ai-memory-rules/rules"/*.md | wc -l | tr -d ' ')
   [ "$count" -eq "$expected" ]
 }
 
@@ -92,6 +92,6 @@ setup() {
   run bash -c "echo y | '$SCRIPT'"
   [ "$status" -eq 0 ]
   actual=$(cd "$HOME/.claude/rules" && ls *.md | sort)
-  expected=$(cd "$ROOT/rules" && ls *.md | sort)
+  expected=$(cd "$ROOT/ai-memory-rules/rules" && ls *.md | sort)
   [ "$actual" = "$expected" ]
 }

@@ -7,5 +7,7 @@
 settings.json
 # macOS noise
 .DS_Store
+# git worktrees (parallel tasks + prod-deploy) — see rules/git-workflow.md
+.worktrees/
 # local-only deploy skill (aws-prod specifics, not for the public repo)
 .claude/skills/deploy-aws-9router/

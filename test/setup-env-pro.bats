@@ -12,10 +12,10 @@ stage_repo() {
   ROOT="$(repo_root)"
   STAGE="$BATS_TEST_TMPDIR/stage"
   mkdir -p "$STAGE/hooks" "$STAGE/profiles"
-  cp "$ROOT/setup.sh" "$STAGE/setup.sh"
-  cp "$ROOT/ccswitch.sh" "$STAGE/ccswitch.sh"
-  cp "$ROOT/hooks/check-router.sh" "$STAGE/hooks/check-router.sh"
-  cp "$ROOT/profiles/claude.json" "$ROOT/profiles/codex.json" "$ROOT/profiles/deepseek.json" "$STAGE/profiles/"
+  cp "$ROOT/ai-proxy/setup.sh" "$STAGE/setup.sh"
+  cp "$ROOT/ai-proxy/ccswitch.sh" "$STAGE/ccswitch.sh"
+  cp "$ROOT/ai-proxy/hooks/check-router.sh" "$STAGE/hooks/check-router.sh"
+  cp "$ROOT/ai-proxy/profiles/claude.json" "$ROOT/ai-proxy/profiles/codex.json" "$ROOT/ai-proxy/profiles/deepseek.json" "$STAGE/profiles/"
 }
 
 write_fake_env_pro() {

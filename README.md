@@ -47,7 +47,7 @@ Installer sẽ:
 
 ### 1.2 Điền key (1 key dùng chung cho cả 3 profile)
 
-**Cách nhanh nhất — `.env.pro`:** tạo file `.env.pro` (gitignored) ở gốc repo, cạnh `setup.sh`:
+**Cách nhanh nhất — `.env.pro`:** tạo file `.env.pro` (gitignored) trong `ai-proxy/`, cạnh `ai-proxy/setup.sh`:
 
 ```bash
 proxy_host=https://9router.acegalaxy.co/v1
@@ -235,7 +235,7 @@ Hook `pre-push` của *repo ccswitch này* (không phải hook cho project khác
 bash install-hooks.sh
 ```
 
-Symlink `git-hooks/pre-push` → `.git/hooks/pre-push` (copy nếu máy không hỗ trợ symlink). Cần chạy 1 lần sau mỗi lần `git clone` mới (hook không tự nhân bản qua clone).
+Symlink `dev-hooks/git-hooks/pre-push` → `.git/hooks/pre-push` (copy nếu máy không hỗ trợ symlink). Cần chạy 1 lần sau mỗi lần `git clone` mới (hook không tự nhân bản qua clone).
 
 Cần `gitleaks` (`brew install gitleaks`) — thiếu thì hook chỉ cảnh báo advisory, không chặn push.
 
@@ -277,21 +277,23 @@ ccswitch-cli/
 ├── MECHANISM.md                 # tài liệu kỹ thuật đầy đủ (dev handoff)
 │
 ├── install-9router-proxy.sh     # Phần 1 — entry point, tự detect OS
-├── ccswitch.sh / ccswitch.ps1    # Phần 1 — tool (mac/linux / windows)
-├── setup.sh / setup.ps1          # Phần 1 — installer chạy bên dưới wrapper
-├── hooks/check-router.sh         # Phần 1 — SessionStart health probe
-├── profiles/                     # Phần 1 — TEMPLATE (placeholder key, an toàn để commit)
-│   ├── claude.json                # claude cc/*
-│   ├── codex.json                 # codex cx/*  (same key as claude.json)
-│   └── deepseek.json              # deepseek ds/*  (same key as claude.json)
-│                                   # subscription không có file — nó là env-clear
+├── ai-proxy/
+│   ├── ccswitch.sh / ccswitch.ps1  # Phần 1 — tool (mac/linux / windows)
+│   ├── setup.sh / setup.ps1        # Phần 1 — installer chạy bên dưới wrapper
+│   ├── hooks/check-router.sh       # Phần 1 — SessionStart health probe
+│   └── profiles/                   # Phần 1 — TEMPLATE (placeholder key, an toàn để commit)
+│       ├── claude.json                # claude cc/*
+│       ├── codex.json                 # codex cx/*  (same key as claude.json)
+│       └── deepseek.json              # deepseek ds/*  (same key as claude.json)
+│                                       # subscription không có file — nó là env-clear
 │
 ├── install-claude-memory.sh     # Phần 2 — entry point, tự detect OS
-├── setup-rules.sh / setup-rules.ps1  # Phần 2 — installer chạy bên dưới wrapper
-├── rules/*.md                    # Phần 2 — 7 rule cá nhân, copy nguyên văn
+├── ai-memory-rules/
+│   ├── setup-rules.sh / setup-rules.ps1  # Phần 2 — installer chạy bên dưới wrapper
+│   └── rules/*.md                         # Phần 2 — 7 rule cá nhân, copy nguyên văn
 │
 ├── install-hooks.sh              # Phần 3 — cài git hook của repo này
-├── git-hooks/pre-push             # Phần 3 — gitleaks scan trước push
+├── dev-hooks/git-hooks/pre-push  # Phần 3 — gitleaks scan trước push
 ├── .claude/commands/push-to-github.md  # Phần 3 — slash command gate pipeline
 └── test/*.bats                    # Phần 3 — bats suite (chạy qua /push-to-github hoặc thủ công)
 ```

@@ -8,11 +8,11 @@ load test_helper.bash
 setup() {
   setup_fake_home
   ROOT="$(repo_root)"
-  CC="$ROOT/ccswitch.sh"
+  CC="$ROOT/ai-proxy/ccswitch.sh"
   mkdir -p "$HOME/.claude/profiles"
-  cp "$ROOT/profiles/claude.json" "$HOME/.claude/profiles/claude.json"
-  cp "$ROOT/profiles/codex.json" "$HOME/.claude/profiles/codex.json"
-  cp "$ROOT/profiles/deepseek.json" "$HOME/.claude/profiles/deepseek.json"
+  cp "$ROOT/ai-proxy/profiles/claude.json" "$HOME/.claude/profiles/claude.json"
+  cp "$ROOT/ai-proxy/profiles/codex.json" "$HOME/.claude/profiles/codex.json"
+  cp "$ROOT/ai-proxy/profiles/deepseek.json" "$HOME/.claude/profiles/deepseek.json"
   echo '{}' > "$HOME/.claude/settings.json"
 }
 
