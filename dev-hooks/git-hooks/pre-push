@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Pre-push: scan secrets bằng gitleaks trước khi push (chặn key/token lên GitHub public).
+# Bypass có chủ đích: GITLEAKS_SKIP=1 git push
+set -uo pipefail
+
+[ "${GITLEAKS_SKIP:-}" = "1" ] && { echo "⚠️  gitleaks skipped (GITLEAKS_SKIP=1)" >&2; exit 0; }
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "⚠️  gitleaks chưa cài — bỏ qua scan (advisory). Cài: brew install gitleaks" >&2
+  exit 0
+fi
+
+ROOT="$(git rev-parse --show-toplevel)"
+echo "🔍 gitleaks scan trước push…" >&2
+if gitleaks detect --source "$ROOT" --redact -v; then
+  echo "✅ gitleaks: no leaks — cho phép push." >&2
+  exit 0
+else
+  echo "❌ gitleaks phát hiện secret — CHẶN push." >&2
+  echo "   Xử lý leak, hoặc GITLEAKS_SKIP=1 git push nếu chắc chắn false-positive." >&2
+  exit 1
+fi

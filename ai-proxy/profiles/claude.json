@@ -1,0 +1,8 @@
+{
+  "ANTHROPIC_BASE_URL": "https://9router.proxy.example.com/v1",
+  "ANTHROPIC_AUTH_TOKEN": "<your-9router-key>",
+  "ANTHROPIC_DEFAULT_OPUS_MODEL": "cc/claude-opus-4-8",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL": "cc/claude-sonnet-5",
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "cc/claude-haiku-4-5-20251001",
+  "ANTHROPIC_DEFAULT_FABLE_MODEL": "cc/claude-fable-5"
+}

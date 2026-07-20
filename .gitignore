@@ -1,0 +1,18 @@
+# never commit real profiles with keys — only the placeholder templates in profiles/ are tracked
+*.bak
+*.tmp
+# root env (consolidated 2026-07-20, was ai-proxy/.env.pro etc.)
+/.env
+/.env.local
+.env.pro
+.env.aws
+# guard against accidentally dropping a filled-in settings.json here
+settings.json
+# per-machine permission overrides (personal paths, ssh aliases) — never shared
+.claude/settings.local.json
+# macOS noise
+.DS_Store
+# git worktrees (parallel tasks + prod-deploy) — see rules/git-workflow.md
+.worktrees/
+# local-only deploy skill (aws-prod specifics, not for the public repo)
+.claude/skills/deploy-aws-9router/
