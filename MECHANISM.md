@@ -56,12 +56,15 @@ ccswitch-cli-claude/
 ├── MECHANISM.md                 # tài liệu này (dev handoff)
 ├── install-9router-proxy.sh     # entry point Phần 1, tự detect OS
 ├── install-claude-memory.sh     # entry point Phần 2, tự detect OS
-├── install-hooks.sh             # entry point Phần 3
+├── install-git-hooks.sh         # entry point Phần 3
+├── install-harness-delegate.sh  # entry point Phần 4 — thin wrapper, exec harness-delegate/install.sh
+├── install-auto-compact.sh      # chỉnh autoCompactWindow / DISABLE_AUTO_COMPACT trong settings.json (đứng riêng, không thuộc phần nào)
 ├── ai-proxy/
 │   ├── ccswitch.sh            # CLI mac/linux — target ~/.claude/settings.json
 │   ├── ccswitch.ps1           # CLI windows (PowerShell) — parity với .sh
 │   ├── setup.sh               # installer mac/linux
 │   ├── setup.ps1              # installer windows
+│   ├── statusline-context.sh  # statusLine script hiển thị context-window usage
 │   ├── hooks/
 │   │   └── check-router.sh    # SessionStart hook: probe + AUTO-SWITCH khi down
 │   └── profiles/              # TEMPLATE placeholder key (an toàn commit)
@@ -70,9 +73,33 @@ ccswitch-cli-claude/
 │       └── deepseek.json     # deepseek ds/*  (cùng key với claude.json; subscription không có file — env-clear)
 ├── ai-memory-rules/
 │   ├── setup-rules.sh / setup-rules.ps1  # installer Phần 2
-│   └── rules/*.md                         # rule cá nhân, copy nguyên văn
-└── dev-hooks/
-    └── git-hooks/pre-push     # gitleaks scan trước push (Phần 3)
+│   └── rules/*.md                         # 8 rule cá nhân, copy nguyên văn
+├── dev-hooks/
+│   └── git-hooks/pre-push     # gitleaks scan trước push (Phần 3)
+├── harness-delegate/           # Phần 4 — cài orchestrator+delegate mechanism vào project KHÁC
+│   ├── install.sh              # installer thật (install-harness-delegate.sh chỉ exec file này)
+│   └── templates/              # nguồn @@TOKEN@@ template, copy+substitute vào project đích
+│       ├── agents/delegate-{codex,deepseek,gemini,sonnet}.md
+│       ├── hooks/{pre-edit-orchestrator-gate,pre-edit-secret-scan,post-edit-syntax-check,session-start-banner,check-session-limit}.sh
+│       ├── scripts/delegate/{_common,run-aider-deepseek,run-codex,run-gemini,probe-gemini-highest,gemini-account,doctor}.sh
+│       ├── commands/{push-to-git,conventional-commit,branch-cleanup,pr-describe,dep-audit,loop-feature,lazy-load-audit,audit-memory-harness}.md
+│       ├── skills/{lazy-load-health,dep-ladder-check}/SKILL.md
+│       └── rules/{git-workflow,skill-superpowers}.md
+├── scripts/delegate/            # bản wrapper THẬT dùng trong repo này (đồng bộ nội dung với harness-delegate/templates/scripts/delegate/, xem §sync)
+│   ├── _common.sh               # source chung: resolve API key theo thứ tự DEEPSEEK_API_KEY → PROXY_DEEPSEEK_API_KEY → deepseek_api_key
+│   ├── run-aider-deepseek.sh    # Aider + DeepSeek, worktree isolation, --no-auto-commits
+│   ├── run-codex.sh             # Codex CLI (o-series) wrapper
+│   ├── run-gemini.sh            # Gemini CLI wrapper
+│   ├── probe-gemini-highest.sh  # chọn Gemini model cao nhất còn quota
+│   ├── gemini-account.sh        # chọn Gemini account/project
+│   └── doctor.sh                # preflight check: CLI cài chưa, git repo chưa, env key resolve chưa — không sửa gì
+├── .claude/
+│   ├── agents/delegate-{codex,deepseek,gemini,sonnet}.md  # persona cho 4 delegate subagent (bản dùng trong repo này)
+│   ├── hooks/*.sh               # 5 hook: orchestrator-gate, secret-scan, syntax-check, session-banner, session-limit
+│   ├── commands/push-to-git.md
+│   ├── skills/{loop-feature,sync-harness-rules}/SKILL.md
+│   └── rules/{git-workflow,skill-superpowers}.md  # rule riêng cho repo này (khác ai-memory-rules/ — đó là rule copy sang máy user)
+└── test/                        # 12 file bats, 170 test — xem §8
 ```
 
 Sau `setup.sh`, các file được cài vào `~/.claude/`:
@@ -239,14 +266,14 @@ source ~/.zshrc && ccswitch claude
 
 Yêu cầu: `jq` + `curl` (`brew install jq` / `apt install -y jq curl`).
 
-**Điền key nhanh qua `.env.pro`** (gitignored, đặt trong `ai-proxy/`, cạnh `ai-proxy/setup.sh`):
+**Điền key nhanh qua `.env`** (gitignored, ở repo root, cạnh `ai-proxy/`):
 
 ```bash
 proxy_host=https://9router.acegalaxy.co/v1
 proxy_key=<your-9router-key>
 ```
 
-Nếu file có đủ cả 2 biến, `setup.sh`/`setup.ps1` hỏi `[Y/n]` — **Enter hoặc y (mặc định) = áp cả `proxy_host` lẫn `proxy_key` vào cả 3 profile** (`claude`/`codex`/`deepseek`); `n` → rơi về flow nhập tay (hỏi base URL rồi hỏi key). Non-interactive cũng mặc định Yes, **trừ khi** một profile đã có key thật (giữ nguyên, không ghi đè âm thầm ngoài TTY). Thiếu 1 trong 2 biến → bỏ qua, coi như không có `.env.pro`.
+Nếu file có đủ cả 2 biến, `setup.sh`/`setup.ps1` **luôn áp `proxy_host` lẫn `proxy_key` vào cả 3 profile** (`claude`/`codex`/`deepseek`) — không hỏi, không prompt, kể cả khi profile đã có key thật (`.env` luôn là source of truth, ghi đè không điều kiện). Thiếu 1 trong 2 biến → bỏ qua, coi như không có `.env`, rơi về flow nhập tay (interactive: hỏi host rồi hỏi key; non-interactive: giữ nguyên placeholder, điền sau bằng `ccswitch set-key`).
 
 ### Windows (PowerShell)
 
@@ -358,9 +385,32 @@ HOME="$T" PATH="$T/bin:$PATH" bash "$T/.claude/ccswitch.sh" spawn deepseek >/dev
 
 Kết quả mong đợi: 3 dòng PASS. `spawn` chỉ tác động process env, giữ nguyên settings switch-in-place.
 
-### 8.7 `.env.pro` flow trong `setup.sh`/`setup.ps1`
+### 8.7 `.env` flow trong `setup.sh`/`setup.ps1`
 
-Covered bởi `test/setup-env-pro.bats` (7 test, chạy trên repo được stage vào thư mục tạm với `.env.pro` giả — không bao giờ đụng `.env.pro` thật của máy): áp mặc định Yes (interactive Enter + non-interactive), bỏ qua khi thiếu `proxy_host`/`proxy_key`, bỏ qua khi thiếu file, **không ghi đè** khi 1 profile đã có key thật, và trả lời `n` rơi đúng về flow nhập tay (host rồi key).
+Covered bởi `test/setup-env-pro.bats` (7 test, chạy trên repo được stage vào thư mục tạm với `.env` giả — không bao giờ đụng `.env` thật của máy): áp không-hỏi khi đủ `proxy_host`+`proxy_key` (interactive + non-interactive, không có prompt `[Y/n]`), bỏ qua khi thiếu 1 trong 2 biến, bỏ qua khi thiếu file, **luôn ghi đè** kể cả khi 1 profile đã có key thật (design: `.env` là source of truth, không âm thầm), và khi thiếu `.env` rơi đúng về flow nhập tay (host rồi key, Enter giữ placeholder).
+
+### 8.8 Toàn bộ bats suite — 170 test / 12 file
+
+```bash
+bats test/*.bats
+```
+
+| File | # test | Phủ |
+|---|---|---|
+| `ccswitch.bats` | 19 | `ccswitch.sh` — apply/status/spawn/set-key, model prefix per target |
+| `delegate-scripts.bats` | 18 | `scripts/delegate/*.sh` — key resolution order, worktree isolation, `--no-auto-commits` |
+| `doctor.bats` | 4 | `scripts/delegate/doctor.sh` — preflight check: CLI present, git repo, env key resolve, không leak secret value |
+| `gemini-account.bats` | 19 | `scripts/delegate/gemini-account.sh` — chọn account Gemini CLI còn quota |
+| `install-auto-compact.bats` | 32 | `install-auto-compact.sh` — `set`/`auto`/`off`/`on`/`status`, `--global`/`--project`, validate `jq`, tạo file + giữ JSON toàn vẹn |
+| `install-git-hooks.bats` | 4 | `install-git-hooks.sh` — dispatch OS + advisory khi thiếu `gitleaks` |
+| `install-harness-delegate.bats` | 3 | `harness-delegate/install.sh` — cài đủ 3 nhóm mặc định, idempotent khi chạy lại 2 lần (không tạo hook trùng trong `settings.json`) |
+| `install-wrappers.bats` | 6 | `install-9router-proxy.sh` / `install-claude-memory.sh` — dispatch logic theo `$OSTYPE`, lỗi rõ khi thiếu `cygpath` trên `msys` |
+| `probe-gemini-highest.bats` | 19 | `scripts/delegate/probe-gemini-highest.sh` — cache 24h TTL (mtime), re-probe khi stale, `--force` bypass, fallback khi all-fail; stub `gemini` CLI trong `PATH`, không cần network/auth thật |
+| `setup-env-pro.bats` | 7 | xem §8.7 |
+| `setup-rules.bats` | 10 | `setup-rules.sh` — copy mode, ghi đè symlink lạ, mirror xoá rule không còn trong repo, idempotent |
+| `statusline-context.bats` | 29 | `ai-proxy/statusline-context.sh` — JSON stdin → progress bar + %, làm tròn token, màu theo ngưỡng, default khi thiếu field |
+
+Không có test nào đụng `$HOME` hay `.claude/` thật của máy chạy CI/dev — tất cả sandbox qua `$BATS_TEST_TMPDIR`.
 
 ---
 
@@ -389,6 +439,16 @@ Covered bởi `test/setup-env-pro.bats` (7 test, chạy trên repo được stag
 
 ## 11. Changelog
 
+- **2026-07-20** — **`doctor.sh` — preflight check cho delegate wrapper setup.** Script mới `scripts/delegate/doctor.sh` (đồng bộ `harness-delegate/templates/scripts/delegate/doctor.sh`): kiểu `brew doctor`, read-only, không auto-fix, không `set -e` để chạy hết mọi check dù check trước fail. Kiểm tra CLI presence (`git`/`jq`/`aider`/`codex`/`gemini`), cwd có trong git work tree không, và env key resolve được không (9router `proxy_host`+`proxy_key`, deepseek fallback) — chỉ báo "resolved"/"missing", KHÔNG bao giờ in giá trị secret thật. Env-key check dùng standalone read-only parser (không side-effect, không export) thay vì source trực tiếp `_common.sh` — file đó `set -euo pipefail` + hard-exit khi ngoài git repo sẽ giết doctor.sh sớm và mất các check còn lại. `harness-delegate/install.sh` thêm `doctor` vào danh sách script cài (nhóm subagents+wrappers giờ 7 script). Files: `scripts/delegate/doctor.sh` + `harness-delegate/templates/scripts/delegate/doctor.sh` + `harness-delegate/install.sh` + `test/doctor.bats` (4 test mới) + README + MECHANISM. Verify: `bats test/doctor.bats` (4/4 pass), `bats test/*.bats` (170/170 pass).
+- **2026-07-20** — **Audit `harness-delegate/templates/commands/` — sửa link vỡ + genericize rule templates.** Fix relative-link vỡ trong `lazy-load-audit.md` (trỏ tới `rule-loading-policy.md` — rule global, không bao giờ cài vào project đích — đổi thành plain-text reference). Xoá `commands/sync-harness-memory.md` (orphan, nội dung tự-tham-chiếu repo này, không generalize được cho project khác). Genericize `templates/rules/git-workflow.md` (bỏ hardcode `main/stable/prod`+AWS+`acegalaxy-co`, dùng `@@BRANCH@@` + mô tả protected-branch chung chung) và `templates/rules/skill-superpowers.md` (bỏ hardcode `paths:` frontmatter của riêng ccswitch, dùng token mới `@@CORE_DIRS_YAML@@`). Thêm nhóm cài thứ 7 **`rules`** (`HARNESS_GROUP_RULES`) vào `install.sh`, cài `git-workflow.md`+`skill-superpowers.md` vào `.claude/rules/` project đích. `loop-feature.md` bỏ hardcode `test/ccswitch.bats`/`bats`, dùng `@@TEST_CMD@@`. Cập nhật `test/install-harness-delegate.bats` (assertion cũ trỏ `.claude/skills/loop-feature/SKILL.md` — stale từ khi loop-feature còn là skill, nay đã là command) + README/MECHANISM (bảng 6→7 nhóm, danh sách file commands/skills/rules đúng hiện trạng). Verify: `bats test/install-harness-delegate.bats` (3/3 pass).
+- **2026-07-20** — **Bats suite mở rộng 166 test / 11 file** (từ 35). Thêm `install-harness-delegate.bats` (3, cài đủ nhóm mặc định + idempotent), `install-wrappers.bats` (6, `install-9router-proxy.sh`/`install-claude-memory.sh` dispatch theo `$OSTYPE`), `install-git-hooks.bats` (4, dispatch OS + advisory thiếu `gitleaks`), `install-auto-compact.bats` (32), `gemini-account.bats` (19), `probe-gemini-highest.bats` (19), `statusline-context.bats` (29). Xem §8.8. Verify: `bats test/*.bats` (166/166 pass).
+- **2026-07-20** — **Hook budget đổi Session%/Weekly% → context-window.** `check-session-limit.sh` bỏ gate theo %-quota (session/weekly không đo được trực tiếp qua tool), chuyển theo dõi context window hội thoại (~200K auto-compact tự trigger). Files: `.claude/hooks/check-session-limit.sh` + `harness-delegate/templates/hooks/check-session-limit.sh`.
+- **2026-07-20** — **Delegate scripts — 9router alias, Gemini account probe, DeepSeek fallback key.** `scripts/delegate/_common.sh` thêm alias `9router` vào chain resolve env key; `probe-gemini-highest.sh`/`gemini-account.sh` chọn account Gemini CLI còn quota cao nhất; routing Codex hợp nhất qua 9router giống DeepSeek, thêm `deepseek_api_key` làm fallback khi thiếu key riêng. Files: `scripts/delegate/_common.sh` + `scripts/delegate/probe-gemini-highest.sh` + `scripts/delegate/gemini-account.sh`. Verify: `bats test/delegate-scripts.bats`.
+- **2026-07-20** — **Gộp `.env` — bỏ `ai-proxy/.env.pro` riêng.** Mọi script (`ccswitch.sh`, `setup.sh`, delegate scripts) đọc chung 1 file `.env` ở repo root thay vì `ai-proxy/.env.pro`. Cập nhật path reference trong README + MECHANISM.
+- **2026-07-20** — **`loop-feature` skill — vòng lặp implement/test/fix tới khi xong.** `.claude/skills/loop-feature/SKILL.md`: loop RED (viết test trước) → GREEN (code tối thiểu) → chạy test thật → fail thì tìm root cause sửa tiếp, dựa trên `skill-superpowers.md` (TDD) đã always-load. Guard: tối đa 3 lần fail liên tiếp cùng lỗi (nâng từ 2) thì dừng báo user thay vì thử thêm. Cài được vào project khác qua harness-delegate installer (nhóm `skills`, env `HARNESS_GROUP_SKILLS`). Files: `.claude/skills/loop-feature/SKILL.md` + `harness-delegate/templates/skills/loop-feature/SKILL.md` + `harness-delegate/install.sh`.
+- **2026-07-19** — **`harness-delegate/` — cài orchestrator+delegate mechanism vào project khác.** `install-harness-delegate.sh` (thin wrapper) exec `harness-delegate/install.sh`: copy agent persona (`delegate-{codex,deepseek,gemini,sonnet}.md`), guard/quality/session-limit hooks, `scripts/delegate/*.sh`, skill `loop-feature` vào project đích, wire `.claude/settings.json` qua `jq` merge idempotent, thay placeholder `@@PROJECT_SLUG@@`/`@@CORE_DIRS_*@@`/`@@BRANCH@@`/`@@TEST_CMD@@` bằng giá trị project đích. 7 nhóm cài độc lập bật/tắt qua env override (`HARNESS_GROUP_*`, xem changelog 2026-07-20 cho nhóm `rules` thêm sau), off-switch `env.HARNESS_DELEGATE=0` không cần gỡ cài. Repo này tự cài chính mình làm nguồn gốc — `.claude/agents/delegate-*.md` + `scripts/delegate/*.sh` là bản THẬT, đồng bộ nội dung với `harness-delegate/templates/`. Files: `install-harness-delegate.sh` + `harness-delegate/install.sh` + `harness-delegate/templates/**` + `scripts/delegate/*.sh` + `.claude/{agents,hooks,commands}/*`. Verify: `bats test/install-harness-delegate.bats` (idempotent re-run không tạo hook trùng trong `settings.json`).
+- **2026-07-19** — **`install-auto-compact.sh` + statusline context-usage bar.** `install-auto-compact.sh` chỉnh `autoCompactWindow`/`env.DISABLE_AUTO_COMPACT` trong `~/.claude/settings.json` hoặc `./.claude/settings.json` (lệnh `set <tokens>`/`auto`/`off`/`on`/`status`). `ai-proxy/statusline-context.sh` hiển thị % context-window đã dùng ngay trên statusLine, cài kèm khi chạy `ai-proxy/setup.sh`. Files: `install-auto-compact.sh` + `ai-proxy/statusline-context.sh` + `ai-proxy/setup.sh`.
+- **2026-07-19** — **Refactor cấu trúc thư mục theo nhóm tính năng.** Gom file rời rạc ở root vào `ai-proxy/` (ccswitch + hooks + profiles + setup), `ai-memory-rules/` (rules + setup-rules), `dev-hooks/` (git-hooks). Cập nhật mọi path reference trong README + MECHANISM.
 - **2026-07-18** — **`.env.pro` — điền proxy_host + proxy_key từ file, không cần gõ tay.** `setup.sh`/`setup.ps1` giờ đọc `.env.pro` (gitignored, cạnh script) nếu có đủ 2 biến `proxy_host`/`proxy_key`; hỏi `[Y/n]` — **Enter/y (mặc định) ghi cả 2 giá trị vào cả 3 profile** (`claude`/`codex`/`deepseek`), `n` rơi về flow nhập tay cũ (hỏi base URL rồi hỏi key riêng, Enter giữ nguyên). Non-interactive (CI/piped) cũng mặc định Yes — **trừ khi** một profile đã có key thật, khi đó `.env.pro` bị bỏ qua để không ghi đè âm thầm ngoài TTY (an toàn tương tự `prompt_shared_key` cũ). Thiếu 1 trong 2 biến, hoặc không có file → bỏ qua, coi như trước đây. Key không bao giờ echo ra output. Files: `setup.sh` (`env_pro_val`/`any_real_key`/`apply_env_pro`/`prompt_host`) + `setup.ps1` parity (`Get-EnvProValue`/`Test-AnyRealKey`/`Set-AllProfiles`) + `.env.example` (mẫu, tracked) + `test/setup-env-pro.bats` (7 test mới, stage repo vào tmp dir để không đụng `.env.pro` thật) + README + MECHANISM. Verify: `bash -n`, `bats test/*.bats` (42/42 pass, gồm 2 test dùng `expect` pty cho prompt `[Y/n]` + fallback host/key).
 - **2026-07-18** — **Thêm lệnh `ccswitch update [src]`.** Kiến trúc "chung 1 token" nghĩa là claude/codex/deepseek phải luôn khớp `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN`, nhưng sau khi `set-key`/`set-host` chỉ sửa 1 profile, 2 profile kia dễ lệch — trước đây phải chạy `set-key`/`set-host` lại thủ công cho từng target còn lại. `update` tự động hoá: đọc host+key từ profile `src` (mặc định `claude`), rồi với từng profile khác trong `ORDER` hỏi `[y/N]` trước khi ghi đè (backup `.bak` từng file); **chỉ copy `ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN`**, không đụng `ANTHROPIC_DEFAULT_*_MODEL` (đó là phần giữ cho các profile khác nhau dù chung host+token). Từ chối nếu `src=subscription` (không có host/key) hoặc chạy ngoài TTY (cùng pattern với `set_key`). Files: `ccswitch.sh` (`update_profiles()` + dispatch case + help) + `ccswitch.ps1` (`Update-Profiles` parity) + `test/ccswitch.bats` (3 test mới, 2 test dùng `expect` pty vì cần trả lời `[y/N]`) + README + MECHANISM. Verify: `bash -n`, `bats test/*.bats` (35/35 pass), sandbox test qua `expect` xác nhận sync đúng + model prefix giữ nguyên + decline 1 profile không bị ghi đè.
 - **2026-07-18** — **Thêm lại target `codex` (`cx/*` GPT).** 9router giờ đã có lớp dịch sang Anthropic format cho `cx/*` (blocker của 2026-07-16 đã hết) — an toàn để phục hồi codex ngang hàng `claude`/`deepseek`. Khôi phục theo đúng cấu trúc trước khi bỏ (`git show 15d58df^`): `profiles/codex.json` (model `cx/gpt-5.6-sol` Opus tier), `ORDER=(claude codex deepseek)`, `tag()`/`active_router_profile()` thêm case `cx/*`, dispatch `claude|codex|deepseek)`, `spawn`/`set-key`/`set-host`/help/usage đều thêm `codex`, hook banner thêm `codex (gpt via 9router)`. **Khác bản gốc:** giữ nguyên kiến trúc "chung 1 token" (không quay lại "mỗi target token riêng" của 2026-07-15e) — mở rộng ra cả 3 profile thay vì chỉ 2. **Đổi UX cấp key:** `setup.sh` xoá `prompt_key()` hỏi từng target, thay bằng `prompt_shared_key()` hỏi **1 lần duy nhất** rồi ghi cùng giá trị vào cả 3 file (backup từng file trước khi ghi). **Nâng `setup.ps1` lên parity đầy đủ** với `setup.sh` — trước đó `.ps1` chỉ wire profile `claude` (TODO comment cũ), giờ loop `$ProfileTargets = @("claude","codex","deepseek")` + prompt 1 key dùng chung, thêm launcher function `claude-cx`. Files: `profiles/codex.json` (new) + `ccswitch.sh` + `ccswitch.ps1` + `hooks/check-router.sh` + `setup.sh` + `setup.ps1` + `test/ccswitch.bats` (test mới `apply codex`) + README + MECHANISM. Verify: `bash -n` toàn bộ script, `bats test/*.bats` (28/28 pass), sandbox test `setup.sh` qua pty (`expect`) xác nhận 1 key ghi đúng vào cả 3 profile.

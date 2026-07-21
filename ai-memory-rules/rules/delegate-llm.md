@@ -2,7 +2,7 @@
 name: delegate-llm
 description: Offload work từ Opus qua 3 delegate subagent (deepseek/gemini/codex); KHÔNG bash aider/gemini/codex CLI trực tiếp; worktree isolation + no auto-commit
 status: live
-updated: 2026-07-16
+updated: 2026-07-20
 metadata:
   type: reference
 ---
@@ -15,8 +15,8 @@ Offload work từ main Claude (Opus) → 4 pre-built delegate subagent. **KHÔNG
 |---|---|---|---|
 | `delegate-deepseek` | Aider + DeepSeek | Cheap + edit-in-place | Large refactor, batch edit |
 | `delegate-gemini` | Gemini CLI | Large context | Read-only audit, cross-file summary |
-| `delegate-codex` | Codex CLI (o-series) | Deep reasoning | Hard bug, algo, security review |
-| `delegate-sonnet` | In-harness Sonnet | Reasoning + edit | L/XL primary (không đụng Opus budget) |
+| `delegate-codex` | Codex CLI (o-series) | Deep reasoning | Hard bug/algo/security — primary route khi cần code thật (hard-reasoning-code) |
+| `delegate-sonnet` | In-harness Sonnet | Reasoning + edit | L/XL thường (spec rõ) primary; fallback cho hard-reasoning-code |
 
 Routing chi tiết (size S/M/L, fallback chain): [[orchestrator]].
 

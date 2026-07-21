@@ -22,6 +22,9 @@ cp "$SRC/ccswitch.sh"        "$CLAUDE_DIR/ccswitch.sh"
 cp "$SRC/hooks/check-router.sh" "$HOOKS/check-router.sh"
 chmod +x "$CLAUDE_DIR/ccswitch.sh" "$HOOKS/check-router.sh"
 echo "  ✓ ccswitch.sh + hooks/check-router.sh"
+cp "$SRC/statusline-context.sh" "$CLAUDE_DIR/statusline-context.sh"
+chmod +x "$CLAUDE_DIR/statusline-context.sh"
+echo "  ✓ statusline-context.sh (context-usage early-warning bar)"
 
 # 2. profile templates — copy ONLY if missing (never clobber a real key).
 # 3 router profiles (claude, codex, deepseek), all via 9router, sharing ONE token (fill the same key into all three).
@@ -37,12 +40,12 @@ for p in "${PROFILE_TARGETS[@]}"; do
 done
 
 # 2b. fill credentials into all 3 profiles (claude/codex/deepseek share ONE 9router token).
-# Preferred source: `.env.pro` next to this script (gitignored) holding `proxy_host=` +
-# `proxy_key=`. When both are present, ALWAYS overwrite host + key in all three profiles —
-# no prompt, no placeholder check, interactive or not. `.env.pro` is the source of truth;
-# re-run this script any time it changes to resync. No `.env.pro` (or missing fields) falls
-# back to the manual prompts (host, then key). Key values are never echoed.
-ENV_PRO="$SRC/.env.pro"
+# Preferred source: `.env` at repo root (one level up from this script's dir, gitignored)
+# holding `proxy_host=` + `proxy_key=`. When both are present, ALWAYS overwrite host + key
+# in all three profiles — no prompt, no placeholder check, interactive or not. `.env` is the
+# source of truth; re-run this script any time it changes to resync. No `.env` (or missing
+# fields) falls back to the manual prompts (host, then key). Key values are never echoed.
+ENV_PRO="$(dirname "$SRC")/.env"
 
 env_pro_val() {  # env_pro_val <name> — first `name=value` line; strips CR + optional quotes
   sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$ENV_PRO" 2>/dev/null \
@@ -63,7 +66,7 @@ mask_secret() {  # mask_secret <value> — first4...last4 + length; never the fu
   if [ "$len" -le 8 ]; then printf '%s' "****"; else printf '%s...%s (len=%d)' "${v:0:4}" "${v: -4}" "$len"; fi
 }
 
-apply_env_pro() {  # write proxy_host + proxy_key from .env.pro into all 3 profiles
+apply_env_pro() {  # write proxy_host + proxy_key from .env into all 3 profiles
   local failed=0 target dst
   for target in "${PROFILE_TARGETS[@]}"; do
     dst="$PROFILES/$target.json"
@@ -71,10 +74,10 @@ apply_env_pro() {  # write proxy_host + proxy_key from .env.pro into all 3 profi
     jq --arg u "$ENV_PRO_HOST" --arg k "$ENV_PRO_KEY" \
       '.ANTHROPIC_BASE_URL = $u | .ANTHROPIC_AUTH_TOKEN = $k' "$dst" > "$dst.tmp" \
       && mv "$dst.tmp" "$dst" \
-      || { echo "  ❌ failed to write .env.pro values to profiles/$target.json (profile unchanged)"; rm -f "$dst.tmp"; failed=1; }
+      || { echo "  ❌ failed to write .env values to profiles/$target.json (profile unchanged)"; rm -f "$dst.tmp"; failed=1; }
   done
   if [ "$failed" -eq 0 ]; then
-    echo "  ✓ .env.pro proxy_host + proxy_key applied to profiles/{$(IFS=,; echo "${PROFILE_TARGETS[*]}")}.json"
+    echo "  ✓ .env proxy_host + proxy_key applied to profiles/{$(IFS=,; echo "${PROFILE_TARGETS[*]}")}.json"
     echo "    1. proxy_key : $(mask_secret "$ENV_PRO_KEY")"
     echo "    2. proxy_host: $ENV_PRO_HOST"
     echo "    3. updated  : ${#PROFILE_TARGETS[@]} profile(s)"
@@ -137,9 +140,9 @@ fi
 USE_ENV_PRO=0
 if [ -n "$ENV_PRO_HOST" ] && [ -n "$ENV_PRO_KEY" ]; then
   USE_ENV_PRO=1
-  any_real_key && echo "  • profiles already hold a key — .env.pro always overrides host+key (by design, no prompt)."
+  any_real_key && echo "  • profiles already hold a key — .env always overrides host+key (by design, no prompt)."
 elif [ -f "$ENV_PRO" ]; then
-  echo "  • .env.pro found but missing proxy_host/proxy_key — ignored"
+  echo "  • .env found but missing proxy_host/proxy_key — ignored"
 fi
 
 if [ "$USE_ENV_PRO" -eq 1 ]; then
@@ -169,6 +172,17 @@ if ! jq -e --arg c "$HOOK_CMD" \
   echo "  ✓ wired SessionStart auto-switch hook into settings.json (disable: export CCSWITCH_NO_AUTO=1)"
 else
   echo "  • SessionStart hook already wired — skipped"
+fi
+
+# 3a. wire statusLine (context-usage early-warning bar) idempotently
+SL_CMD="bash ~/.claude/statusline-context.sh"
+if [ "$(jq -r '.statusLine.command // empty' "$SETTINGS" 2>/dev/null)" != "$SL_CMD" ]; then
+  cp "$SETTINGS" "$SETTINGS.bak"
+  jq --arg c "$SL_CMD" '.statusLine = { "type": "command", "command": $c }' \
+    "$SETTINGS.bak" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+  echo "  ✓ wired statusLine (context-usage bar) into settings.json"
+else
+  echo "  • statusLine already wired — skipped"
 fi
 
 # 3b. default model — intentionally NOT set. Let Claude Code pick per its own default

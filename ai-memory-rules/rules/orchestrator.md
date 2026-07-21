@@ -1,8 +1,8 @@
 ---
 name: orchestrator
-description: Opus main = pure orchestrator; phân rã S/M/L, delegate execution (L/XL→Sonnet, M-mechanical→DeepSeek, read-only→Gemini, S→tự làm); Opus tự làm reasoning (architecture design, debug chẩn đoán, code review) nhưng KHÔNG tự code/edit L/XL
+description: Opus main = pure orchestrator; phân rã S/M/L, delegate execution (L/XL→Sonnet, hard-reasoning-code→Codex, M-mechanical→DeepSeek, read-only→Gemini, S→tự làm); Opus tự làm reasoning (architecture design, debug chẩn đoán, code review) nhưng KHÔNG tự code/edit L/XL
 status: live
-updated: 2026-07-18
+updated: 2026-07-20
 metadata:
   type: reference
 ---
@@ -30,11 +30,14 @@ Ranh giới cố định: **size-S** và **reasoning-only** → Opus tự làm; 
 | **reasoning-only** | architecture design, debug chẩn đoán root cause, code review (KHÔNG kèm edit) | **Opus main** | — |
 | **M-mechanical** | boilerplate / batch edit | `delegate-deepseek` | → sonnet → re-classify L/XL (1 lần) → STOP + báo user |
 | **read-only** | audit, cross-file summary, grep rộng, risk analysis | `delegate-gemini` | → deepseek → sonnet (last resort) → STOP + báo user |
-| **L/XL** | code/edit thật: algo, refactor subtle invariant, fix bug sau chẩn đoán | `delegate-sonnet` | → codex → STOP: Opus re-decompose spec (KHÔNG tự code, KHÔNG rơi về DeepSeek) |
+| **hard-reasoning-code** | bug khó đã resist fix thường, algo design phức tạp, security-sensitive edit, refactor invariant tinh vi (concurrency, transaction) | `delegate-codex` | → sonnet → STOP: Opus re-decompose spec |
+| **L/XL** | code/edit thật theo spec rõ: implement feature, refactor thường, fix bug sau khi đã chẩn đoán rõ nguyên nhân | `delegate-sonnet` | → codex → STOP: Opus re-decompose spec (KHÔNG rơi về DeepSeek) |
 
-Nguyên tắc L/XL: task càng khó → subagent càng mạnh (Sonnet→Codex), **không phải Opus tự ôm**. M-mechanical ưu tiên DeepSeek trước (rẻ hơn), chỉ fallback Sonnet khi DeepSeek fail.
+Nguyên tắc L/XL vs hard-reasoning-code: task cần suy luận sâu (bug khó, algo, security, invariant tinh vi) → route thẳng **Codex trước**, không qua Sonnet. Task L/XL thường (spec rõ, implement/refactor bình thường) → **Sonnet trước**, Codex chỉ fallback khi Sonnet không xử lý được. Cả hai đều **không phải Opus tự ôm**. M-mechanical ưu tiên DeepSeek trước (rẻ hơn), chỉ fallback Sonnet khi DeepSeek fail.
 
 **Heuristic M vs L/XL** (ranh giới routing quan trọng nhất): chạm ≤3 file + pattern lặp lại + KHÔNG đổi logic/behavior (rename, đổi signature hàng loạt, format, boilerplate) → **M-mechanical**. Đổi behavior, thêm/sửa algo, refactor đụng invariant, fix bug cần suy luận → **L/XL**. Nghi ngờ giữa 2 nhãn → chọn nhãn cao hơn (L/XL) vì under-provision subagent tốn 1 vòng fallback.
+
+**Heuristic L/XL vs hard-reasoning-code**: tín hiệu "đã thử fix không được", "security review", "concurrency/race condition", "thiết kế thuật toán phức tạp" → **hard-reasoning-code** (Codex trước). Spec rõ, biết ngay cách làm (thêm field, implement theo design có sẵn, refactor cơ học có suy luận nhẹ) → **L/XL** (Sonnet trước). Nghi ngờ → chọn hard-reasoning-code (Codex mạnh hơn, an toàn hơn khi under-provision).
 
 **Repo KHÔNG có delegate wrapper** (`scripts/delegate/` vắng): chỉ `delegate-sonnet` (in-harness) chạy được — mọi nhánh cần execute route thẳng sang in-harness subagent (Sonnet), KHÔNG STOP, KHÔNG Opus tự ôm. Ghi rõ trong report là repo thiếu wrapper.
 

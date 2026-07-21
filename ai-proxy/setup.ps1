@@ -28,6 +28,8 @@ New-Item -ItemType Directory -Force -Path $Profiles, $Hooks | Out-Null
 Copy-Item (Join-Path $Src "ccswitch.ps1") (Join-Path $ClaudeDir "ccswitch.ps1") -Force
 Copy-Item (Join-Path $Src "hooks\check-router.sh") (Join-Path $Hooks "check-router.sh") -Force
 Write-Host "  ✓ ccswitch.ps1 + hooks\check-router.sh"
+Copy-Item (Join-Path $Src "statusline-context.sh") (Join-Path $ClaudeDir "statusline-context.sh") -Force
+Write-Host "  ✓ statusline-context.sh (context-usage early-warning bar)"
 
 # 2. profile templates — copy ONLY if missing (never clobber a real key).
 # 3 router profiles (claude, codex, deepseek), all via 9router, sharing ONE token.
@@ -43,12 +45,13 @@ foreach ($t in $ProfileTargets) {
 }
 
 # 2b. fill credentials into all 3 profiles (claude/codex/deepseek share ONE 9router token).
-# Preferred source: `.env.pro` next to this script (gitignored) holding `proxy_host=` +
-# `proxy_key=`. When both are present we ask ONCE — Enter / yes (default) writes host + key
-# into all three profiles; no falls back to the manual prompts (host, then key). Key values
-# are never echoed. Non-interactive: .env.pro is applied only while the profiles still hold
-# placeholders — a real key is never clobbered without a terminal to confirm.
-$EnvPro = Join-Path $Src ".env.pro"
+# Preferred source: `.env` at repo root (one level up from this script's dir, gitignored)
+# holding `proxy_host=` + `proxy_key=`. When both are present we ask ONCE — Enter / yes
+# (default) writes host + key into all three profiles; no falls back to the manual prompts
+# (host, then key). Key values are never echoed. Non-interactive: .env is applied only
+# while the profiles still hold placeholders — a real key is never clobbered without a
+# terminal to confirm.
+$EnvPro = Join-Path (Split-Path $Src -Parent) ".env"
 
 function Test-AnyRealKey {
   foreach ($t in $ProfileTargets) {
@@ -95,23 +98,23 @@ $useEnvPro = $false
 if ($envProHost -and $envProKey) {
   if ([Environment]::UserInteractive) {
     if (Test-AnyRealKey) { Write-Host "  • profiles already hold a key — answering Yes overwrites all three." }
-    $ans = Read-Host "  ▸ Use proxy_host + proxy_key from .env.pro for all profiles (claude/codex/deepseek)? [Y/n]"
+    $ans = Read-Host "  ▸ Use proxy_host + proxy_key from .env for all profiles (claude/codex/deepseek)? [Y/n]"
     if ($ans -notmatch '^(n|no)$') { $useEnvPro = $true }
   } else {
     if (Test-AnyRealKey) {
-      Write-Host "  • .env.pro found but profiles already hold a key — kept (overwrite: re-run interactively, or ccswitch set-key)"
+      Write-Host "  • .env found but profiles already hold a key — kept (overwrite: re-run interactively, or ccswitch set-key)"
     } else {
       $useEnvPro = $true
-      Write-Host "  • non-interactive session — using proxy_host + proxy_key from .env.pro (default Yes)"
+      Write-Host "  • non-interactive session — using proxy_host + proxy_key from .env (default Yes)"
     }
   }
 } elseif (Test-Path $EnvPro) {
-  Write-Host "  • .env.pro found but missing proxy_host/proxy_key — ignored"
+  Write-Host "  • .env found but missing proxy_host/proxy_key — ignored"
 }
 
 if ($useEnvPro) {
   if (Set-AllProfiles $envProHost $envProKey) {
-    Write-Host "  ✓ .env.pro proxy_host + proxy_key applied to profiles\{$($ProfileTargets -join ',')}.json"
+    Write-Host "  ✓ .env proxy_host + proxy_key applied to profiles\{$($ProfileTargets -join ',')}.json"
   }
 } elseif (-not [Environment]::UserInteractive) {
   Write-Host "  • non-interactive session — skipped key prompt (edit profiles\*.json manually)"
@@ -166,6 +169,18 @@ if (-not $already) {
   Write-Host "  ✓ wired SessionStart health hook into settings.json"
 } else {
   Write-Host "  • SessionStart hook already wired — skipped"
+}
+
+# 3a. wire statusLine (context-usage early-warning bar) idempotently
+$s = Get-Content $Settings -Raw | ConvertFrom-Json
+$SlCmd = "bash ~/.claude/statusline-context.sh"
+if ($s.statusLine.command -ne $SlCmd) {
+  Copy-Item $Settings "$Settings.bak" -Force
+  $s | Add-Member -NotePropertyName statusLine -NotePropertyValue ([pscustomobject]@{ type = "command"; command = $SlCmd }) -Force
+  $s | ConvertTo-Json -Depth 10 | Set-Content $Settings -Encoding UTF8
+  Write-Host "  ✓ wired statusLine (context-usage bar) into settings.json"
+} else {
+  Write-Host "  • statusLine already wired — skipped"
 }
 
 # 3b. default model — set only if the user hasn't already chosen one (never clobber a pref).

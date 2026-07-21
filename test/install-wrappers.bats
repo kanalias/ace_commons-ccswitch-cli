@@ -45,12 +45,14 @@ setup() {
   [[ "$output" == *"cygpath"* ]]
 }
 
-@test "setup.sh sets default model to sonnet on a fresh install" {
+@test "setup.sh does NOT pin a default model on a fresh install" {
+  # By design (setup.sh 3b): no `.model` is written — Claude Code picks per its own
+  # default. Forcing a pin caused a stale model to be requested after endpoint switches.
   setup_fake_home
   run bash -c "cd '$ROOT' && echo N | bash ai-proxy/setup.sh"
   [ "$status" -eq 0 ]
-  model=$(jq -r '.model' "$HOME/.claude/settings.json")
-  [ "$model" = "sonnet" ]
+  model=$(jq -r '.model // "unset"' "$HOME/.claude/settings.json")
+  [ "$model" = "unset" ]
 }
 
 @test "setup.sh does not clobber an existing model preference" {
@@ -59,7 +61,7 @@ setup() {
   echo '{"model":"opus"}' > "$HOME/.claude/settings.json"
   run bash -c "cd '$ROOT' && echo N | bash ai-proxy/setup.sh"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"already has a model preference"* ]]
+  # setup.sh never touches .model, so a pre-existing preference survives untouched.
   model=$(jq -r '.model' "$HOME/.claude/settings.json")
   [ "$model" = "opus" ]
 }

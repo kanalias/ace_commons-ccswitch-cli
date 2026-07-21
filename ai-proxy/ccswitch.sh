@@ -207,12 +207,16 @@ ping_verify() {
   local body http_code text tmp_resp
   tmp_resp=$(mktemp) || { echo "⏭  ping skipped: mktemp failed"; return; }
   body=$(jq -n --arg m "$model" '{model:$m, max_tokens:16, messages:[{role:"user",content:"Ping"}]}')
+  # `|| true`: curl exits nonzero on an unreachable host (e.g. 6 DNS fail). Under
+  # `set -e` that would abort the whole switch — but the local settings.json write
+  # already succeeded. Ping is a diagnostic, not a gate: swallow curl's exit, keep
+  # the "%{http_code}" (000 on failure) and let the HTTP-code branch below report.
   http_code=$(curl -s -m 15 "${base%/}/messages" \
     -H "Authorization: Bearer $tok" \
     -H "content-type: application/json" \
     -H "anthropic-version: 2023-06-01" \
     -d "$body" \
-    -o "$tmp_resp" -w "%{http_code}" 2>/dev/null)
+    -o "$tmp_resp" -w "%{http_code}" 2>/dev/null || true)
 
   if [ "$http_code" = "200" ]; then
     text=$(jq -r '.content[0].text // empty' "$tmp_resp" 2>/dev/null || true)
