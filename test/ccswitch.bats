@@ -21,7 +21,7 @@ setup() {
   run "$CC" claude
   [ "$status" -eq 0 ]
   model=$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL' "$HOME/.claude/settings.json")
-  [ "$model" = "cc/claude-opus-4-8" ]
+  [ "$model" = "cc/claude-opus-5" ]
 }
 
 @test "apply codex writes current GPT-5.6 model tiers" {

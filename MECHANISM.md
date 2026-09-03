@@ -384,7 +384,7 @@ HOME="$T" bash "$T/.claude/ccswitch.sh" spawn subscription 2>&1 \
   | grep -qi 'subscription\|real target' && echo "PASS: spawn subscription rejected"
 
 # settings.json KHÔNG bị đụng bởi spawn
-printf '{"env":{"ANTHROPIC_DEFAULT_OPUS_MODEL":"cc/claude-opus-4-8"}}\n' > "$T/.claude/settings.json"
+printf '{"env":{"ANTHROPIC_DEFAULT_OPUS_MODEL":"cc/claude-opus-5"}}\n' > "$T/.claude/settings.json"
 b=$(cat "$T/.claude/settings.json")
 HOME="$T" PATH="$T/bin:$PATH" bash "$T/.claude/ccswitch.sh" spawn deepseek >/dev/null 2>&1
 [ "$b" = "$(cat "$T/.claude/settings.json")" ] && echo "PASS: settings.json untouched by spawn"
@@ -425,7 +425,7 @@ Không có test nào đụng `$HOME` hay `.claude/` thật của máy chạy CI/
 | Switch xong không đổi | Chưa restart Claude Code. Quit hẳn rồi mở lại. |
 | `env | grep ANTHROPIC` có giá trị lạ | Process env đang đè settings (§2). `unset ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN` hoặc quit hẳn VSCode/terminal rồi mở lại. |
 | `check` báo `000 DOWN` nhưng endpoint sống | IPv6 route hỏng — Node né sang IPv4 nên vẫn chạy; chỉ curl kẹt. Verify: `curl -4 ... /v1/models`. Muốn dứt điểm: pin IPv4 vào `/etc/hosts`. |
-| `model_not_found` | Với 9router model phải có prefix `cc/` (vd `cc/claude-opus-4-8`). Ở `subscription` (env-clear) Claude Code tự dùng model tài khoản, không prefix. |
+| `model_not_found` | Với 9router model phải có prefix `cc/` (vd `cc/claude-opus-5`). Ở `subscription` (env-clear) Claude Code tự dùng model tài khoản, không prefix. |
 | Sau `ccswitch subscription` Claude đòi login | subscription = OAuth; máy chưa từng login. Chạy `claude` + làm theo prompt đăng nhập. Không có key để điền. |
 | Auto-switch spam mỗi lần mở | Endpoint active đang down thật. Sửa router hoặc `ccswitch <profile khỏe>`. Tạm tắt: `export CCSWITCH_NO_AUTO=1`. |
 | Khôi phục settings | `cp ~/.claude/settings.json.bak ~/.claude/settings.json` |

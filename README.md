@@ -167,7 +167,7 @@ Hook `SessionStart` (`hooks/check-router.sh`) probe endpoint đang active mỗi 
 Ví dụ output `ccswitch`:
 ```
 ── effective source (Claude Code precedence §2) ──
-▶ ③ settings.json  →  claude (https://9router.proxy.example.com/v1, cc/claude-opus-4-8)
+▶ ③ settings.json  →  claude (https://9router.proxy.example.com/v1, cc/claude-opus-5)
 ── các tầng khác ──
   claude: 200 OK
   codex: 200 OK
@@ -201,7 +201,7 @@ Model qua 9router **phải** có prefix. Mỗi profile map sẵn 4 tier (Opus/So
 
 | Target | Prefix | Ví dụ (Opus tier) |
 |---|---|---|
-| `claude` | `cc/` (claude) | `cc/claude-opus-4-8` |
+| `claude` | `cc/` (claude) | `cc/claude-opus-5` |
 | `codex` | `cx/` | `cx/gpt-5.6-sol` |
 | `deepseek` | `ds/` | `ds/deepseek-v4-pro-max` |
 | `kimi` | `kimi/` | `kimi/kimi-k3` |
