@@ -1,5 +1,5 @@
 {
-  "ANTHROPIC_BASE_URL": "https://9router.acegalaxy.co/v1",
+  "ANTHROPIC_BASE_URL": "https://9router.proxy.example.com/v1",
   "ANTHROPIC_AUTH_TOKEN": "<your-9router-key>",
   "ANTHROPIC_DEFAULT_OPUS_MODEL": "cc/claude-opus-4-8",
   "ANTHROPIC_DEFAULT_SONNET_MODEL": "cc/claude-sonnet-5",

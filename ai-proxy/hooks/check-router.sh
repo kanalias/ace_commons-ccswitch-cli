@@ -24,12 +24,13 @@ if [ -z "$base" ] && [ -f "$SETTINGS" ]; then
   model=$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL // empty' "$SETTINGS" 2>/dev/null || true)
 fi
 
-# claude / codex / deepseek share the same base URL (9router) → phân biệt bằng model prefix (cc/ cx/ ds/).
+# claude / codex / deepseek / kimi share the same base URL (9router) → phân biệt bằng model prefix (cc/ cx/ ds/ kimi/).
 case "$base" in
-  *9router.acegalaxy.co*)
+  *9router.proxy.example.com*)
     case "$model" in
       cx/*) name="codex (gpt via 9router)" ;;
       ds/*) name="deepseek (via 9router)" ;;
+      kimi*) name="kimi (via 9router)" ;;
       *)    name="claude (via 9router)" ;;
     esac ;;
   "")                                     name="subscription (OAuth)" ;;
@@ -41,9 +42,9 @@ esac
   echo "━━━ ccswitch ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "▶ Endpoint đang chạy: ${name}${base:+  ($base${model:+, $model})}"
   echo "  Fallback (khi router chết): <router hiện tại> → subscription (OAuth)"
-  echo "    • claude/codex/deepseek chung 1 router + 1 key (9router) → router chết là fallback về subscription"
+  echo "    • claude/codex/deepseek/kimi chung 1 router + 1 key (9router)"
   echo "    • subscription = safe-harbor: gỡ env → Claude Code dùng OAuth login (luôn về được)"
-  echo "  Lệnh: ccswitch [check | claude | codex | deepseek | subscription | fallback | clear]"
+  echo "  Lệnh: ccswitch [check | claude | codex | deepseek | kimi | subscription | fallback | clear]"
   echo "        đổi endpoint xong → RESTART Claude Code (env nạp lúc khởi động)"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 } >&2
@@ -52,7 +53,7 @@ esac
 command -v curl >/dev/null 2>&1 || exit 0
 [ -f "$SETTINGS" ] || exit 0
 case "$base" in
-  *9router.acegalaxy.co*) ;;
+  *9router.proxy.example.com*) ;;
   *) exit 0 ;;   # subscription/custom → không có "cấp trên" để fallback
 esac
 

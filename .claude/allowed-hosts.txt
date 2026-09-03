@@ -1,0 +1,7 @@
+# Allowlist host/IP đã được user duyệt (public / well-known).
+# Hook .claude/hooks/pre-edit-host-scan.sh đọc file này: host khớp → cho ghi.
+# Format: 1 host/dòng, khớp exact hostname (không kèm scheme/path). # = comment.
+# Safe pattern (example.*, *.test, *.local, localhost, RFC1918, 127.*, 0.0.0.0,
+# *.proxy.example.com) KHÔNG cần liệt kê — hook tự bỏ qua.
+github.com
+api.moonshot.ai

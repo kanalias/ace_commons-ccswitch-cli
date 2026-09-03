@@ -16,7 +16,7 @@ stage_repo() {
   cp "$ROOT/ai-proxy/ccswitch.sh" "$STAGE/ai-proxy/ccswitch.sh"
   cp "$ROOT/ai-proxy/statusline-context.sh" "$STAGE/ai-proxy/statusline-context.sh"
   cp "$ROOT/ai-proxy/hooks/check-router.sh" "$STAGE/ai-proxy/hooks/check-router.sh"
-  cp "$ROOT/ai-proxy/profiles/claude.json" "$ROOT/ai-proxy/profiles/codex.json" "$ROOT/ai-proxy/profiles/deepseek.json" "$STAGE/ai-proxy/profiles/"
+  cp "$ROOT/ai-proxy/profiles/claude.json" "$ROOT/ai-proxy/profiles/codex.json" "$ROOT/ai-proxy/profiles/deepseek.json" "$ROOT/ai-proxy/profiles/kimi.json" "$STAGE/ai-proxy/profiles/"
 }
 
 write_fake_env_pro() {
@@ -24,6 +24,12 @@ write_fake_env_pro() {
   : > "$STAGE/.env"
   if [ -n "${1:-}" ]; then echo "proxy_host=$1" >> "$STAGE/.env"; fi
   if [ -n "${2:-}" ]; then echo "proxy_key=$2" >> "$STAGE/.env"; fi
+}
+
+write_fake_kimi_env() {
+  : > "$STAGE/.env"
+  echo "kimi_api_key_force_subscription=1" >> "$STAGE/.env"
+  if [ -n "${1:-}" ]; then echo "kimi_api_key=$1" >> "$STAGE/.env"; fi
 }
 
 setup() {
@@ -125,5 +131,27 @@ setup() {
   host=$(jq -r '.ANTHROPIC_BASE_URL' "$HOME/.claude/profiles/claude.json")
   key=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/claude.json")
   [ "$host" = "$orig_host" ]
+  [[ "$key" == *"<your-9router-key>"* ]]
+}
+
+@test "non-interactive: kimi force subscription applies kimi_api_key only to kimi profile" {
+  write_fake_kimi_env "$TEST_KEY"
+  run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *".env kimi_api_key applied to profiles/kimi.json"* ]]
+  base=$(jq -r '.ANTHROPIC_BASE_URL' "$HOME/.claude/profiles/kimi.json")
+  key=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/kimi.json")
+  claude_key=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/claude.json")
+  [ "$base" = "https://api.moonshot.ai/anthropic" ]
+  [ "$key" = "$TEST_KEY" ]
+  [[ "$claude_key" == *"<your-9router-key>"* ]]
+}
+
+@test "non-interactive: kimi force subscription without key leaves placeholder" {
+  write_fake_kimi_env ""
+  run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"kimi_api_key_force_subscription=1 but kimi_api_key missing"* ]]
+  key=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/kimi.json")
   [[ "$key" == *"<your-9router-key>"* ]]
 }
