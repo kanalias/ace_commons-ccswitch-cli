@@ -202,7 +202,7 @@ Model qua 9router **phải** có prefix. Mỗi profile map sẵn 4 tier (Opus/So
 | Target | Prefix | Ví dụ (Opus tier) |
 |---|---|---|
 | `claude` | `cc/` (claude) | `cc/claude-opus-5` |
-| `codex` | `cx/` | `cx/gpt-5.6-sol` |
+| `codex` | `cx/` | `cx/gpt-5.6-luna` (default) |
 | `deepseek` | `ds/` | `ds/deepseek-v4-pro-max` |
 | `kimi` | `kimi/` | `kimi/kimi-k3` |
 

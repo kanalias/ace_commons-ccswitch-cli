@@ -26,14 +26,15 @@ harden_cli_env
 # PROXY_9ROUTER_TOKEN + PROXY_9ROUTER_BASE_URL alone decides routing, no opt-in
 # flag. route cx/* qua 9router responses API bằng Codex `-c` inline provider
 # override (ephemeral — KHÔNG đụng ~/.codex/config.toml global).
-# Model map: cx/gpt-5.6-sol = strongest, cx/gpt-5.6-terra = default high,
-# cx/gpt-5.6-luna = fastest small-scope. Token qua env_key ref, KHÔNG qua argv.
+# Model map: cx/gpt-5.6-sol = strongest, cx/gpt-5.6-terra = balanced,
+# cx/gpt-5.6-luna = default fast. Reasoning default high. Token qua env_key ref, KHÔNG qua argv.
 CODEX_PROVIDER_ARGS=()
 if [[ -n "${PROXY_9ROUTER_TOKEN:-}" && -n "${PROXY_9ROUTER_BASE_URL:-}" ]]; then
   export PROXY_CODEX_9R_KEY="$PROXY_9ROUTER_TOKEN"   # env_key ref — token never in argv
-  # Default high/balanced Codex model. Override qua PROXY_CODEX_MODEL:
-  # cx/gpt-5.6-sol strongest; cx/gpt-5.6-terra default high; cx/gpt-5.6-luna fastest small-scope.
-  CODEX_MODEL="${PROXY_CODEX_MODEL:-cx/gpt-5.6-terra}"
+  # Default fast Codex model + high reasoning. Override qua PROXY_CODEX_MODEL / CODEX_REASONING_EFFORT.
+  # cx/gpt-5.6-sol strongest; cx/gpt-5.6-terra balanced; cx/gpt-5.6-luna default fast.
+  CODEX_MODEL="${PROXY_CODEX_MODEL:-cx/gpt-5.6-luna}"
+  CODEX_REASONING_EFFORT="${CODEX_REASONING_EFFORT:-high}"
   CODEX_PROVIDER_ARGS=(
     -c 'model_providers.nexus9r.name="9router"'
     -c "model_providers.nexus9r.base_url=\"${PROXY_9ROUTER_BASE_URL}\""
@@ -41,6 +42,7 @@ if [[ -n "${PROXY_9ROUTER_TOKEN:-}" && -n "${PROXY_9ROUTER_BASE_URL:-}" ]]; then
     -c 'model_providers.nexus9r.wire_api="responses"'
     -c 'model_provider="nexus9r"'
     -c "model=\"${CODEX_MODEL}\""
+    -c "model_reasoning_effort=\"${CODEX_REASONING_EFFORT}\""
   )
   delegate_log codex "endpoint: 9router (opt-in, model=$CODEX_MODEL)"
 else
@@ -56,7 +58,8 @@ else
     exit 1
   fi
   CODEX_MODEL="${CODEX_MODEL:-@@CODEX_MODEL_DEFAULT@@}"
-  CODEX_PROVIDER_ARGS=(-m "$CODEX_MODEL")
+  CODEX_REASONING_EFFORT="${CODEX_REASONING_EFFORT:-high}"
+  CODEX_PROVIDER_ARGS=(-m "$CODEX_MODEL" -c "model_reasoning_effort=\"${CODEX_REASONING_EFFORT}\"")
   delegate_log codex "endpoint: OpenAI gốc (codex login / OPENAI_API_KEY), model=$CODEX_MODEL"
 fi
 

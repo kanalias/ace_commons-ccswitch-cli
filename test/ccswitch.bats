@@ -24,17 +24,19 @@ setup() {
   [ "$model" = "cc/claude-opus-5" ]
 }
 
-@test "apply codex writes current GPT-5.6 model tiers" {
+@test "apply codex writes current GPT model tiers and high effort" {
   run "$CC" codex
   [ "$status" -eq 0 ]
   opus=$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL' "$HOME/.claude/settings.json")
   sonnet=$(jq -r '.env.ANTHROPIC_DEFAULT_SONNET_MODEL' "$HOME/.claude/settings.json")
   haiku=$(jq -r '.env.ANTHROPIC_DEFAULT_HAIKU_MODEL' "$HOME/.claude/settings.json")
   fable=$(jq -r '.env.ANTHROPIC_DEFAULT_FABLE_MODEL' "$HOME/.claude/settings.json")
-  [ "$opus" = "cx/gpt-5.6-sol" ]
-  [ "$sonnet" = "cx/gpt-5.6-terra" ]
-  [ "$haiku" = "cx/gpt-5.6-luna" ]
-  [ "$fable" = "cx/gpt-5.6-sol" ]
+  effort=$(jq -r '.env.CLAUDE_CODE_EFFORT_LEVEL' "$HOME/.claude/settings.json")
+  [ "$opus" = "cx/gpt-5.6-luna" ]
+  [ "$sonnet" = "cx/gpt-5.6-sol" ]
+  [ "$haiku" = "cx/gpt-5.6-terra" ]
+  [ "$fable" = "cx/gpt-6-astra" ]
+  [ "$effort" = "high" ]
 }
 
 @test "apply deepseek writes deepseek env block" {
@@ -186,7 +188,7 @@ setup() {
   codex_model=$(jq -r '.ANTHROPIC_DEFAULT_OPUS_MODEL' "$HOME/.claude/profiles/codex.json")
   ds_token=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/deepseek.json")
   [ "$codex_token" = "claude-real-key" ]
-  [ "$codex_model" = "cx/gpt-5.6-sol" ]
+  [ "$codex_model" = "cx/gpt-5.6-luna" ]
   [ "$ds_token" = "claude-real-key" ]
 }
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ccswitch setup (macOS / Linux).
 # Installs ccswitch.sh + profile templates + SessionStart health hook into ~/.claude,
-# then wires a `ccswitch` shell alias. Never overwrites existing profiles that already
-# hold real keys — templates are only copied when the target file is missing.
+# then wires a `ccswitch` shell alias. Existing profile host/key values are kept;
+# model defaults are refreshed from repo templates.
 set -euo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,17 +28,29 @@ cp "$SRC/statusline-context.sh" "$CLAUDE_DIR/statusline-context.sh"
 chmod +x "$CLAUDE_DIR/statusline-context.sh"
 echo "  ✓ statusline-context.sh (context-usage early-warning bar)"
 
-# 2. profile templates — copy ONLY if missing (never clobber a real key).
+# 2. profile templates — create missing profiles; refresh model defaults in existing
+# profiles while preserving real host/key. Re-run setup after repo model updates.
 # 4 profiles: claude/codex/deepseek/kimi via 9router share ONE token.
 # kimi_api_key_force_subscription=1 switches kimi to Kimi's own direct Anthropic-compatible endpoint instead.
 # `subscription` is the env-clear fallback (no file, no key).
 PROFILE_TARGETS=(claude codex deepseek kimi)
 ROUTER_TARGETS=(claude codex deepseek kimi)
 for p in "${PROFILE_TARGETS[@]}"; do
-  if [ -f "$PROFILES/$p.json" ]; then
-    echo "  • profiles/$p.json exists — kept (edit manually or run: ccswitch set-key $p)"
+  dst="$PROFILES/$p.json"
+  tmpl="$SRC/profiles/$p.json"
+  if [ -f "$dst" ]; then
+    cp "$dst" "$dst.bak" 2>/dev/null || true
+    jq -s '.[0] as $cur | .[1] as $tmpl | $cur
+      | .ANTHROPIC_DEFAULT_OPUS_MODEL = $tmpl.ANTHROPIC_DEFAULT_OPUS_MODEL
+      | .ANTHROPIC_DEFAULT_SONNET_MODEL = $tmpl.ANTHROPIC_DEFAULT_SONNET_MODEL
+      | .ANTHROPIC_DEFAULT_HAIKU_MODEL = $tmpl.ANTHROPIC_DEFAULT_HAIKU_MODEL
+      | .ANTHROPIC_DEFAULT_FABLE_MODEL = $tmpl.ANTHROPIC_DEFAULT_FABLE_MODEL
+      | if $tmpl.CLAUDE_CODE_EFFORT_LEVEL then .CLAUDE_CODE_EFFORT_LEVEL = $tmpl.CLAUDE_CODE_EFFORT_LEVEL else del(.CLAUDE_CODE_EFFORT_LEVEL) end' "$dst" "$tmpl" > "$dst.tmp" \
+      && mv "$dst.tmp" "$dst" \
+      && echo "  ✓ profiles/$p.json model defaults refreshed (host/key kept)" \
+      || { echo "  ❌ failed to refresh profiles/$p.json (profile unchanged)"; rm -f "$dst.tmp"; }
   else
-    cp "$SRC/profiles/$p.json" "$PROFILES/$p.json"
+    cp "$tmpl" "$dst"
     echo "  ✓ profiles/$p.json (template — fill in your key)"
   fi
 done

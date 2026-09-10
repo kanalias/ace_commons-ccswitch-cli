@@ -51,7 +51,7 @@ read_dotenv_var() { # read_dotenv_var <VAR_NAME> <default>
   printf '%s' "${val:-$default}"
 }
 GEMINI_MODEL_DEFAULT="${HARNESS_GEMINI_MODEL_DEFAULT:-$(read_dotenv_var GEMINI_MODEL gemini-3.5-flash)}"
-CODEX_MODEL_DEFAULT="${HARNESS_CODEX_MODEL_DEFAULT:-$(read_dotenv_var CODEX_MODEL gpt-5.6-terra)}"
+CODEX_MODEL_DEFAULT="${HARNESS_CODEX_MODEL_DEFAULT:-$(read_dotenv_var CODEX_MODEL gpt-5.6-luna)}"
 DEEPSEEK_MODEL_DEFAULT="${HARNESS_DEEPSEEK_MODEL_DEFAULT:-$(read_dotenv_var DEEPSEEK_MODEL openai/ds/deepseek-v4-pro)}"
 
 command -v jq >/dev/null 2>&1 || { echo "❌ 'jq' required. Install: brew install jq (mac) / apt install jq (linux)"; exit 1; }

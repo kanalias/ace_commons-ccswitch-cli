@@ -4,8 +4,8 @@
 
 .DESCRIPTION
   Installs ccswitch.ps1 + profile templates + SessionStart health hook into %USERPROFILE%\.claude,
-  then registers a `ccswitch` function in your PowerShell profile. Never overwrites existing
-  profile files that already hold real keys — templates are only copied when missing.
+  then registers a `ccswitch` function in your PowerShell profile. Existing profile
+  host/key values are kept; model defaults are refreshed from repo templates.
 
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\setup.ps1
@@ -33,17 +33,36 @@ Write-Host "  ✓ repo path recorded (ccswitch install)"
 Copy-Item (Join-Path $Src "statusline-context.sh") (Join-Path $ClaudeDir "statusline-context.sh") -Force
 Write-Host "  ✓ statusline-context.sh (context-usage early-warning bar)"
 
-# 2. profile templates — copy ONLY if missing (never clobber a real key).
+# 2. profile templates — create missing profiles; refresh model defaults in existing
+# profiles while preserving real host/key. Re-run setup after repo model updates.
 # 4 profiles: claude/codex/deepseek/kimi via 9router share ONE token.
 # kimi_api_key_force_subscription=1 switches kimi to Kimi's own direct Anthropic-compatible endpoint instead.
 $ProfileTargets = @("claude", "codex", "deepseek", "kimi")
 $RouterTargets = @("claude", "codex", "deepseek", "kimi")
+$ModelFields = @(
+  "ANTHROPIC_DEFAULT_OPUS_MODEL",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL",
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+  "ANTHROPIC_DEFAULT_FABLE_MODEL",
+  "CLAUDE_CODE_EFFORT_LEVEL"
+)
 foreach ($t in $ProfileTargets) {
   $dst = Join-Path $Profiles "$t.json"
+  $tmplPath = Join-Path $Src "profiles\$t.json"
   if (Test-Path $dst) {
-    Write-Host "  • profiles\$t.json exists — kept (edit manually or run: ccswitch set-key $t)"
+    try {
+      $cur = Get-Content $dst -Raw | ConvertFrom-Json
+      $tmpl = Get-Content $tmplPath -Raw | ConvertFrom-Json
+      foreach ($field in $ModelFields) {
+        $cur | Add-Member -NotePropertyName $field -NotePropertyValue $tmpl.$field -Force
+      }
+      $cur | ConvertTo-Json -Depth 10 | Set-Content $dst -Encoding UTF8
+      Write-Host "  ✓ profiles\$t.json model defaults refreshed (host/key kept)"
+    } catch {
+      Write-Host "  ❌ failed to refresh profiles\$t.json (profile unchanged)"
+    }
   } else {
-    Copy-Item (Join-Path $Src "profiles\$t.json") $dst -Force
+    Copy-Item $tmplPath $dst -Force
     Write-Host "  ✓ profiles\$t.json (template — fill in your key)"
   }
 }
