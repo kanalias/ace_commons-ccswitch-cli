@@ -1,0 +1,8 @@
+{
+  "ANTHROPIC_BASE_URL": "https://9router.proxy.example.com/v1",
+  "ANTHROPIC_AUTH_TOKEN": "<your-9router-key>",
+  "ANTHROPIC_DEFAULT_OPUS_MODEL": "kimi/kimi-k3",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL": "kimi/kimi-k3",
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "kimi/kimi-k3",
+  "ANTHROPIC_DEFAULT_FABLE_MODEL": "kimi/kimi-k3"
+}

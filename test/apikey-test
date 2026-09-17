@@ -1,0 +1,167 @@
+#!/usr/bin/env bats
+# =============================================================================
+# API KEY TEST — live integration against the 9router proxy
+# =============================================================================
+# WHAT IT TESTS
+#   Endpoint : https://9router.proxy.example.com/v1   (from .env `proxy_host`)
+#   Auth     : /v1/models rejects a keyless request with 401.
+#   Providers: for each of Gemini / OpenAI / DeepSeek / Kimi —
+#                1) the model id is registered in /v1/models, and
+#                2) a "Ping" chat completion returns a non-empty reply
+#                   with finish_reason=stop (HTTP 200).
+#   All three providers go through the SAME 9router endpoint + client key.
+#
+# CONFIG (repo-root .env, gitignored — no leak): proxy_host, proxy_key,
+#   GEMINI_MODEL, OPENAI_MODEL, DEEPSEEK_MODEL, KIMI_MODEL. Never prints token.
+#
+# REPORT: after the run a PASS/FAIL summary + per-provider latency table is
+#   printed (see teardown_file at the bottom).
+#
+# RUN (not auto-discovered — no .bats extension):
+#     bats test/apikey-test
+#   Skips (not fails) when .env / key is missing or endpoint unreachable, so it
+#   never blocks the offline suite.
+# =============================================================================
+
+load test_helper.bash
+
+setup() {
+  setup_fake_home          # isolates $HOME
+  command -v curl >/dev/null || skip "curl not installed"
+  command -v python3 >/dev/null || skip "python3 not installed"
+
+  local envf; envf="$(repo_root)/.env"
+  [ -f "$envf" ] || skip "no .env at repo root"
+  set -a; . "$envf"; set +a   # proxy_host, proxy_key, *_MODEL
+
+  BASE="${proxy_host:-}"
+  TOKEN="${proxy_key:-}"
+  [ -n "$BASE" ]  || skip "proxy_host unset in .env"
+  [ -n "$TOKEN" ] || skip "proxy_key unset in .env"
+
+  # Model ids per provider. DEEPSEEK_MODEL/KIMI_MODEL carry the ccswitch adapter
+  # prefix "openai/" — strip it to the router-native id (ds/... , kimi/...).
+  GEMINI_ID="gemini/${GEMINI_MODEL:-}"
+  OPENAI_ID="${OPENAI_MODEL:-}"
+  DEEPSEEK_ID="${DEEPSEEK_MODEL#openai/}"
+  KIMI_ID="${KIMI_MODEL#openai/}"
+
+  curl -s -m 8 -o /dev/null "$BASE/models" -H "Authorization: Bearer $TOKEN" \
+    || skip "9router endpoint unreachable"
+}
+
+# Tolerant parser: router replies as plain JSON, JSON + trailing "data: [DONE]",
+# or full SSE stream. Prints "OK <content>" on a valid non-empty completion,
+# else exits non-zero with the error/reason. Response file path is $1.
+_assert_reply='
+import json,sys
+raw=open(sys.argv[1]).read().strip()
+def emit(c,fin):
+    assert c.strip(),"empty content"
+    assert fin=="stop",f"finish={fin}"
+    print("OK",c[:40]);sys.exit(0)
+try:
+    d=json.loads(raw)
+    assert "error" not in d,d.get("error")
+    ch=d["choices"][0];emit(ch["message"]["content"],ch.get("finish_reason"))
+except json.JSONDecodeError:
+    pass
+# JSON object followed by trailing junk (e.g. "\ndata: [DONE]")
+try:
+    obj,_=json.JSONDecoder().raw_decode(raw)
+    if "choices" in obj:
+        ch=obj["choices"][0];emit(ch["message"]["content"],ch.get("finish_reason"))
+except (json.JSONDecodeError,KeyError):
+    pass
+# SSE: stitch deltas
+parts=[json.loads(l[6:]) for l in raw.splitlines()
+       if l.startswith("data: ") and l[6:].strip() not in ("","[DONE]")]
+txt="".join(p["choices"][0]["delta"].get("content","")
+            for p in parts if p.get("choices"))
+fin=next((p["choices"][0].get("finish_reason") for p in reversed(parts)
+          if p.get("choices") and p["choices"][0].get("finish_reason")),None)
+emit(txt,fin)
+'
+
+# _ping <label> <model-id> — POST "Ping", assert 200 + valid non-empty reply,
+# and record "<label> <http> <seconds> <model>" to the shared report file for
+# the end-of-run summary. No max_tokens: OpenAI rejects it ("Unsupported
+# parameter") since the router injects its own limit.
+_ping() {
+  local label="$1" model="$2" body="$BATS_TEST_TMPDIR/resp.json"
+  run curl -s -m 40 -o "$body" -w '%{http_code} %{time_total}' "$BASE/chat/completions" \
+    -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+    -d "{\"model\":\"$model\",\"messages\":[{\"role\":\"user\",\"content\":\"Ping\"}],\"stream\":false}"
+  [ "$status" -eq 0 ]
+  local http="${output%% *}" secs="${output##* }"
+  printf '%s %s %s %s\n' "$label" "$http" "$secs" "$model" >> "$BATS_FILE_TMPDIR/report"
+  [ "$http" = "200" ]
+  run python3 -c "$_assert_reply" "$body"
+  [ "$status" -eq 0 ]
+  [[ "$output" == OK* ]]
+}
+
+@test "auth: /v1/models rejects missing key with 401" {
+  run curl -s -m 15 -o /dev/null -w '%{http_code}' "$BASE/models"
+  [ "$status" -eq 0 ]
+  [ "$output" = "401" ]
+}
+
+@test "gemini: provider registered + Ping ok" {
+  [ -n "${GEMINI_MODEL:-}" ] || skip "GEMINI_MODEL unset in .env"
+  run bash -c "curl -s -m 15 -H 'Authorization: Bearer $TOKEN' '$BASE/models' | grep -qF '\"id\":\"$GEMINI_ID\"'"
+  [ "$status" -eq 0 ]
+  _ping gemini "$GEMINI_ID"
+}
+
+@test "openai: provider registered + Ping ok" {
+  [ -n "${OPENAI_MODEL:-}" ] || skip "OPENAI_MODEL unset in .env"
+  run bash -c "curl -s -m 15 -H 'Authorization: Bearer $TOKEN' '$BASE/models' | grep -qF '\"id\":\"$OPENAI_ID\"'"
+  [ "$status" -eq 0 ]
+  _ping openai "$OPENAI_ID"
+}
+
+@test "deepseek: provider registered + Ping ok" {
+  [ -n "${DEEPSEEK_MODEL:-}" ] || skip "DEEPSEEK_MODEL unset in .env"
+  run bash -c "curl -s -m 15 -H 'Authorization: Bearer $TOKEN' '$BASE/models' | grep -qF '\"id\":\"$DEEPSEEK_ID\"'"
+  [ "$status" -eq 0 ]
+  _ping deepseek "$DEEPSEEK_ID"
+}
+
+@test "kimi: provider registered + Ping ok" {
+  [ -n "${KIMI_MODEL:-}" ] || skip "KIMI_MODEL unset in .env"
+  run bash -c "curl -s -m 15 -H 'Authorization: Bearer $TOKEN' '$BASE/models' | grep -qF '\"id\":\"$KIMI_ID\"'"
+  [ "$status" -eq 0 ]
+  _ping kimi "$KIMI_ID"
+}
+
+# Print a PASS/FAIL + latency report after all tests (fd 3 = always visible in
+# bats, even without -t). Reads rows recorded by _ping.
+teardown_file() {
+  local rep="$BATS_FILE_TMPDIR/report"
+  local host; host="$(grep -E '^proxy_host=' "$(repo_root)/.env" 2>/dev/null | sed 's/^proxy_host=//')"
+  {
+    echo
+    echo "================ 9router API key test — REPORT ================"
+    echo "Endpoint: ${host:-<unset>}"
+    if [ -s "$rep" ]; then
+      printf '  %-9s %-6s %-9s %s\n' PROVIDER HTTP LATENCY MODEL
+      local ok=0 total=0 sum=0
+      while read -r label http secs model; do
+        total=$((total+1))
+        local verdict="FAIL"
+        if [ "$http" = "200" ]; then verdict="PASS"; ok=$((ok+1)); fi
+        sum=$(awk "BEGIN{print $sum+$secs}")
+        printf '  %-9s %-6s %6.2fs   %s  [%s]\n' "$label" "$http" "$secs" "$model" "$verdict"
+      done < "$rep"
+      local status="✅ ALL PASS"
+      [ "$ok" -eq "$total" ] || status="❌ $((total-ok))/$total FAILED"
+      printf '  ------------------------------------------------\n'
+      printf '  Result: %s   avg latency: %.2fs\n' "$status" \
+        "$(awk "BEGIN{print $total?$sum/$total:0}")"
+    else
+      echo "  (no chat pings recorded — provider tests skipped or setup failed)"
+    fi
+    echo "=============================================================="
+  } >&3
+}

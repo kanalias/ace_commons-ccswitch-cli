@@ -1,0 +1,33 @@
+# never commit real profiles with keys — only the placeholder templates in profiles/ are tracked
+*.bak
+*.tmp
+# root env (consolidated 2026-07-20, was ai-proxy/.env.pro etc.)
+/.env
+/.env.local
+.env.pro
+.env.aws
+# guard against accidentally dropping a filled-in settings.json at repo root
+# (anchored — .claude/settings.json IS tracked; it holds only hook wiring + flags)
+/settings.json
+# per-machine permission overrides (personal paths, ssh aliases) — never shared
+.claude/settings.local.json
+# macOS noise
+.DS_Store
+# orchestration ledger/trace state (runtime, per-machine)
+.claude/state/
+# git worktrees (parallel tasks + prod-deploy) — see rules/git-workflow.md
+.claude/worktrees/
+.worktrees/
+# legacy path (pre .claude/worktrees/ migration) — kept to avoid tracking leftover dirs
+# local-only deploy skill (aws-prod specifics, not for the public repo)
+.claude/skills/deploy-aws-9router/
+# scratch audit output from delegate md-audit task (2026-07-22)
+/AUDIT_REPORT_DEEPSEEK.md
+/audit_md.sh
+/audit_v2.sh
+# unrelated template, not part of this repo
+/multi-model-coding-harness-template/
+
+# Python
+__pycache__/
+*.pyc
