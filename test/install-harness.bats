@@ -196,8 +196,8 @@ run_install() {
   events_len=$(jq '.hooks.PreToolUse | length' "$TARGET/.claude/settings.json")
 
   [ "$first_len" -eq "$second_len" ]
-  # Edit|Write|MultiEdit|NotebookEdit + Bash + Task gate = 3 matchers; no legacy Edit|Write orphan
-  [ "$events_len" -eq 3 ]
+  # Edit|Write|MultiEdit|NotebookEdit + Bash + Task + mcp-browser gate = 4 matchers; no legacy Edit|Write orphan
+  [ "$events_len" -eq 4 ]
   [ "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Edit|Write")] | length' "$TARGET/.claude/settings.json")" -eq 0 ]
 }
 
