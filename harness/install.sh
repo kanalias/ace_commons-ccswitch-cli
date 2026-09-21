@@ -310,6 +310,8 @@ if [ "$SEL_GUARD" -eq 1 ]; then
   install_file "allowed-hosts.txt"                    ".claude/allowed-hosts.txt" preserve
   # orchestration gate — block under-specified Task dispatch
   install_file "hooks/pre-task-dispatch-gate.sh"      ".claude/hooks/pre-task-dispatch-gate.sh"
+  # browser profile gate — force Cloak/Playwright qua profile prj_<xx>_sv_<yy>
+  install_file "hooks/pre-browser-profile-gate.sh"    ".claude/hooks/pre-browser-profile-gate.sh"
 fi
 
 if [ "$SEL_QUALITY" -eq 1 ]; then
@@ -559,6 +561,9 @@ if [ "$SEL_GUARD" -eq 1 ] || [ "$SEL_QUALITY" -eq 1 ]; then
     wire_hook PreToolUse 'Edit|Write|MultiEdit|NotebookEdit' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-edit-content-scan.sh' 'Edit|Write'
     # orchestration gate — under-specified dispatch
     wire_hook PreToolUse 'Task' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-task-dispatch-gate.sh'
+    # browser profile gate — MCP browser tools + Bash launch
+    wire_hook PreToolUse 'mcp__(pw_|cloak|playwright|browser).*' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-browser-profile-gate.sh'
+    wire_hook PreToolUse 'Bash' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-browser-profile-gate.sh'
   fi
   if [ "$SEL_QUALITY" -eq 1 ]; then
     wire_hook PostToolUse 'Edit|Write|MultiEdit' '$CLAUDE_PROJECT_DIR/.claude/hooks/post-edit-advisor.sh' 'Edit|Write Write'

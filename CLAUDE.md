@@ -45,3 +45,7 @@ BẮT BUỘC route qua 1 trong **5 surfaces** dưới đây. KHÔNG add ad-hoc s
 - [.claude/rules/common/](.claude/rules/common/) — invariant guardrails (secret, vault, budget, orchestrator, delegate, git, red-flags, rule-loading, memory-mirror). Managed by harness install.sh: **overwrite** khi re-sync — KHÔNG sửa trực tiếp trong project (sửa upstream ở harness repo).
 - [.claude/rules/project/](.claude/rules/project/) — rule riêng repo, LAZY trừ khi vượt gate P0-mọi-turn; install.sh **giữ nguyên** khi re-sync.
 <!-- END HARNESS RULES -->
+
+## Project rules — quick links (ngoài block harness)
+
+- [.claude/rules/project/browser-mcp-profiles.md](.claude/rules/project/browser-mcp-profiles.md) — Cloak/Playwright qua MCP, profile `prj_xx_sv_yy` isolation tránh lock session, container tập trung `~/.browser-profiles` (config env `BROWSER_PROFILES_DIR`), MCP per-project. LAZY.
