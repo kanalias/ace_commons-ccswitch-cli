@@ -1,6 +1,8 @@
 ---
+name: git-push-safety
 description: Chạy test, gitleaks, sensitive-content scan; chỉ push nếu cả 3 pass
 disable-model-invocation: true
+user-invocable: true
 ---
 > **Confirmation gate:** Explicit invocation is not confirmation. Before any destructive action, production change, or remote publish, list the exact targets, scope, and impact; ask the user for explicit confirmation in this conversation and wait. Preserve all stricter workflow-specific confirmations below.
 

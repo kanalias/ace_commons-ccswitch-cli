@@ -8,7 +8,7 @@ user-invocable: true
 
 Vòng lặp: viết/sửa code → viết testcase → chạy test → nếu fail thì tìm root cause rồi sửa tiếp → lặp lại tới khi tất cả test pass và acceptance criteria của task đã đạt. Không dừng ở "trông có vẻ đúng" — chỉ dừng khi verify chạy thật pass.
 
-Method dùng ở đây build trên [skill-superpowers.md](../rules/project/skill-superpowers.md) (TDD red-green-refactor + systematic debugging, lazy-load khi chạm code source) — không lặp lại nội dung, chỉ áp dụng thành loop cụ thể.
+Method dùng ở đây build trên [skill-superpowers.md](../../rules/project/skill-superpowers.md) (TDD red-green-refactor + systematic debugging, lazy-load khi chạm code source) — không lặp lại nội dung, chỉ áp dụng thành loop cụ thể.
 
 ## Input cần có
 

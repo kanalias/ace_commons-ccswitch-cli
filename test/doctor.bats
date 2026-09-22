@@ -11,7 +11,7 @@ setup() {
   ROOT="$(repo_root)"
   STAGE="$BATS_TEST_TMPDIR/stage"
   mkdir -p "$STAGE/scripts/delegate"
-  cp "$ROOT"/scripts/delegate/*.sh "$STAGE/scripts/delegate/"
+  cp "$ROOT"/harness/templates/scripts/delegate/*.sh "$STAGE/scripts/delegate/"
   chmod +x "$STAGE"/scripts/delegate/*.sh
   git init -q "$STAGE"
   git -C "$STAGE" config user.email test@test.com
@@ -29,7 +29,7 @@ setup() {
   # doctor.sh's Hooks: section uses internally — NOT probed for
   # presence/absence like the CLI: section above, so they belong in every
   # test's PATH rather than being toggled on/off per test.
-  for bin in basename sed tr sort diff grep cat chmod printf mkdir awk; do
+  for bin in basename sed tr sort diff grep cat chmod printf mkdir awk shasum; do
     real="$(command -v "$bin")"
     ln -s "$real" "$STUBBIN/$bin"
   done
@@ -178,7 +178,7 @@ exit 0'
   [[ "$output" == *"✗ wired: foo.sh"* ]]
 }
 
-@test "doctor.sh: unwired extra hook file → warn line present, exit still 0" {
+@test "doctor.sh: preserved project hooks are not reported as unwired" {
   cat > "$STAGE/.env" <<EOF
 proxy_host=https://fake-9router.test/v1
 proxy_key=fake-9router-key-abc123
@@ -191,7 +191,8 @@ exit 0'
   stage_settings_wiring "foo.sh"
   run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"⚠ unwired hook: extra.sh"* ]]
+  [[ "$output" != *"unwired hook: extra.sh"* ]]
+  [[ "$output" != *"no template counterpart: extra.sh"* ]]
 }
 
 @test "doctor.sh: template drift (real content change) → FAIL naming the file" {
@@ -303,4 +304,76 @@ EOF
   # this doctor.sh version doesn't use jq there, so status is unaffected by
   # jq alone; assert the hooks section specifically degraded gracefully.
   [[ "$output" == *"Hooks:"* ]]
+}
+
+manifest_fixture() {
+  mkdir -p "$STAGE/.claude/commands" "$STAGE/.claude/rules/project"
+  printf 'managed command\n' > "$STAGE/.claude/commands/example.md"
+  printf 'custom project rule\n' > "$STAGE/.claude/rules/project/custom.md"
+  printf '{"hooks":{},"permissions":{"deny":["Read(.env)"]},"env":{"HARNESS_DELEGATE":"1"}}\n' > "$STAGE/.claude/settings.json"
+  local digest
+  digest="$(shasum -a 256 "$STAGE/.claude/commands/example.md" | cut -d ' ' -f1)"
+  jq -n --arg hash "$digest" '{schemaVersion:1,harnessVersion:"test",syncFiles:[{path:".claude/commands/example.md",sha256:$hash}],preservePaths:[".claude/rules/project/custom.md"],settings:{hooks:[],deny:["Read(.env)"],env:{HARNESS_DELEGATE:"1"},statusLineCommand:null}}' > "$STAGE/.claude/harness-manifest.json"
+  export proxy_host=https://example.test proxy_key=test-key deepseek_api_key=test-key
+}
+
+@test "doctor.sh: manifest inventory passes and ignores preserved project edits" {
+  manifest_fixture
+  printf 'project edits\n' >> "$STAGE/.claude/rules/project/custom.md"
+  before="$(git -C "$STAGE" status --porcelain --untracked-files=all)"
+  run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"installed: .claude/commands/example.md"* ]]
+  [[ "$output" == *"manifest settings contributions"* ]]
+  [[ "$output" != *"custom.md"* ]]
+  [ "$before" = "$(git -C "$STAGE" status --porcelain --untracked-files=all)" ]
+}
+
+@test "doctor.sh: manifest missing and modified managed files fail" {
+  manifest_fixture
+  printf 'changed\n' >> "$STAGE/.claude/commands/example.md"
+  run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"✗ installed: .claude/commands/example.md"* ]]
+  rm "$STAGE/.claude/commands/example.md"
+  run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"✗ installed: .claude/commands/example.md"* ]]
+}
+
+@test "doctor.sh: missing settings contribution fails without exposing values" {
+  manifest_fixture
+  jq '.settings.env.HARNESS_DELEGATE="synthetic-private-marker"' "$STAGE/.claude/harness-manifest.json" > "$STAGE/manifest.tmp"
+  mv "$STAGE/manifest.tmp" "$STAGE/.claude/harness-manifest.json"
+  run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"✗ manifest settings contributions"* ]]
+  [[ "$output" != *"synthetic-private-marker"* ]]
+}
+
+@test "doctor.sh: malformed settings and manifest produce diagnostics and complete" {
+  manifest_fixture
+  printf '{bad-json\n' > "$STAGE/.claude/settings.json"
+  printf '{bad-json\n' > "$STAGE/.claude/harness-manifest.json"
+  run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"✗ settings JSON"* ]]
+  [[ "$output" == *"✗ harness manifest schema"* ]]
+  [[ "$output" == *"pass, "* ]]
+}
+
+@test "doctor.sh: manifest checks exact event matcher and command wiring" {
+  manifest_fixture
+  stage_hook "foo.sh" '#!/bin/bash
+exit 0'
+  stage_settings_wiring "foo.sh"
+  jq '.settings = {hooks:[{event:"PreToolUse",matcher:"Bash",command:"$CLAUDE_PROJECT_DIR/.claude/hooks/foo.sh"}],deny:[],env:{},statusLineCommand:null}' "$STAGE/.claude/harness-manifest.json" > "$STAGE/manifest.tmp"
+  mv "$STAGE/manifest.tmp" "$STAGE/.claude/harness-manifest.json"
+  run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
+  [ "$status" -eq 0 ]
+  jq '.hooks.PreToolUse[0].matcher="Write"' "$STAGE/.claude/settings.json" > "$STAGE/settings.tmp"
+  mv "$STAGE/settings.tmp" "$STAGE/.claude/settings.json"
+  run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"✗ manifest settings contributions"* ]]
 }
