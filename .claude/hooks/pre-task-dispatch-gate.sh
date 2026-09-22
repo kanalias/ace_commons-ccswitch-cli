@@ -18,6 +18,19 @@
 # Fail-open: thiếu jq / payload không JSON / thiếu subagent_type → exit 0.
 set -euo pipefail
 
+# Slug từ session cwd — mỗi worktree 1 state file riêng (FORMAT v1.3, xem
+# orchestrator.md "Task-graph artifact"), không còn race read-modify-write
+# giữa 2 session cùng repo. cwd rỗng/không khớp worktree → "main".
+graph_slug() {
+  local c="$1" rest s
+  case "$c" in
+    */.claude/worktrees/*) rest="${c#*/.claude/worktrees/}"; s="${rest%%/*}" ;;
+    *) s="" ;;
+  esac
+  s="$(printf '%s' "$s" | tr -cd 'A-Za-z0-9._-')"
+  printf '%s' "${s:-main}"
+}
+
 # harness off-switch — set HARNESS_DELEGATE=0 in .claude/settings.local.json to disable
 [ "${HARNESS_DELEGATE:-1}" = "0" ] && exit 0
 
@@ -75,13 +88,18 @@ fi
 # Graph unreadable / parse lỗi bất kỳ → fail-open exit 0 (threat model: chống
 # vô ý, không chống adversary — như mọi check khác trong hook này).
 #
-# FORMAT v1.2: marker "task-graph <slug>#<id>" — slug chống session song song
-# validate nhầm graph của task khác (2 session cùng repo, mỗi task 1 graph
-# path cố định .claude/state/task-graph.md nhưng nội dung khác nhau theo lúc).
-# Marker v1 cũ "task-graph #<id>" (không slug) vẫn ACCEPT — tolerated cho
-# dispatch đang chạy chưa cập nhật prompt.
+# FORMAT v1.3: graph per-worktree tại .claude/state/task-graph/<slug>.md —
+# slug tự suy ra từ `cwd` thật của session (payload.cwd, KHÔNG phải
+# CLAUDE_PROJECT_DIR — field đó luôn trỏ về repo root kể cả khi session đang
+# cwd trong worktree). Mỗi session chỉ đọc/ghi ĐÚNG file của mình → không còn
+# file dùng chung → không còn race read-modify-write giữa 2 session song song.
+# Loại bỏ hẳn cơ chế slug-marker v1.2 (band-aid detect-mismatch-sau-khi-xảy-ra)
+# vì giờ collision KHÔNG THỂ xảy ra nữa — không cần detect. Marker quay lại
+# format v1 đơn giản: "task-graph #<id>" (không slug).
+cwd_in=$(echo "$payload" | jq -r '.cwd // empty')
+slug=$(graph_slug "$cwd_in")
 project_dir="${CLAUDE_PROJECT_DIR:-$(dirname "$0")/../..}"
-graph_file="$project_dir/.claude/state/task-graph.md"
+graph_file="$project_dir/.claude/state/task-graph/$slug.md"
 
 if [ -f "$graph_file" ] && [ -r "$graph_file" ]; then
   # Header validation — không tin field index ($2 id / $5 rw / $6 locked) nếu
@@ -94,31 +112,13 @@ if [ -f "$graph_file" ] && [ -r "$graph_file" ]; then
   if [ "$header_norm" != "$header_canonical" ]; then
     echo "$(ts) WARN task-graph header không khớp format chuẩn (graph: $graph_file) → fail-open, bỏ qua task-graph gate" >> "$LOG" 2>/dev/null || true
   else
-    slug_expected=$(sed -n '1p' "$graph_file" | sed -E 's/^# task-graph: *//' | grep -oE '^[a-z0-9-]+' || true)
-
-    marker_id=""
-    marker_v12=$(echo "$prompt" | grep -oE 'task-graph [a-z0-9-]+#[0-9]+' | head -1 || true)
-    if [ -n "$marker_v12" ]; then
-      marker_slug=$(echo "$marker_v12" | sed -E 's/^task-graph ([a-z0-9-]+)#[0-9]+$/\1/')
-      marker_id=$(echo "$marker_v12" | grep -oE '[0-9]+$' || true)
-      if [ -n "$slug_expected" ] && [ "$marker_slug" != "$slug_expected" ]; then
-        echo "$(ts) BLOCK $subagent_type dispatch → task-graph slug mismatch marker=$marker_slug expected=$slug_expected" >> "$LOG" 2>/dev/null || true
-        cat >&2 << EOF
-🚦 dispatch-gate: marker "task-graph $marker_slug#$marker_id" có slug "$marker_slug" không khớp slug graph hiện tại "$slug_expected" ($graph_file) — có thể đang dispatch nhầm sang task-graph của session khác.
-   Sửa marker thành "task-graph $slug_expected#$marker_id", hoặc xác nhận lại graph file đúng task trước khi dispatch.
-EOF
-        exit 2
-      fi
-    else
-      # v1 tolerated (không slug) — giữ hành vi cũ.
-      marker_id=$(echo "$prompt" | grep -oE 'task-graph #[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
-    fi
+    marker_id=$(echo "$prompt" | grep -oE 'task-graph #[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
 
     if [ -z "$marker_id" ]; then
       echo "$(ts) BLOCK $subagent_type dispatch → thiếu task-graph marker (graph file: $graph_file)" >> "$LOG" 2>/dev/null || true
       cat >&2 << EOF
-🚦 dispatch-gate: task-graph tồn tại ($graph_file) nhưng prompt không có marker "task-graph <slug>#<id>" khớp row trong file.
-   Thêm marker "task-graph ${slug_expected:-<slug>}#<id>" khớp đúng subtask, hoặc xoá graph file nếu task này không thuộc graph.
+🚦 dispatch-gate: task-graph tồn tại ($graph_file) nhưng prompt không có marker "task-graph #<id>" khớp row trong file.
+   Thêm marker "task-graph #<id>" khớp đúng subtask, hoặc xoá graph file nếu task này không thuộc graph.
 EOF
       exit 2
     fi

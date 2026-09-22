@@ -27,6 +27,18 @@ run_gate() {
   run bash -c "printf '%s' '$json' | CLAUDE_PROJECT_DIR='$PROJECT_DIR' bash '$GATE_SCRIPT'"
 }
 
+write_graph_status() {
+  # $1 = slug, $2 = status, $3 = integration-status
+  local slug="$1" st="$2" integ="$3"
+  mkdir -p "$PROJECT_DIR/.claude/state/task-graph"
+  cat > "$PROJECT_DIR/.claude/state/task-graph/${slug}.md" << EOF
+# task-graph: ${slug}
+status: ${st}
+integration-verify: -
+integration-status: ${integ}
+EOF
+}
+
 @test "verdict-record: APPROVE message writes APPROVE to state file" {
   run_record '{"last_assistant_message":"review ok\nVERDICT: APPROVE"}'
   [ "$status" -eq 0 ]
@@ -134,5 +146,44 @@ run_gate() {
 
 @test "merge-gate: path fallback resolves to repo root when CLAUDE_PROJECT_DIR unset" {
   run bash -c "cd '$ROOT' && printf '%s' '{\"tool_input\":{\"command\":\"git merge feat/foo\"}}' | bash '$GATE_SCRIPT'"
+  [ "$status" -eq 0 ]
+}
+
+# ── integration-verify gate (FORMAT v1.3, per-slug từ cwd) ──────────────────
+
+@test "integration-gate: main-repo session blocks git commit when integrating + status != pass" {
+  write_graph_status "main" "integrating" "pending"
+  json=$(jq -nc '{tool_input:{command:"git commit -m x"},cwd:""}')
+  run bash -c "printf '%s' '$json' | CLAUDE_PROJECT_DIR='$PROJECT_DIR' bash '$GATE_SCRIPT'"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"integration-verify-gate"* ]]
+}
+
+@test "integration-gate: main-repo session allows git commit when integration-status=pass" {
+  write_graph_status "main" "integrating" "pass"
+  json=$(jq -nc '{tool_input:{command:"git commit -m x"},cwd:""}')
+  run bash -c "printf '%s' '$json' | CLAUDE_PROJECT_DIR='$PROJECT_DIR' bash '$GATE_SCRIPT'"
+  [ "$status" -eq 0 ]
+}
+
+@test "integration-gate: worktree session resolves its own slug graph, not main.md" {
+  # main.md would block (integrating/pending); close-graph-gaps.md is clean (dispatched) → allow.
+  write_graph_status "main" "integrating" "pending"
+  write_graph_status "close-graph-gaps" "dispatched" "pending"
+  json=$(jq -nc '{tool_input:{command:"git commit -m x"},cwd:"/Users/admin/repo/.claude/worktrees/close-graph-gaps"}')
+  run bash -c "printf '%s' '$json' | CLAUDE_PROJECT_DIR='$PROJECT_DIR' bash '$GATE_SCRIPT'"
+  [ "$status" -eq 0 ]
+}
+
+@test "integration-gate: subagent (agent_id set) bypasses regardless of graph status" {
+  write_graph_status "main" "integrating" "pending"
+  json=$(jq -nc '{tool_input:{command:"git commit -m x"},cwd:"",agent_id:"a1"}')
+  run bash -c "printf '%s' '$json' | CLAUDE_PROJECT_DIR='$PROJECT_DIR' bash '$GATE_SCRIPT'"
+  [ "$status" -eq 0 ]
+}
+
+@test "integration-gate: no graph file for session's own slug → allow (no gate)" {
+  json=$(jq -nc '{tool_input:{command:"git commit -m x"},cwd:""}')
+  run bash -c "printf '%s' '$json' | CLAUDE_PROJECT_DIR='$PROJECT_DIR' bash '$GATE_SCRIPT'"
   [ "$status" -eq 0 ]
 }

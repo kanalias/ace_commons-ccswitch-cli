@@ -28,7 +28,11 @@ run_stop() {
 }
 
 run_start() {
-  run bash -c "CLAUDE_PROJECT_DIR='$PROJECT_DIR' bash '$START_SCRIPT'"
+  # $1 = cwd (optional, mô phỏng session ở worktree nào — rỗng = main repo)
+  local cwd="${1:-}"
+  local json
+  json=$(jq -nc --arg c "$cwd" '{cwd:$c}')
+  run bash -c "printf '%s' '$json' | CLAUDE_PROJECT_DIR='$PROJECT_DIR' bash '$START_SCRIPT'"
 }
 
 @test "stop-ledger: appends line + creates state dir" {
@@ -219,4 +223,57 @@ run_start() {
   run bash -c "CLAUDE_PROJECT_DIR='$PROJECT_DIR' bash '$START_SCRIPT' 2>&1 1>/dev/null"
   [ "$status" -eq 0 ]
   [[ "$output" != *"jq KHÔNG có trong PATH"* ]]
+}
+
+# ── task-graph banner (FORMAT v1.3, per-slug từ cwd) ────────────────────────
+
+write_graph_status() {
+  # $1 = slug, $2 = status
+  local slug="$1" st="$2"
+  mkdir -p "$PROJECT_DIR/.claude/state/task-graph"
+  cat > "$PROJECT_DIR/.claude/state/task-graph/${slug}.md" << EOF
+# task-graph: ${slug}
+status: ${st}
+integration-verify: -
+integration-status: pending
+EOF
+}
+
+@test "session-start-graph: main-repo session (no worktree cwd) shows only main.md" {
+  write_graph_status "main" "dispatched"
+  run_start ""
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Task-graph dở dang"* ]]
+  [[ "$output" == *"task-graph: main"* ]]
+}
+
+@test "session-start-graph: worktree session shows only its own slug's graph, not other slugs" {
+  write_graph_status "main" "dispatched"
+  write_graph_status "close-graph-gaps" "review"
+  run_start "/Users/admin/repo/.claude/worktrees/close-graph-gaps"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"task-graph: close-graph-gaps"* ]]
+  [[ "$output" != *"task-graph: main"* ]]
+}
+
+@test "session-start-graph: main-repo session does not see dangling worktree graph" {
+  write_graph_status "close-graph-gaps" "dispatched"
+  run_start ""
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Task-graph dở dang"* ]]
+}
+
+@test "session-start-graph: status done → file removed, no banner" {
+  write_graph_status "main" "done"
+  run_start ""
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Task-graph dở dang"* ]]
+  [ ! -f "$PROJECT_DIR/.claude/state/task-graph/main.md" ]
+}
+
+@test "session-start-graph: missing task-graph directory degrades gracefully (no crash, no noise)" {
+  [ ! -d "$PROJECT_DIR/.claude/state/task-graph" ]
+  run_start "/Users/admin/repo/.claude/worktrees/close-graph-gaps"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Task-graph dở dang"* ]]
 }

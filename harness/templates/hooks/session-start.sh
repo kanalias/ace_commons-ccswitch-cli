@@ -5,8 +5,28 @@
 # đã có ở token-budget.md always-load, không cần lặp ở đây).
 set -u
 
+# Slug từ session cwd — mỗi worktree 1 state file riêng (FORMAT v1.3, xem
+# orchestrator.md "Task-graph artifact"), không còn race read-modify-write
+# giữa 2 session cùng repo. cwd rỗng/không khớp worktree → "main".
+graph_slug() {
+  local c="$1" rest s
+  case "$c" in
+    */.claude/worktrees/*) rest="${c#*/.claude/worktrees/}"; s="${rest%%/*}" ;;
+    *) s="" ;;
+  esac
+  s="$(printf '%s' "$s" | tr -cd 'A-Za-z0-9._-')"
+  printf '%s' "${s:-main}"
+}
+
 # harness off-switch — set HARNESS_DELEGATE=0 in .claude/settings.local.json to disable
 [ "${HARNESS_DELEGATE:-1}" = "0" ] && exit 0
+
+payload=$(cat 2>/dev/null || true)
+cwd_in=""
+if command -v jq >/dev/null 2>&1 && [ -n "$payload" ]; then
+  cwd_in=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null) || cwd_in=""
+fi
+slug=$(graph_slug "$cwd_in")
 
 # ── ledger (stdout — Claude Code inject làm context đầu session) ───────────
 project_dir="${CLAUDE_PROJECT_DIR:-$(dirname "$0")/../..}"
@@ -46,11 +66,14 @@ if [ -f "$ledger" ]; then
 fi
 
 # ── task-graph banner (stdout — resume hint từ orchestrator plan) ──────────
-graph="$project_dir/.claude/state/task-graph.md"
+# Per-slug: chỉ đọc file khớp ĐÚNG slug của session hiện tại (suy từ cwd) —
+# KHÔNG glob toàn bộ .claude/state/task-graph/*.md (tránh in graph dở dang
+# của worktree/session khác, gây noisy banner không liên quan).
+graph="$project_dir/.claude/state/task-graph/$slug.md"
 if [ -f "$graph" ]; then
   status=$(grep -m1 '^status:' "$graph" 2>/dev/null | sed 's/^status:[[:space:]]*//') || status=""
   if [ -n "$status" ] && [ "$status" != "done" ]; then
-    echo "📊 Task-graph dở dang (status: $status) — đọc .claude/state/task-graph.md để resume:"
+    echo "📊 Task-graph dở dang (status: $status) — đọc $graph để resume:"
     cat "$graph"
   elif [ "$status" = "done" ]; then
     rm -f "$graph"

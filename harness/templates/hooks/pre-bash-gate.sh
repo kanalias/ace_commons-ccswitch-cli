@@ -6,8 +6,9 @@
 #   1) git-push gate    — runs for EVERYONE (main + subagent), no agent_id check.
 #   2) merge-verdict gate — runs for EVERYONE (main + subagent), no agent_id check.
 #   2.5) integration-verify gate — main-agent only. Blocks `git commit` while
-#      .claude/state/task-graph.md says status: integrating and
-#      integration-status != pass (orchestrator.md: Integration verify).
+#      .claude/state/task-graph/<slug>.md (slug từ cwd, xem graph_slug() dưới)
+#      says status: integrating and integration-status != pass
+#      (orchestrator.md: Integration verify).
 #   3) orchestrator gate  — subagent (agent_id set) short-circuit allow, THEN
 #      direct-CLI bypass block, THEN ORCHESTRATOR_GATE_BYPASS=1 hatch, THEN
 #      bash-write-core pattern block.
@@ -21,6 +22,19 @@
 # Output: exit 0 = allow · exit 2 = block (stderr shown to model).
 # Fail-open: thiếu jq / payload không JSON → allow.
 set -euo pipefail
+
+# Slug từ session cwd — mỗi worktree 1 state file riêng (FORMAT v1.3, xem
+# orchestrator.md "Task-graph artifact"), không còn race read-modify-write
+# giữa 2 session cùng repo. cwd rỗng/không khớp worktree → "main".
+graph_slug() {
+  local c="$1" rest s
+  case "$c" in
+    */.claude/worktrees/*) rest="${c#*/.claude/worktrees/}"; s="${rest%%/*}" ;;
+    *) s="" ;;
+  esac
+  s="$(printf '%s' "$s" | tr -cd 'A-Za-z0-9._-')"
+  printf '%s' "${s:-main}"
+}
 
 # harness off-switch — set HARNESS_DELEGATE=0 in .claude/settings.local.json to disable
 [ "${HARNESS_DELEGATE:-1}" = "0" ] && exit 0
@@ -64,14 +78,16 @@ fi
 # ── 2.5) integration-verify gate (main-agent only) ──────────────────────────
 if [ -z "$agent_id" ] && echo "$cmd" | grep -Eq '(^|[;&|]|[[:space:]])git([[:space:]]+-[^[:space:]]+([[:space:]]+[^[:space:]-]+)?)*[[:space:]]+commit([[:space:]]|$)'; then
   project_dir="${CLAUDE_PROJECT_DIR:-$(dirname "$0")/../..}"
-  graph_file="$project_dir/.claude/state/task-graph.md"
+  cwd_in=$(echo "$payload" | jq -r '.cwd // empty')
+  slug=$(graph_slug "$cwd_in")
+  graph_file="$project_dir/.claude/state/task-graph/$slug.md"
   if [ -f "$graph_file" ]; then
     graph_status=$(grep '^status:' "$graph_file" 2>/dev/null | head -1 | awk -F: '{gsub(/^[ \t]+|[ \t]+$/,"",$2); print $2}')
     integ_status=$(grep '^integration-status:' "$graph_file" 2>/dev/null | head -1 | awk -F: '{gsub(/^[ \t]+|[ \t]+$/,"",$2); print $2}')
     if [ "$graph_status" = "integrating" ] && [ "$integ_status" != "pass" ]; then
       echo "$(ts) BLOCK main-agent git-commit-during-integrating (integration-status=${integ_status:-<empty>}) → ${cmd:0:120}" >> "$LOG" 2>/dev/null || true
       cat >&2 << EOF
-🚦 integration-verify-gate: task-graph đang integrating nhưng integration-status=${integ_status:-<empty>} — chạy integration verify (test suite/build) trên branch đã ghép, set integration-status: pass trong .claude/state/task-graph.md rồi mới commit tổng (orchestrator.md: Integration verify)
+🚦 integration-verify-gate: task-graph đang integrating nhưng integration-status=${integ_status:-<empty>} — chạy integration verify (test suite/build) trên branch đã ghép, set integration-status: pass trong $graph_file rồi mới commit tổng (orchestrator.md: Integration verify)
 EOF
       exit 2
     fi

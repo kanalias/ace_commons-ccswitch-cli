@@ -47,7 +47,7 @@ Fable/Opus:  review diff từng worktree → merge / reject → integration veri
 
 ≥2 dòng cùng wave → PHẢI gửi chung 1 message. Bảng 1 dòng duy nhất → giải thích tại sao không chẻ được. WRITE subtask chưa ✅ interface-locked → KHÔNG dispatch.
 
-- Task **M+ multi-agent WRITE** (≥2 subtask WRITE, hoặc có subtask L/XL) → PHẢI ghi blackboard `.claude/state/plan-<slug>.md` (cấu trúc: `/resume-orchestration` mục 0): contract/interface đã lock, edge cases, decisions log, bảng phân rã (kèm cột `agent_id` cho SendMessage resume — KHÔNG cột `status`, trạng thái sống ở `task-graph.md`), section `## Questions`. Blackboard = shared source-of-truth cho mọi subagent.
+- Task **M+ multi-agent WRITE** (≥2 subtask WRITE, hoặc có subtask L/XL) → PHẢI ghi blackboard `.claude/state/plan-<slug>.md` (cấu trúc: `/resume-orchestration` mục 0): contract/interface đã lock, edge cases, decisions log, bảng phân rã (kèm cột `agent_id` cho SendMessage resume — KHÔNG cột `status`, trạng thái sống ở `task-graph/<slug>.md`), section `## Questions`. Blackboard = shared source-of-truth cho mọi subagent.
 - Task M đơn-agent hoặc READ-only fan-out → chỉ in bảng chat, blackboard optional.
 - Lifecycle: task xong → xoá plan file cùng lúc ledger. Plan file >48h không đụng → stale, audit trước khi tin.
 
@@ -57,14 +57,16 @@ Fable/Opus:  review diff từng worktree → merge / reject → integration veri
 
 ## Task-graph artifact (BẮT BUỘC task M trở lên)
 
-Task M trở lên → bảng phân rã PHẢI ghi vào `.claude/state/task-graph.md` (sống sót qua compact/session, ledger resume đọc được).
+Task M trở lên → bảng phân rã PHẢI ghi vào `.claude/state/task-graph/<slug>.md` (sống sót qua compact/session, ledger resume đọc được).
 
-**Phân vai 2 artifact (không trộn):** `task-graph.md` = state machine DUY NHẤT (status/tiến độ/wave/verdict) — hook parse, luôn thắng khi mâu thuẫn trạng thái. Blackboard `plan-<slug>.md` = contract/spec/edge-cases/decisions/Questions — KHÔNG giữ máy trạng thái riêng. Cả 2 xoá cùng lúc khi graph `status: done`.
+**Per-worktree, KHÔNG chung file (FORMAT v1.3):** mỗi session chỉ đọc/ghi ĐÚNG graph của mình — `<slug>` tự suy từ `cwd` thật của session (đọc field `cwd` trong hook JSON payload, KHÔNG dùng `$CLAUDE_PROJECT_DIR` — biến này luôn trỏ về repo root kể cả khi session đang cwd trong worktree). Session cwd khớp `.claude/worktrees/<slug>/...` (xem [[git-workflow]]) → dùng `<slug>` đó; không khớp (làm việc thẳng trên repo chính) → `main`. Vì không còn file dùng chung giữa các session, race read-modify-write (2 session cùng ghi đè 1 file) bị loại bỏ **tận gốc** — không chỉ detect-mismatch-sau-khi-xảy-ra như cơ chế slug-marker v1.2 cũ.
 
-**Format (TASK-GRAPH FORMAT v1.2):**
+**Phân vai 2 artifact (không trộn):** `task-graph/<slug>.md` = state machine DUY NHẤT (status/tiến độ/wave/verdict) — hook parse, luôn thắng khi mâu thuẫn trạng thái. Blackboard `plan-<slug>.md` = contract/spec/edge-cases/decisions/Questions — KHÔNG giữ máy trạng thái riêng. Cả 2 xoá cùng lúc khi graph `status: done`.
+
+**Format (TASK-GRAPH FORMAT v1.3):**
 
 ```text
-File: .claude/state/task-graph.md (runtime state, không commit vào git)
+File: .claude/state/task-graph/<slug>.md (runtime state, không commit vào git; <slug> tự suy từ cwd/worktree của session — xem trên)
 Header lines:
   # task-graph: <slug>
   status: planning|dispatched|review|integrating|done
@@ -72,12 +74,12 @@ Header lines:
   integration-status: pending|pass|fail
 Table header đúng: | id | subtask | persona | rw | locked | deps | wave | status | verify |
 Row values: id=int · rw=R|W · locked=yes|no · deps=- hoặc ids phẩy · wave=int · status=pending|dispatched|pass|revise|done · verify=command
-Prompt marker (v1.2): mọi dispatch delegate-* PHẢI chứa literal `task-graph <slug>#<id>` — slug khớp đúng header `# task-graph: <slug>` của file graph hiện tại (chống graph của task khác còn sót lại / session song song đè nhầm). Marker v1 cũ `task-graph #<id>` (không slug) vẫn được tolerate — backward-compat, không hard-fail.
+Prompt marker (v1, quay lại từ v1.2 — hết cần slug vì mỗi worktree đã có graph riêng): mọi dispatch delegate-* PHẢI chứa literal `task-graph #<id>` khớp row trong file graph của ĐÚNG session đang dispatch.
 ```
 
-- Hook `pre-task-dispatch-gate.sh` HARD-BLOCK dispatch khi: graph tồn tại mà prompt thiếu marker, id không có trong bảng, slug lệch header (marker v1.2), hoặc row `rw=W` có `locked≠yes` — interface-lock enforce cứng. Marker v1 (không slug) → tolerate. Header bảng bị reformat → gate **fail-open + WARN log**.
+- Hook `pre-task-dispatch-gate.sh` HARD-BLOCK dispatch khi: graph (của đúng slug session) tồn tại mà prompt thiếu marker, id không có trong bảng, hoặc row `rw=W` có `locked≠yes` — interface-lock enforce cứng. Header bảng bị reformat → gate **fail-open + WARN log**.
 - Orchestrator update cột `status` row ngay sau mỗi verdict (pass/revise). Sau integration verify → set `integration-status: pass`. Task hoàn tất → `status: done`; `session-start.sh` dọn file khi done.
-- Hook `pre-bash-gate.sh` chặn `git commit` main-agent khi graph `status: integrating` mà `integration-status` chưa `pass`.
+- Hook `pre-bash-gate.sh` chặn `git commit` main-agent khi graph (đúng slug session) `status: integrating` mà `integration-status` chưa `pass`.
 - **Render block v1.2** (thay icon map bản trước):
   - Icon map RENDER-ONLY (hiển thị chat/statusline, KHÔNG ghi vào file graph): `⬜ queued · 🚀 spawned · 🔄 running · 📥 returned · 👀 reviewing · ♻️ revise · ✅ pass · ✔️ done · 🛑 fail · ⏳ pending · 🧪 verify · 🔀 merging · 🧠 orchestrator · 🤖 agents · 📊 header`.
   - Mapping row-status (file, text thuần) → render-status: orchestrator suy ra từ session knowledge, KHÔNG ghi state mới vào file: `pending`→⬜ (hoặc 🚀 vừa spawn) · `dispatched`→🔄 (hoặc 📥 đã return chờ review / 👀 đang review) · `revise`→♻️ kèm số vòng · `pass`→✅ · `done`→✔️ · fail hết fallback chain→🛑.
@@ -235,6 +237,6 @@ Context window (~200K auto-compact): xem [[token-budget]] — orchestrator luôn
 | `subagent-stop-record.sh` | SubagentStop | Ghi verdict (PASS/REVISE) vào ledger + append metrics JSONL; nhiều dòng cùng `agent_id` = resume iterations |
 | `session-start.sh` | SessionStart | Đọc ledger, hiển thị task dở dang qua `/resume-orchestration` |
 
-**Vai ledger (`orchestrator-ledger.md`):** audit-trail PHỤ, append-only, TTL 48h tự prune — KHÔNG phải state machine. `task-graph.md` là nguồn TRẠNG THÁI chính; ledger chỉ đối chiếu completion khi resume. Graph đã xoá mà ledger còn dòng cũ → bình thường.
+**Vai ledger (`orchestrator-ledger.md`):** audit-trail PHỤ, append-only, TTL 48h tự prune — KHÔNG phải state machine, vẫn 1 file dùng chung mọi session (an toàn vì append-only, không read-modify-write nên không race). `task-graph/<slug>.md` (per-worktree, xem mục "Task-graph artifact") là nguồn TRẠNG THÁI chính; ledger chỉ đối chiếu completion khi resume. Graph đã xoá mà ledger còn dòng cũ → bình thường.
 
 **Metrics JSONL:** `subagent-stop-record.sh` append mỗi verdict vào `~/.cache/claude-code-<slug>/orchestration.jsonl` (fields: `ts`, `agent_id`, `type`, `verdict`) — audit định kỳ revise-rate/fallback-rate.

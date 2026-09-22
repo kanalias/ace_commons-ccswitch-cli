@@ -16,14 +16,16 @@ Task M+ multi-agent WRITE ghi blackboard `.claude/state/plan-<slug>.md` lúc
 dispatch (xem [[orchestrator]] Planning gate). Nếu file này tồn tại → dùng nó
 làm nguồn **CONTEXT/contract** (bảng subtask + contract đã lock + decisions +
 Questions) — **KHÔNG** dùng làm nguồn trạng thái. Trạng thái (status/wave/verdict)
-sống DUY NHẤT ở `.claude/state/task-graph.md` (dual-artifact: xem [[orchestrator]]
-mục "Task-graph artifact") — plan file không tự giữ máy trạng thái riêng nữa.
+sống DUY NHẤT ở `.claude/state/task-graph/<slug>.md` (per-worktree — `<slug>`
+tự suy từ cwd/worktree của session hiện tại, `main` nếu làm thẳng trên repo
+chính; dual-artifact: xem [[orchestrator]] mục "Task-graph artifact") — plan
+file không tự giữ máy trạng thái riêng nữa.
 Ledger (`orchestrator-ledger.md`) chỉ để đối chiếu completion (mục 2 dưới).
 Template chuẩn:
 
 ```markdown
 # Plan: <slug>
-(trạng thái xem .claude/state/task-graph.md — file này KHÔNG có field status riêng)
+(trạng thái xem .claude/state/task-graph/<slug>.md — file này KHÔNG có field status riêng)
 ## Contract (LOCKED — subagent không tự sửa)
 <signatures, types, ranh giới file/module>
 ## Edge cases (đã quyết)
@@ -71,7 +73,8 @@ guard: re-decompose, không quay lại model đã fail).
 ## 4. Quy ước ghi ledger (orchestrator side)
 
 Ledger = audit-trail PHỤ, append-only, TTL 48h tự prune — KHÔNG phải state
-machine (state machine là `task-graph.md`, xem [[orchestrator]]). Hook
+machine (state machine là `task-graph/<slug>.md` per-worktree, xem
+[[orchestrator]]). Hook
 `subagent-stop-record.sh` CHỈ ghi dòng "subagent done" khi subagent kết
 thúc — nó không biết bảng phân rã. Vì vậy tại thời điểm dispatch, orchestrator
 NÊN tự ghi bảng phân rã (subtask/persona/wave) vào
@@ -82,7 +85,7 @@ nhưng bỏ qua bước này làm ledger vô dụng khi resume.
 ## 5. Hoàn tất
 
 Khi task-graph chuyển `status: done` (tất cả subtask done + integration
-verify pass) → xoá `.claude/state/task-graph.md` **và**
+verify pass) → xoá `.claude/state/task-graph/<slug>.md` **và**
 `.claude/state/plan-<slug>.md` (nếu có) cùng lúc, báo user orchestration đã
 hoàn tất. Ledger giữ nguyên (TTL 48h tự prune riêng) — graph/plan đã xoá mà
 ledger còn dòng cũ là bình thường, không phải bug.
