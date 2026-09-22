@@ -1,12 +1,26 @@
 #!/usr/bin/env bash
-# Statusline: hiển thị tiến độ task-graph (xem .claude/state/task-graph.md)
+# Statusline: hiển thị tiến độ task-graph (xem .claude/state/task-graph/<slug>.md)
 # nối sau global context-budget statusline (~/.claude/statusline-context.sh),
 # nếu global script tồn tại — project statusLine OVERRIDE global nên phải tự chain.
 #
-# Nhận session JSON qua stdin (không cần parse ở đây — chỉ forward cho global
-# script). Fail-open triệt để: mọi lỗi (graph vắng/hỏng, global script lỗi,
-# thiếu jq...) vẫn in được phần còn lại, KHÔNG exit non-zero, KHÔNG stderr rác.
+# Nhận session JSON qua stdin — statusLine payload có field `cwd` (và
+# `workspace.current_dir`/`workspace.git_worktree`) dùng để suy slug per-
+# worktree (FORMAT v1.3). Fail-open triệt để: mọi lỗi (graph vắng/hỏng,
+# global script lỗi, thiếu jq...) vẫn in được phần còn lại, KHÔNG exit
+# non-zero, KHÔNG stderr rác.
 set -u
+
+# Slug từ session cwd — mỗi worktree 1 state file riêng, không còn race
+# read-modify-write giữa 2 session cùng repo. cwd rỗng/không khớp worktree → "main".
+graph_slug() {
+  local c="$1" rest s
+  case "$c" in
+    */.claude/worktrees/*) rest="${c#*/.claude/worktrees/}"; s="${rest%%/*}" ;;
+    *) s="" ;;
+  esac
+  s="$(printf '%s' "$s" | tr -cd 'A-Za-z0-9._-')"
+  printf '%s' "${s:-main}"
+}
 
 input_json="$(cat 2>/dev/null)"
 
@@ -16,23 +30,28 @@ if [ -f "$HOME/.claude/statusline-context.sh" ]; then
   global_output="$(printf '%s' "$input_json" | bash "$HOME/.claude/statusline-context.sh" 2>/dev/null)"
 fi
 
-# ── 2. locate task-graph.md ──────────────────────────────────────────────
+# ── 2. locate task-graph/<slug>.md ────────────────────────────────────────
 project_dir="${CLAUDE_PROJECT_DIR:-}"
 if [ -z "$project_dir" ]; then
   project_dir="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)"
 fi
-graph="${project_dir:-.}/.claude/state/task-graph.md"
+
+cwd_in=""
+if command -v jq >/dev/null 2>&1 && [ -n "$input_json" ]; then
+  cwd_in="$(printf '%s' "$input_json" | jq -r '.cwd // empty' 2>/dev/null)" || cwd_in=""
+fi
+slug="$(graph_slug "$cwd_in")"
+graph="${project_dir:-.}/.claude/state/task-graph/${slug}.md"
 
 segment=""
 if [ -r "$graph" ]; then
-  # Header validation (FORMAT v1.2) — không tin field index ($9 status) nếu
-  # bảng bị reformat (cột thêm/xoá/đổi thứ tự). Lệch → im lặng bỏ segment,
-  # không in rác/sai vào statusline (fail-open, nhất quán dispatch-gate).
+  # Header validation — không tin field index ($9 status) nếu bảng bị
+  # reformat (cột thêm/xoá/đổi thứ tự). Lệch → im lặng bỏ segment, không in
+  # rác/sai vào statusline (fail-open, nhất quán dispatch-gate).
   header_line="$(grep -m1 -E '^\|[[:space:]]*id[[:space:]]*\|' "$graph" 2>/dev/null || true)"
   header_norm="$(printf '%s' "$header_line" | sed -E 's/[[:space:]]+/ /g; s/^ *//; s/ *$//')"
   header_canonical="| id | subtask | persona | rw | locked | deps | wave | status | verify |"
 
-  slug="$(sed -n '1p' "$graph" 2>/dev/null | sed -e 's/^# task-graph: *//' -e 's/[[:space:]]*$//')"
   status_val="$(grep -m1 '^status:' "$graph" 2>/dev/null | sed -e 's/^status: *//' -e 's/[[:space:]]*$//')"
   integ_val="$(grep -m1 '^integration-status:' "$graph" 2>/dev/null | sed -e 's/^integration-status: *//' -e 's/[[:space:]]*$//')"
 
