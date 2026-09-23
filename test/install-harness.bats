@@ -123,6 +123,7 @@ run_install() {
   # commands group (default Y) — must land, non-empty, generic (no 9router leak)
   [ -s "$TARGET/.claude/commands/git-push-safety.md" ]
   [ -f "$TARGET/.claude/commands/task-loop-feature.md" ]
+  [ -f "$TARGET/.claude/commands/update-claude.md" ]
   [ -f "$TARGET/.claude/commands/doctor-memory.md" ]
   [ -f "$TARGET/.claude/commands/git-commit.md" ]
   ! grep -q '9router' "$TARGET/.claude/commands/git-push-safety.md" || false
