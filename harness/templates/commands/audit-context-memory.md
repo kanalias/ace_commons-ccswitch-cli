@@ -19,22 +19,40 @@ Khác [[doctor-memory]] (chỉ memory content — broken link, orphan, naming, s
 - **Gate always-load (đúng CẢ 2):** (1) P0 guardrail — vi phạm gây mất data / leak secret / phá scope; (2) áp mọi-turn — không gắn được vào 1 vùng code cụ thể. Thiếu 1 trong 2 → phải LAZY (kể cả P0 nếu chỉ chạm 1 vùng).
 - **Global rule** (`~/.claude/rules/`) miễn gate này — luôn always theo bản chất tầng global, KHÔNG bao giờ gán `paths:`.
 
+## Write-boundary (BẮT BUỘC đọc trước Bước 5)
+
+Không phải file nào audit được cũng sửa được tại chỗ. 3 vùng, 3 cách sửa khác nhau:
+
+| Vùng | Sửa ở đâu | Lý do |
+|---|---|---|
+| `.claude/rules/project/**` | sửa LIVE trực tiếp | `install.sh` mode `preserve` — không bị đè |
+| `.claude/rules/common/**` | sửa `harness/templates/rules/common/<same>.md`, KHÔNG sửa live | `install.sh` mode `sync` (**overwrite**) — sửa live mất trắng lần re-sync sau |
+| `CLAUDE.md` giữa `<!-- BEGIN HARNESS RULES ... -->` / `<!-- END HARNESS RULES -->` | KHÔNG sửa — sửa heredoc `ensure_claude_md()` trong `harness/install.sh` | block do install.sh generate, replace-in-place mỗi lần sync |
+
+`CLAUDE.md` NGOÀI block → sửa live bình thường. Repo không có `harness/templates/` (project đã cài harness từ nơi khác) → `common/` và block CLAUDE.md thành **read-only**: chỉ flag ở report, hướng user sửa upstream ở harness repo.
+
+Sửa bất kỳ harness surface LIVE nào → mirror vào template cùng commit: [[sync-template]].
+
 ## Bước 1 — Liệt kê file load tĩnh
 
 ```bash
 echo "=== GLOBAL RULES (~/.claude/rules/, luôn ALWAYS) ==="
-wc -l ~/.claude/rules/*.md 2>/dev/null
+# find, không glob: zsh abort cả lệnh với "no matches found" khi dir vắng.
+find ~/.claude/rules -maxdepth 1 -name '*.md' 2>/dev/null | sort | xargs -r wc -l || true
+[ -d ~/.claude/rules ] || echo "(không có global rules)"
 
 echo "=== PROJECT CLAUDE.md ==="
 wc -l ./CLAUDE.md 2>/dev/null
 
-echo "=== PROJECT RULES (.claude/rules/) — phân loại ALWAYS/LAZY ==="
-cd .claude/rules 2>/dev/null && for f in *.md; do
-  [ "$f" = "00-index.md" ] && continue
+echo "=== PROJECT RULES (.claude/rules/**) — phân loại ALWAYS/LAZY + tier ==="
+# Rule nằm trong .claude/rules/common/ + .claude/rules/project/, KHÔNG phẳng ở tầng rules/.
+# `cd .claude/rules && for f in *.md` KHÔNG match gì → báo 0 rule im lặng. Dùng find.
+# head -20: frontmatter chuẩn ~8 dòng, paths: nằm sau — head -5 báo nhầm lazy thành ALWAYS.
+find .claude/rules -name '*.md' ! -name '00-index.md' 2>/dev/null | sort | while read -r f; do
   n=$(wc -l < "$f")
-  # head -20: frontmatter chuẩn ~8 dòng, paths: nằm sau — head -5 báo nhầm lazy thành ALWAYS.
-  head -20 "$f" | grep -q "^paths:" && echo "LAZY   $f ($n dòng)" || echo "ALWAYS $f ($n dòng)"
-done; cd - >/dev/null
+  case "$f" in */common/*) tier="common:SYNC-overwrite" ;; *) tier="project:PRESERVE" ;; esac
+  head -20 "$f" | grep -q "^paths:" && echo "LAZY   $f [$tier] ($n dòng)" || echo "ALWAYS $f [$tier] ($n dòng)"
+done
 
 echo "=== MEMORY.md index (auto-memory, luôn load) ==="
 p="$PWD"; slug="$(printf '%s' "$p" | sed 's/[\/_]/-/g')"
@@ -80,9 +98,11 @@ Không tự sửa ở bước này. Với mỗi finding ở Bước 3, đề xu�
 - **TÁCH FILE** — chi tiết ít dùng chuyển ra file riêng (project rule LAZY hoặc memory `reference_*`), always-load chỉ giữ pointer.
 - **GIỮ NGUYÊN** — vượt gate, không đổi.
 
-Mỗi đề xuất ghi rõ: file, dòng hiện tại → dòng sau tối ưu (ước lượng), lý do 1 dòng.
+Mỗi đề xuất ghi rõ: file, dòng hiện tại → dòng sau tối ưu (ước lượng), lý do 1 dòng, **và target sửa theo Write-boundary** (live / `harness/templates/rules/common/...` / `install.sh ensure_claude_md()`).
 
 ## Bước 5 — Áp fix (chỉ sau khi user chọn `[a]ll/[s]elect/[n]one`)
+
+Trước mỗi Edit, route target theo **Write-boundary** ở trên. Finding chạm `.claude/rules/common/**` → Edit file template tương ứng rồi copy sang live (để session hiện tại có hiệu lực). Finding chạm CLAUDE.md managed block → KHÔNG Edit, báo user sửa `harness/install.sh`.
 
 Cho mỗi finding **CHUYỂN LAZY** user đồng ý:
 
