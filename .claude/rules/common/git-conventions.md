@@ -17,6 +17,6 @@ feat|fix|refactor|chore|docs: <mô tả>
 
 ## Branch cleanup sau merge (BẮT BUỘC)
 
-Xong tính năng → merge vào `dev` → cleanup worktree + branch NGAY trong cùng session, KHÔNG để rác qua session. Quy trình đầy đủ (3 bước, whitelist prefix, confirm trước xoá, ngoại lệ): [[git-workflow]] mục "Cleanup sau merge".
+Xong tính năng → merge vào `main` → cleanup worktree + branch NGAY trong cùng session, KHÔNG để rác qua session. Quy trình đầy đủ (3 bước, whitelist prefix, confirm trước xoá, ngoại lệ): [[git-workflow]] mục "Cleanup sau merge".
 
 Liên quan: [[delegate-llm]] (delegate infra), [[orchestrator]] (routing).

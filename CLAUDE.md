@@ -8,7 +8,7 @@
 - [.claude/rules/project/git-workflow.md](.claude/rules/project/git-workflow.md) — branching, working branch rule, protected-branch deploy confirm, worktree, cleanup
 - [.claude/rules/common/feature-redflags.md](.claude/rules/common/feature-redflags.md) — safe minimal changes + RED FLAGS cognitive wedge
 - Thêm/sửa rule → đọc [.claude/rules/common/rule-loading-policy.md](.claude/rules/common/rule-loading-policy.md) trước (rule mới mặc định LAZY `paths:`)
-- Ghi memory type project → xem [.claude/rules/common/memory-mirror.md](.claude/rules/common/memory-mirror.md) (mirror git-tracked; chưa kích hoạt ở repo này)
+- Ghi memory type project → mirror vào [.claude/memory/](.claude/memory/) theo [.claude/rules/common/memory-mirror.md](.claude/rules/common/memory-mirror.md)
 - ⭐⭐⭐ **Harness Architecture (P0)** — xem section dưới
 
 ## ⭐⭐⭐ Harness Architecture (P0 — đọc kỹ)
@@ -39,7 +39,7 @@ BẮT BUỘC route qua 1 trong **5 surfaces** dưới đây. KHÔNG add ad-hoc s
 
 **Skip mechanism (user-only):** prompt chứa `SKIP_HOOKS` / `BYPASS_<HOOK>` / "ignore <hook> safety" → hook exit 0 + log audit.
 
-**`.claude/rules/` KHÔNG phải surface thứ 6.** 5 surfaces trên là cơ chế native Claude Code tự thực thi (runtime). `.claude/rules/` là convention thuần docs/governance — không có cơ chế "rule loading" built-in nào cả; nó chỉ hoạt động qua (a) link Markdown trong CLAUDE.md, (b) hardcode path reference trong hook script text. Feature logic → 5 surfaces. Quy định/convention/gate loading → `.claude/rules/`.
+**Native rules loading.** Claude Code tự động khám phá Markdown trong `.claude/rules/`: rule không có `paths:` được nạp luôn; rule có `paths:` chỉ nạp khi đọc file khớp glob. Rules cung cấp instructions, không phải executable hooks hay permission enforcement. Feature logic → 5 surfaces ở trên; governance → rules.
 
 **Harness rules (bundled, self-contained).** Mọi session PHẢI đọc + tuân thủ trước khi action:
 - [.claude/rules/common/](.claude/rules/common/) — invariant guardrails (secret, vault, budget, orchestrator, delegate, git, red-flags, rule-loading, memory-mirror). Managed by harness install.sh: **overwrite** khi re-sync — KHÔNG sửa trực tiếp trong project (sửa upstream ở harness repo).

@@ -1,0 +1,352 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": "1",
+  "syncFiles": [
+    {
+      "path": ".claude/agents/code-reviewer.md",
+      "sha256": "38db544015763dec1bd9a2452202b6dd11dcc9745c2ec7ac12091e683bcfce6a"
+    },
+    {
+      "path": ".claude/agents/delegate-codex.md",
+      "sha256": "ae4a268b6a7411b837c3769ecbbfce7279d18ff8038b5e9ec15c11aefc16fcdd"
+    },
+    {
+      "path": ".claude/agents/delegate-deepseek.md",
+      "sha256": "40c33f0cc0071feaa81150092c214b565fe34c22cfccb0efe0128fa3fd1e3df0"
+    },
+    {
+      "path": ".claude/agents/delegate-gemini.md",
+      "sha256": "23180b99483eff487ea461f5cdbae8e39f1d989e306842f41d9b6381c32ab8de"
+    },
+    {
+      "path": ".claude/agents/delegate-sonnet.md",
+      "sha256": "413e3b39ae6db971e2cea1e59a3b67dd8544118b5e576c466b0886ee63ded66b"
+    },
+    {
+      "path": ".claude/agents/secret-scanner.md",
+      "sha256": "ba2543e600d73eb011804c5447e2c26c3b673e117c710284117d1a226b0f9b67"
+    },
+    {
+      "path": ".claude/commands/audit-claude-md.md",
+      "sha256": "71b64e27432c266ae05ab375fe8769b2955500d52d07c7a515bc7acaa1ce70da"
+    },
+    {
+      "path": ".claude/commands/audit-context-memory.md",
+      "sha256": "1e1fa3e00afbd272024870456d75ebc6891722500ab654630558461a671d0f6e"
+    },
+    {
+      "path": ".claude/commands/audit-dependency.md",
+      "sha256": "c214c0cab210af4845ca4de55c7a9a9d81463d19609874b037d71bd711f809c1"
+    },
+    {
+      "path": ".claude/commands/audit-vietnamese.md",
+      "sha256": "ebb1bbba8bee942581053db0b77fe2f6dd029abe15bbefbdc242f88d331b92b9"
+    },
+    {
+      "path": ".claude/commands/clean-up-project.md",
+      "sha256": "39f8d5a054ae091364d0119b70d355cd719bf43524f1ea911fa1e17b6143f809"
+    },
+    {
+      "path": ".claude/commands/doctor-memory.md",
+      "sha256": "2b06ea93e19acdfafe5d7307a52d1a2e8be9de04321837ea538ccd96bbd9c40c"
+    },
+    {
+      "path": ".claude/commands/git-cleanup-branch.md",
+      "sha256": "5eff876e064daca219fceccb82974ae580514223c88d258d2bee5c783ac23c04"
+    },
+    {
+      "path": ".claude/commands/git-commit-describe.md",
+      "sha256": "c0976ca5709b8a007aa26a947923b807eb4da29b0512fe748851ed59f39423d6"
+    },
+    {
+      "path": ".claude/commands/git-commit.md",
+      "sha256": "58442b3e79098b1c0692d2c1ad3200d78e95152c651b3fb2179654abdd946260"
+    },
+    {
+      "path": ".claude/commands/git-force-snapshot.md",
+      "sha256": "ba82a124128e3f7aaeaf6cc72d823898d64693720e1e5f82be515537c75536b2"
+    },
+    {
+      "path": ".claude/commands/git-push-safety.md",
+      "sha256": "b1a5bd43e671c07c28cb0a88adfb7bb1c779f62d55665e7959c104104e040d5c"
+    },
+    {
+      "path": ".claude/commands/production-cleanup.md",
+      "sha256": "67d96946de985de388a417a7abd3bcbdc06ee02f515ea2835bae7a8eb22d904d"
+    },
+    {
+      "path": ".claude/commands/production-deploy.md",
+      "sha256": "6f8606ee2fb78606c8bfca0cfc3e5fbc3c66546ce65fd077910f3b4f4721023b"
+    },
+    {
+      "path": ".claude/commands/production-reboot.md",
+      "sha256": "ba10904cc63135767d202725fe8aa79371ad6b9786e4218aceaf9569f68e1108"
+    },
+    {
+      "path": ".claude/commands/resume-orchestration.md",
+      "sha256": "1097bb29e4e761535be785a991c6e53e3aa2f1817d53a454a8dad0238db77f08"
+    },
+    {
+      "path": ".claude/commands/task-loop-feature.md",
+      "sha256": "eff98890af8192ebda90f84c325d92a14b8488f9abd684ff62f052b0c2599176"
+    },
+    {
+      "path": ".claude/commands/update-claude.md",
+      "sha256": "33bab12481a2fbc0b00aa0bbe5af49b5309f32f2100b10f243c8df78a39ee0f7"
+    },
+    {
+      "path": ".claude/commands/update-codex.md",
+      "sha256": "de2e67aaa384d1c8fcc3088a5fbb6de416e4d50537c39604ab3ec39250b90d13"
+    },
+    {
+      "path": ".claude/commands/update-deepseek.md",
+      "sha256": "dff03fa94bb9d6fc05e353fabfa76c2a774a4cba63d43fa4cb3977d52230813c"
+    },
+    {
+      "path": ".claude/commands/update-gemini.md",
+      "sha256": "e360666a88ee604ddf8315365f770bb8fcb464ca9382a82065fd09e9cf1b2607"
+    },
+    {
+      "path": ".claude/hooks/post-bash-stuck-detector.sh",
+      "sha256": "85ea0a310c88627567d5136ba24fa239a930e9feae5fd6126304bafe81c53af3"
+    },
+    {
+      "path": ".claude/hooks/post-edit-advisor.sh",
+      "sha256": "22cb67d9b38a89f25b99c6e87b599eed16354fb0ebfeb325753e742fd641fc48"
+    },
+    {
+      "path": ".claude/hooks/pre-bash-gate.sh",
+      "sha256": "3446e5ef9d3e63f7f23b5c21a7866fc15e680b387f5f9d3c6b9344151c55e1d4"
+    },
+    {
+      "path": ".claude/hooks/pre-browser-profile-gate.sh",
+      "sha256": "f6aa5d710ae55c290ba945c86f73e44cba25dda422d30858ae1f5ef8bcf62302"
+    },
+    {
+      "path": ".claude/hooks/pre-edit-content-scan.sh",
+      "sha256": "053c17b48555988dc07d01c369187938b4c999ee42236df203719cca87beafb1"
+    },
+    {
+      "path": ".claude/hooks/pre-edit-orchestrator-gate.sh",
+      "sha256": "71eda8a3aa7a83418739c848b9eecb623cb9efcda42ba5e76b5389cf18e55203"
+    },
+    {
+      "path": ".claude/hooks/pre-task-dispatch-gate.sh",
+      "sha256": "b34bfb4ef7fa19be3be2c29cbdb835bf5794bf673ad89707917a714283b3e2e3"
+    },
+    {
+      "path": ".claude/hooks/session-start.sh",
+      "sha256": "294c2d237aa8edc6c7ecaa55a3ba38e2cdd1390177ac2e11309948aa4f863d9c"
+    },
+    {
+      "path": ".claude/hooks/subagent-stop-record.sh",
+      "sha256": "5af2fbd22814b7ddc1fe50cd027b038e1618e62a0668efadee006b5de31f29ed"
+    },
+    {
+      "path": ".claude/rules/common/delegate-llm.md",
+      "sha256": "748fd79754565dced8be552db068b8984f96818cd0f2f126e9aee70fe39a9037"
+    },
+    {
+      "path": ".claude/rules/common/feature-redflags.md",
+      "sha256": "ca3528b83fc514061fb4aa23721620049fbdf676745984bb5b754710caef2f2d"
+    },
+    {
+      "path": ".claude/rules/common/git-conventions.md",
+      "sha256": "8fc29d8138e383bf586505664a127ae3846f0b584f474fbe3ce4cfb6f1eaf786"
+    },
+    {
+      "path": ".claude/rules/common/memory-mirror.md",
+      "sha256": "7719e802454ecdae0f9b4ca338bf3355769f663ede04e8172eeb2ebeb947b2ac"
+    },
+    {
+      "path": ".claude/rules/common/orchestrator.md",
+      "sha256": "6f46e7f69ab373c7ba9fc264786cca9807337bd44c81046d2eb7b1a6762e6372"
+    },
+    {
+      "path": ".claude/rules/common/rule-loading-policy.md",
+      "sha256": "899eb8c58af693d15c4be3cdf3f4693ebe3be1c9e90cf0f3d95bfcd036c88c2a"
+    },
+    {
+      "path": ".claude/rules/common/secrets-no-printout.md",
+      "sha256": "b14f2fee45933e3f92e932d2c4659a37107b20f24bb79b149dc6715db682a1eb"
+    },
+    {
+      "path": ".claude/rules/common/token-budget.md",
+      "sha256": "27bd376d890f9d98d91f9ea5e2945c187b871145daf41b7199398fde5f721cf9"
+    },
+    {
+      "path": ".claude/rules/common/vault-no-mcp.md",
+      "sha256": "09423b6ae0529283c5d670b9f48091ed2ea75033e5c0318dbcb5c530b7c2b2fe"
+    },
+    {
+      "path": ".claude/skills/audit-claude-md/SKILL.md",
+      "sha256": "71b64e27432c266ae05ab375fe8769b2955500d52d07c7a515bc7acaa1ce70da"
+    },
+    {
+      "path": ".claude/skills/audit-context-memory/SKILL.md",
+      "sha256": "1e1fa3e00afbd272024870456d75ebc6891722500ab654630558461a671d0f6e"
+    },
+    {
+      "path": ".claude/skills/audit-dependency/SKILL.md",
+      "sha256": "c214c0cab210af4845ca4de55c7a9a9d81463d19609874b037d71bd711f809c1"
+    },
+    {
+      "path": ".claude/skills/audit-git-leak/SKILL.md",
+      "sha256": "40462a87ca9005c639857f9776f3f971f913080b479f79276781d90a59e6267d"
+    },
+    {
+      "path": ".claude/skills/audit-vietnamese/SKILL.md",
+      "sha256": "ebb1bbba8bee942581053db0b77fe2f6dd029abe15bbefbdc242f88d331b92b9"
+    },
+    {
+      "path": ".claude/skills/auto-commit/SKILL.md",
+      "sha256": "a249629905b41526338dbd3f17fe51ca4b0de08e6c0c18c29874f48abe185c69"
+    },
+    {
+      "path": ".claude/skills/check-hardcode/SKILL.md",
+      "sha256": "fcad8f5045d7a216de60ff6b6a2b87351835f82cea7010f64e5c0a3e712dea75"
+    },
+    {
+      "path": ".claude/skills/clean-up-project/SKILL.md",
+      "sha256": "39f8d5a054ae091364d0119b70d355cd719bf43524f1ea911fa1e17b6143f809"
+    },
+    {
+      "path": ".claude/skills/dep-ladder-check/SKILL.md",
+      "sha256": "c8e69b9a0ec791da0b91a721f8bdb08e272e7e455d8aaa5adc870cb1bd161f58"
+    },
+    {
+      "path": ".claude/skills/doctor-memory/SKILL.md",
+      "sha256": "2b06ea93e19acdfafe5d7307a52d1a2e8be9de04321837ea538ccd96bbd9c40c"
+    },
+    {
+      "path": ".claude/skills/fix-ledger/SKILL.md",
+      "sha256": "5404fefd639fb76cee80b80caed1d8f7b679e3e36f26c9878855a08190b415da"
+    },
+    {
+      "path": ".claude/skills/git-cleanup-branch/SKILL.md",
+      "sha256": "5eff876e064daca219fceccb82974ae580514223c88d258d2bee5c783ac23c04"
+    },
+    {
+      "path": ".claude/skills/git-commit-describe/SKILL.md",
+      "sha256": "c0976ca5709b8a007aa26a947923b807eb4da29b0512fe748851ed59f39423d6"
+    },
+    {
+      "path": ".claude/skills/git-commit/SKILL.md",
+      "sha256": "58442b3e79098b1c0692d2c1ad3200d78e95152c651b3fb2179654abdd946260"
+    },
+    {
+      "path": ".claude/skills/git-force-snapshot/SKILL.md",
+      "sha256": "ba82a124128e3f7aaeaf6cc72d823898d64693720e1e5f82be515537c75536b2"
+    },
+    {
+      "path": ".claude/skills/git-push-safety/SKILL.md",
+      "sha256": "13457cdd9ea53902e55af0f1cb233f8a1a5b740bfd96d68a96e1444bb6010b50"
+    },
+    {
+      "path": ".claude/skills/lazy-load-health/SKILL.md",
+      "sha256": "63b562983e1fbba265482d3bda09c0e4be036c1493edd6fa40c44bd3f66007e0"
+    },
+    {
+      "path": ".claude/skills/orchestrate/SKILL.md",
+      "sha256": "9653e023311ca82d63f84ef5abfa1fc72f5bb9fb4207ec19d279f7ea2f644b7a"
+    },
+    {
+      "path": ".claude/skills/production-cleanup/SKILL.md",
+      "sha256": "69ada453f6ecd3b7e238004f0bdb0921e4bf9134414e49fb097d5d988695a72c"
+    },
+    {
+      "path": ".claude/skills/production-deploy/SKILL.md",
+      "sha256": "6f8606ee2fb78606c8bfca0cfc3e5fbc3c66546ce65fd077910f3b4f4721023b"
+    },
+    {
+      "path": ".claude/skills/production-reboot/SKILL.md",
+      "sha256": "bb9cb2ab675de4e651c64c7325cd53fa1975e3f00e9cf4c86b7d4bda9f99903e"
+    },
+    {
+      "path": ".claude/skills/resume-orchestration/SKILL.md",
+      "sha256": "1097bb29e4e761535be785a991c6e53e3aa2f1817d53a454a8dad0238db77f08"
+    },
+    {
+      "path": ".claude/skills/task-loop-feature/SKILL.md",
+      "sha256": "2bbabefc5737d765cda41476b5a275a19eebfbe424655307680dbd445808d40c"
+    },
+    {
+      "path": ".claude/skills/update-claude/SKILL.md",
+      "sha256": "33bab12481a2fbc0b00aa0bbe5af49b5309f32f2100b10f243c8df78a39ee0f7"
+    },
+    {
+      "path": ".claude/skills/update-codex/SKILL.md",
+      "sha256": "de2e67aaa384d1c8fcc3088a5fbb6de416e4d50537c39604ab3ec39250b90d13"
+    },
+    {
+      "path": ".claude/skills/update-deepseek/SKILL.md",
+      "sha256": "dff03fa94bb9d6fc05e353fabfa76c2a774a4cba63d43fa4cb3977d52230813c"
+    },
+    {
+      "path": ".claude/skills/update-gemini/SKILL.md",
+      "sha256": "e360666a88ee604ddf8315365f770bb8fcb464ca9382a82065fd09e9cf1b2607"
+    },
+    {
+      "path": ".claude/statusline-orchestration.sh",
+      "sha256": "fbf724465174826c48331d0960783d581909afb756f64e3267c374ed05e89242"
+    },
+    {
+      "path": ".git/hooks/pre-push",
+      "sha256": "6becc152672fe08e3c64e779104090928884169e49186d034ec21d7a7f2ada09"
+    },
+    {
+      "path": "scripts/delegate/_common.sh",
+      "sha256": "c0118cf6eb6bf8bfcbe2df0ccadc3a137c0687ec35b0f83183aa7bd1f43fbabb"
+    },
+    {
+      "path": "scripts/delegate/doctor.sh",
+      "sha256": "40905d98b191439a5a4517437b0af56b7b0f06d4cfd896bc5def1512e4028ef3"
+    },
+    {
+      "path": "scripts/delegate/lib/sitecustomize.py",
+      "sha256": "1c5c783e11695c0cf68d3b5beaa10e4f5e02980e3fa48d761c654e830f41ccff"
+    },
+    {
+      "path": "scripts/delegate/run-aider-deepseek.sh",
+      "sha256": "7f1ac2e7ed572c5771754c4b636d69718ebb1a85c1e6eb909e6b453e9c8d47d4"
+    },
+    {
+      "path": "scripts/delegate/run-codex.sh",
+      "sha256": "690e881b41da904880c6deb72db3e47c5480697f6a04f06a8cc3789fc35792a4"
+    },
+    {
+      "path": "scripts/delegate/run-gemini.sh",
+      "sha256": "66bd0a5c76ad885bdc7eacd78fdfd5169355a2167860647af8bac15f7636bb1c"
+    }
+  ],
+  "preservePaths": [
+    ".claude/allowed-hosts.txt",
+    ".claude/rules/project/browser-mcp-profiles.md",
+    ".claude/rules/project/git-workflow.md",
+    ".claude/rules/project/skill-superpowers.md",
+    ".claude/rules/project/test-parallel.md",
+    "CLAUDE.md"
+  ],
+  "settings": {
+    "hooks": [],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(rm -rf .git:*)",
+      "Edit(./**/*.pem)",
+      "Edit(./.env)",
+      "Edit(./.env.*)",
+      "Edit(./secrets/**)",
+      "Read(./**/*.pem)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Write(./**/*.pem)",
+      "Write(./.env)",
+      "Write(./.env.*)",
+      "Write(./secrets/**)"
+    ],
+    "env": {},
+    "statusLineCommand": null
+  }
+}

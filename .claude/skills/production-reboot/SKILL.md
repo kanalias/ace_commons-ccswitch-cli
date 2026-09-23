@@ -47,7 +47,7 @@ out-of-band** qua API/console của provider.
    ssh -o ConnectTimeout=15 <deploy-ssh-host> 'echo SSH_OK; uptime' 2>&1 | head -2
    ```
    - **Nếu SSH trả về `SSH_OK`** → host KHÔNG bị wedged. **Không** reboot. Chạy
-     [/production-cleanup](production-cleanup.md) thay thế (nhiều khả năng chỉ là disk pressure).
+     [/production-cleanup](../production-cleanup/SKILL.md) thay thế (nhiều khả năng chỉ là disk pressure).
    - Dấu hiệu wedged: port mở (TCP connect được) nhưng SSH banner-timeout và healthcheck timeout.
 
 2. **Reboot out-of-band — ví dụ, tự điều chỉnh theo cloud provider của bạn.** SSH/console không truy cập được, nên
@@ -76,7 +76,7 @@ out-of-band** qua API/console của provider.
    ```
 
 5. **Cleanup + verify.** Reboot lấy lại được SSH nhưng KHÔNG tự giải phóng disk — chạy
-   [/production-cleanup](production-cleanup.md) để prune build cache/dangling image và verify
+   [/production-cleanup](../production-cleanup/SKILL.md) để prune build cache/dangling image và verify
    `<service-name>` cùng mọi service khác trên host.
 
 ## Guardrails

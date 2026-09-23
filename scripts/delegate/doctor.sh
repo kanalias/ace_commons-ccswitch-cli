@@ -132,6 +132,11 @@ if [[ "$IN_GIT_REPO" -eq 1 ]]; then
   WIRED_NAMES=""
   if command -v jq >/dev/null 2>&1; then
     if [[ -f "$SETTINGS_JSON" ]]; then
+      if jq -e 'type == "object"' "$SETTINGS_JSON" >/dev/null 2>&1; then
+        check 1 "settings JSON"
+      else
+        check 0 "settings JSON"
+      fi
       WIRED_NAMES="$(jq -r '(.hooks // {}) | .. | strings | select(test("\\.claude/hooks/.*\\.sh$"))' "$SETTINGS_JSON" 2>/dev/null | sed -E 's#.*/##' | sort -u)"
 
       while IFS= read -r hook_name; do
@@ -153,6 +158,7 @@ if [[ "$IN_GIT_REPO" -eq 1 ]]; then
     for hook_file in "$HOOKS_DIR"/*.sh; do
       [[ -f "$hook_file" ]] || continue
       hook_name="$(basename "$hook_file")"
+      [[ -f "$TEMPLATE_HOOKS_DIR/$hook_name" ]] || continue
       grep -qx "$hook_name" <<< "$WIRED_NAMES" || echo "  ⚠ unwired hook: $hook_name"
     done
   fi
@@ -176,7 +182,7 @@ if [[ "$IN_GIT_REPO" -eq 1 ]]; then
   # markers) — that substitution is expected at install time, not drift. Line-pairwise
   # compare (not NR==FNR diff trick) so an empty template file still
   # correctly reports drift against a non-empty live file.
-  if [[ -d "$TEMPLATE_HOOKS_DIR" ]]; then
+  if [[ -d "$TEMPLATE_HOOKS_DIR" && ! -f "$REPO_ROOT/.claude/harness-manifest.json" ]]; then
     if [[ -d "$HOOKS_DIR" ]]; then
       for hook_file in "$HOOKS_DIR"/*.sh; do
         [[ -f "$hook_file" ]] || continue
@@ -201,8 +207,6 @@ if [[ "$IN_GIT_REPO" -eq 1 ]]; then
           else
             check 0 "template match: $hook_name"
           fi
-        else
-          echo "  ⚠ no template counterpart: $hook_name"
         fi
       done
     fi
@@ -214,6 +218,73 @@ if [[ "$IN_GIT_REPO" -eq 1 ]]; then
   fi
 else
   echo "  – skipped — no git repo to locate .claude/hooks"
+fi
+
+# The install manifest is the expected inventory, not the source template tree:
+# optional groups and preserved project files must not cause false drift reports.
+echo
+echo "Installed harness:"
+if [[ "$IN_GIT_REPO" -eq 1 ]] && command -v jq >/dev/null 2>&1; then
+  manifest="$REPO_ROOT/.claude/harness-manifest.json"
+  if [[ -f "$manifest" ]]; then
+    if jq -e '
+      .schemaVersion == 1 and
+      (.syncFiles | type == "array") and
+      (.preservePaths | type == "array") and
+      (.settings | type == "object") and
+      all(.syncFiles[]; (.path | type == "string") and
+        (.path | test("^(\\.claude/|scripts/delegate/|\\.git/hooks/)[A-Za-z0-9_./-]+$")) and
+        (.path | split("/") | all(. != ".." and . != ".")) and
+        (.sha256 | type == "string" and test("^[a-fA-F0-9]{64}$")))
+    ' "$manifest" >/dev/null 2>&1; then
+      check 1 "harness manifest schema"
+      while IFS=$'\t' read -r installed_path expected_hash; do
+        [[ -n "$installed_path" ]] || continue
+        # Never inspect a preserved path even if a malformed inventory lists both.
+        jq -e --arg path "$installed_path" '.preservePaths | index($path) != null' "$manifest" >/dev/null 2>&1 && continue
+        actual_hash=""
+        if [[ -f "$REPO_ROOT/$installed_path" ]]; then
+          if command -v shasum >/dev/null 2>&1; then
+            actual_hash="$(shasum -a 256 "$REPO_ROOT/$installed_path" 2>/dev/null)"
+          elif command -v sha256sum >/dev/null 2>&1; then
+            actual_hash="$(sha256sum "$REPO_ROOT/$installed_path" 2>/dev/null)"
+          fi
+          actual_hash="${actual_hash%% *}"
+        fi
+        if [[ -n "$actual_hash" && "$actual_hash" == "$expected_hash" ]]; then
+          check 1 "installed: $installed_path"
+        else
+          check 0 "installed: $installed_path"
+        fi
+      done < <(jq -r '.syncFiles[] | [.path,.sha256] | @tsv' "$manifest" 2>/dev/null)
+
+      # Only emit a result label, never commands, permission values or env values.
+      if jq -e --slurpfile manifest "$manifest" '
+        . as $live | $manifest[0].settings as $owned |
+        all(($owned.hooks // [])[]; . as $h |
+          any($live.hooks[$h.event][]?;
+            (.matcher // "") == ($h.matcher // "") and
+            any(.hooks[]?; .type == "command" and .command == $h.command))) and
+        all(($owned.deny // [])[]; . as $deny |
+          ($live.permissions.deny // [] | index($deny)) != null) and
+        all(($owned.env // {} | to_entries)[]; . as $entry |
+          $live.env[$entry.key] == $entry.value) and
+        (if $owned.statusLineCommand == null then true else
+          $live.statusLine.type == "command" and
+          $live.statusLine.command == $owned.statusLineCommand end)
+      ' "$SETTINGS_JSON" >/dev/null 2>&1; then
+        check 1 "manifest settings contributions"
+      else
+        check 0 "manifest settings contributions"
+      fi
+    else
+      check 0 "harness manifest schema"
+    fi
+  else
+    echo "  – no install manifest; legacy hook diagnostics only"
+  fi
+else
+  echo "  – inventory check skipped (git repo or jq missing)"
 fi
 
 echo

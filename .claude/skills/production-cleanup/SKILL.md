@@ -70,4 +70,4 @@ volume hay container đang chạy.
   trên image prune, không bao giờ `down -v` / `rm -rf`.
 - Không bao giờ restart/recreate service nào ở đây — đây là dọn disk, không phải deploy.
 - Nếu host bị kẹt cứng hoàn toàn (SSH treo ở banner exchange), cleanup không chạy được — dùng
-  [/production-reboot](production-reboot.md) trước để lấy lại SSH, rồi mới chạy cái này.
+  [/production-reboot](../production-reboot/SKILL.md) trước để lấy lại SSH, rồi mới chạy cái này.

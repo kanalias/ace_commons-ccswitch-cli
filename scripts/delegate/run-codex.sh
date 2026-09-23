@@ -57,7 +57,7 @@ else
     echo "ERROR: no Codex auth found — set OPENAI_API_KEY or run 'codex login'" >&2
     exit 1
   fi
-  CODEX_MODEL="${CODEX_MODEL:-gpt-5.5}"
+  CODEX_MODEL="${CODEX_MODEL:-gpt-5.6-terra}"
   CODEX_REASONING_EFFORT="${CODEX_REASONING_EFFORT:-high}"
   CODEX_PROVIDER_ARGS=(-m "$CODEX_MODEL" -c "model_reasoning_effort=\"${CODEX_REASONING_EFFORT}\"")
   delegate_log codex "endpoint: OpenAI gốc (codex login / OPENAI_API_KEY), model=$CODEX_MODEL"

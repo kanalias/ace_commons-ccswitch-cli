@@ -94,5 +94,24 @@
   "statusLine": {
     "type": "command",
     "command": "bash $CLAUDE_PROJECT_DIR/.claude/statusline-orchestration.sh"
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(./**/*.pem)",
+      "Edit(./.env)",
+      "Edit(./.env.*)",
+      "Edit(./secrets/**)",
+      "Edit(./**/*.pem)",
+      "Write(./.env)",
+      "Write(./.env.*)",
+      "Write(./secrets/**)",
+      "Write(./**/*.pem)",
+      "Bash(rm -rf .git:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)"
+    ]
   }
 }
