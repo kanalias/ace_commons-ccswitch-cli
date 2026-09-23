@@ -232,7 +232,7 @@ Tạo / dùng profile → cập nhật dòng (nhất là `last-used`). Không c�
 ## Secret guard
 
 - Profile dir chứa cookie / session / auth token → **coi là secret**. KHÔNG `cat`/print nội dung profile ra chat. KHÔNG commit.
-- Container mặc định `<repo>/.browser-profiles/` → BẮT BUỘC `.gitignore` + `.dockerignore` trước khi tạo profile. Override ngoài repo vẫn giữ guard này để fallback không bao giờ bị track hoặc vào Docker context.
+- Container mặc định `<repo>/.browser-profiles/` → BẮT BUỘC `.gitignore` + `.dockerignore` trước khi tạo profile. Override qua `BROWSER_PROFILES_DIR` vẫn giữ guard này để profile không bao giờ bị track hoặc vào Docker context.
 - Tie [[secrets-no-printout]], [[vault-no-mcp]].
 
 ## Cleanup / TTL
