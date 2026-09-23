@@ -37,3 +37,19 @@ setup() {
   run grep -R -F 'không có cơ chế "rule loading" built-in nào cả' "$ROOT/harness/templates/rules"
   [ "$status" -eq 1 ]
 }
+
+@test "relative markdown links in live .claude commands and skills resolve" {
+  run python3 - "$ROOT" <<'PY'
+import re, sys
+from pathlib import Path
+root = Path(sys.argv[1]) / '.claude'
+bad = []
+for f in list(root.glob('commands/*.md')) + list(root.glob('skills/*/SKILL.md')):
+    for link in re.findall(r'\]\((\.{1,2}/[^)#]+)', f.read_text()):
+        if not (f.parent / link).exists():
+            bad.append(f'{f.relative_to(root.parent)} -> {link}')
+print('\n'.join(bad))
+sys.exit(1 if bad else 0)
+PY
+  [ "$status" -eq 0 ] || { echo "$output"; false; }
+}

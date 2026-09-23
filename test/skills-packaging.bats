@@ -72,7 +72,8 @@ for name in destructive:
         assert path.is_file(), f'Missing workflow: {path}'
         _, frontmatter, body = path.read_text().split('---', 2)
         assert re.search(r'^disable-model-invocation: true$', frontmatter, re.M), path
-        assert 'Explicit invocation is not confirmation' in body, path
+        # gate wording may be EN or VI (repo docs are being translated) — both must say invocation != confirmation
+        assert re.search(r'Explicit invocation is not confirmation|không phải là xác nhận', body, re.I), path
         assert re.search(r'confirm|xác nhận', body, re.I), path
 # Local commits/PR publishing should not be triggered implicitly either.
 for name in ('auto-commit', 'git-commit', 'git-commit-describe'):
