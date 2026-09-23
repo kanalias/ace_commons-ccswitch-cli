@@ -16,9 +16,8 @@ metadata:
 
 > **CONTAINER PATH (resolve TRƯỚC mọi thao tác profile) — chain 3 bước, dừng ở bước đầu tiên khớp:**
 > 1. env `BROWSER_PROFILES_DIR` (thắng tất cả — dùng cho Docker/CI).
-> 2. repo-root `<repo>/.browser-profiles/` **nếu dir đã tồn tại** (opt-in per-project; xem mục dưới).
-> 3. fallback `~/.browser-profiles`.
->
+> 2. repo-root `<repo>/.browser-profiles/` **nếu dir đã tồn tại** (opt-in per-project; xem mục dưới). Nếu không tồn tại thì tạo mới
+
 > Container = folder chứa các profile `prj_<xx>_sv_<yy>/`.
 > **Không bước nào khớp (kể cả `~` chưa có) → STOP, hỏi user** container path thực. KHÔNG tự tạo path đoán, KHÔNG `mkdir` đại.
 
