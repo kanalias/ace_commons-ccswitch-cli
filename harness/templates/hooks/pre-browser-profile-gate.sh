@@ -5,9 +5,9 @@
 #
 # Rule: .claude/rules/project/browser-mcp-profiles.md
 #   Mọi action Cloak/Playwright PHẢI gắn 1 profile prj_<xx>_sv_<yy> trong container.
-#   - MCP: server name = <pw|cloak>_<xx>_<yy> (profile bake vào --user-data-dir lúc
-#     launch). Server generic (playwright / cloak / browser) = CHƯA scope profile → BLOCK.
-#   - Bash launch: phải có --user-data-dir=.../prj_<xx>_sv_<yy> → thiếu = BLOCK.
+#   - MCP: server name = <pw|cloak>_<xx>_<yy>. Cloak launch phải truyền đúng
+#     user_data_dir=.../prj_<xx>_sv_<yy>; Playwright bake profile vào server entry.
+#   - Bash Playwright launch: phải có --user-data-dir=.../prj_<xx>_sv_<yy> → thiếu = BLOCK.
 #
 # THREAT MODEL: chống tạo profile tùm lum vô ý (default cache, tên bừa), KHÔNG chống
 # adversary — name/command heuristic, không sandbox.
@@ -29,17 +29,17 @@ msg_block() {
    $1
 
    Rule: .claude/rules/project/browser-mcp-profiles.md (GATE P0)
-     • MCP server phải đặt tên <pw|cloak>_<xx>_<yy> (1 entry / profile,
-       --user-data-dir=<container>/prj_<xx>_sv_<yy> bake lúc launch).
-     • KHÔNG dùng server generic (playwright / cloak) hay launch thiếu --user-data-dir
-       (rơi vào default cache, ngoài container, không track được → tùm lum).
+     • MCP server phải đặt tên <pw|cloak>_<xx>_<yy> (1 entry / profile).
+     • Cloak launch phải truyền user_data_dir=<container>/prj_<xx>_sv_<yy> khớp server;
+       Playwright server phải bake --user-data-dir vào entry.
+     • KHÔNG dùng server generic hay launch thiếu profile (rơi default/ephemeral).
    Tạo/chọn profile prj_<xx>_sv_<yy> rồi thao tác lại.
 EOF
 }
 
-# verdict <tool_name> <cmd>  → prints ALLOW or "BLOCK:<reason>" (used by main + self-test)
+# verdict <tool_name> <cmd> <user_data_dir> → ALLOW hoặc "BLOCK:<reason>"
 verdict() {
-  local tool="$1" cmd="${2:-}" server
+  local tool="$1" cmd="${2:-}" user_data_dir="${3:-}" server expected
 
   # ── MCP browser tool ────────────────────────────────────────────────
   if [[ "$tool" == mcp__* ]]; then
@@ -47,10 +47,21 @@ verdict() {
     # chỉ quan tâm server browser
     case "$server" in
       pw_*|cloak_*|cloak|playwright|browser|*[Bb]rowser*)
-        if [[ "$server" =~ $RE_SERVER ]]; then
-          echo ALLOW
-        else
+        if ! [[ "$server" =~ $RE_SERVER ]]; then
           echo "BLOCK:MCP server '$server' chưa scope profile (đặt tên <pw|cloak>_<xx>_<yy>)."
+          return
+        fi
+        if [[ "$server" == cloak_* && "$tool" == *"__cloak_launch" ]]; then
+          local pair="${server#cloak_}" xx yy
+          xx="${pair%%_*}"; yy="${pair#*_}"
+          expected="prj_${xx}_sv_${yy}"
+          if [[ -z "$user_data_dir" || "$user_data_dir" != */"$expected" ]]; then
+            echo "BLOCK:cloak_launch trên '$server' phải truyền user_data_dir absolute kết thúc bằng /$expected."
+          else
+            echo ALLOW
+          fi
+        else
+          echo ALLOW
         fi
         ;;
       *) echo ALLOW ;;  # MCP non-browser (notion...) — không đụng
@@ -58,14 +69,15 @@ verdict() {
     return
   fi
 
-  # ── Bash launch playwright/cloak MCP ────────────────────────────────
+  # ── Bash launch Playwright MCP ──────────────────────────────────────
+  # Cloak không bind profile qua CLI; gate nó tại tool cloak_launch ở trên.
   if [ "$tool" = "Bash" ] && [ -n "$cmd" ]; then
-    if echo "$cmd" | grep -Eq '@playwright/mcp|[[:space:]]cloak(-mcp)?[[:space:]]|playwright.*mcp'; then
+    if echo "$cmd" | grep -Eq '@playwright/mcp|playwright.*mcp'; then
       # phải có --user-data-dir=...prj_<xx>_sv_<yy>
       if echo "$cmd" | grep -Eq -- "--user-data-dir=[^[:space:]]*${RE_PROFILE}"; then
         echo ALLOW
       else
-        echo "BLOCK:launch browser MCP thiếu --user-data-dir=.../prj_<xx>_sv_<yy>."
+        echo "BLOCK:launch Playwright MCP thiếu --user-data-dir=.../prj_<xx>_sv_<yy>."
       fi
       return
     fi
@@ -77,8 +89,8 @@ verdict() {
 # ── self-test ───────────────────────────────────────────────────────────
 if [ "${1:-}" = "--self-test" ]; then
   fail=0
-  check() { # check <expect-prefix> <tool> <cmd>
-    local got; got=$(verdict "$2" "${3:-}")
+  check() { # check <expect-prefix> <tool> <cmd> <user_data_dir>
+    local got; got=$(verdict "$2" "${3:-}" "${4:-}")
     case "$got" in
       "$1"*) ;;
       *) echo "FAIL: verdict($2,'${3:-}')='$got' expected '$1*'"; fail=1 ;;
@@ -86,6 +98,9 @@ if [ "${1:-}" = "--self-test" ]; then
   }
   check ALLOW  "mcp__pw_myapp_auth__browser_navigate"
   check ALLOW  "mcp__cloak_shop_checkout__click"
+  check BLOCK  "mcp__cloak_shop_checkout__cloak_launch"
+  check BLOCK  "mcp__cloak_shop_checkout__cloak_launch" "" "/profiles/prj_shop_sv_other"
+  check ALLOW  "mcp__cloak_shop_checkout__cloak_launch" "" "/profiles/prj_shop_sv_checkout"
   check BLOCK  "mcp__playwright__browser_navigate"
   check BLOCK  "mcp__cloak__click"
   check BLOCK  "mcp__pw_myapp__navigate"           # thiếu _yy
@@ -93,6 +108,7 @@ if [ "${1:-}" = "--self-test" ]; then
   check ALLOW  "Bash" "npx -y @playwright/mcp --user-data-dir=/Users/you/.browser-profiles/prj_myapp_sv_auth"
   check BLOCK  "Bash" "npx -y @playwright/mcp --headless"
   check BLOCK  "Bash" "npx -y @playwright/mcp --user-data-dir=/tmp/scratch"  # tên không phải prj_
+  check ALLOW  "Bash" "git commit -m 'configure cloak per repo'" # không phải browser launch
   check ALLOW  "Bash" "ls -la"                      # bash thường
   [ "$fail" = 0 ] && echo "self-test PASS" || { echo "self-test FAIL"; exit 1; }
   exit 0
@@ -105,9 +121,10 @@ printf '%s' "$payload" | jq empty >/dev/null 2>&1 || exit 0
 
 tool=$(echo "$payload" | jq -r '.tool_name // empty')
 cmd=$(echo "$payload"  | jq -r '.tool_input.command // empty')
+user_data_dir=$(echo "$payload" | jq -r '.tool_input.user_data_dir // empty')
 [ -z "$tool" ] && exit 0
 
-res=$(verdict "$tool" "$cmd")
+res=$(verdict "$tool" "$cmd" "$user_data_dir")
 if [[ "$res" == BLOCK:* ]]; then
   msg_block "${res#BLOCK:}"
   exit 2
