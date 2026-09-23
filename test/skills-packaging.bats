@@ -65,7 +65,7 @@ PY
 import os, re
 from pathlib import Path
 root = Path(os.environ['TEMPLATE_ROOT'])
-destructive = ('clean-up', 'doctor-memory', 'git-cleanup-branch', 'git-force-snapshot',
+destructive = ('clean-up-project', 'doctor-memory', 'git-cleanup-branch', 'git-force-snapshot',
                'git-push-safety', 'production-cleanup', 'production-deploy', 'production-reboot')
 for name in destructive:
     for path in (root / 'commands' / f'{name}.md', root / 'skills' / name / 'SKILL.md'):

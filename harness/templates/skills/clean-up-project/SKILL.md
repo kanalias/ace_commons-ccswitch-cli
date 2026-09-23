@@ -1,5 +1,5 @@
 ---
-name: clean-up
+name: clean-up-project
 description: Dọn dẹp project an toàn theo dry-run, phân loại rác/dead code/worktree/branch, yêu cầu xác nhận trước thao tác phá huỷ.
 user-invocable: true
 disable-model-invocation: true
