@@ -23,6 +23,23 @@ set -euo pipefail
 RE_SERVER='^(pw|cloak)_[a-z0-9]+_[a-z0-9]+$'
 RE_PROFILE='prj_[a-z0-9]+_sv_[a-z0-9]+'
 
+profile_root() {
+  local root="${BROWSER_PROFILES_DIR:-}"
+  if [[ -z "$root" ]]; then
+    [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] || return 1
+    root="$CLAUDE_PROJECT_DIR/.browser-profiles"
+  fi
+  [[ "$root" == /* ]] || return 1
+  printf '%s' "${root%/}"
+}
+
+valid_profile_dir() {
+  local user_data_dir="$1" expected="$2" root
+  [[ "$user_data_dir" == /* ]] || return 1
+  root="$(profile_root)" || return 1
+  [[ "$user_data_dir" == "$root/$expected" ]]
+}
+
 msg_block() {
   cat >&2 << EOF
 🚦 browser-profile-gate: action Cloak/Playwright thiếu profile hợp lệ — BLOCK.
@@ -55,8 +72,9 @@ verdict() {
           local pair="${server#cloak_}" xx yy
           xx="${pair%%_*}"; yy="${pair#*_}"
           expected="prj_${xx}_sv_${yy}"
-          if [[ -z "$user_data_dir" || "$user_data_dir" != */"$expected" ]]; then
-            echo "BLOCK:cloak_launch trên '$server' phải truyền user_data_dir absolute kết thúc bằng /$expected."
+          if ! valid_profile_dir "$user_data_dir" "$expected"; then
+            echo "BLOCK:cloak_launch trên '$server' phải truyền user_data_dir=<container>/$expected, đúng container đã resolve."
+
           else
             echo ALLOW
           fi
@@ -74,10 +92,10 @@ verdict() {
   if [ "$tool" = "Bash" ] && [ -n "$cmd" ]; then
     if echo "$cmd" | grep -Eq '@playwright/mcp|playwright.*mcp'; then
       # phải có --user-data-dir=...prj_<xx>_sv_<yy>
-      if echo "$cmd" | grep -Eq -- "--user-data-dir=[^[:space:]]*${RE_PROFILE}"; then
+      if [[ "$cmd" =~ --user-data-dir=([^[:space:]]+) ]] && valid_profile_dir "${BASH_REMATCH[1]}" "${BASH_REMATCH[1]##*/}" && [[ "${BASH_REMATCH[1]##*/}" =~ ^$RE_PROFILE$ ]]; then
         echo ALLOW
       else
-        echo "BLOCK:launch Playwright MCP thiếu --user-data-dir=.../prj_<xx>_sv_<yy>."
+        echo "BLOCK:launch Playwright MCP phải có --user-data-dir=<container>/prj_<xx>_sv_<yy>."
       fi
       return
     fi
@@ -88,6 +106,8 @@ verdict() {
 
 # ── self-test ───────────────────────────────────────────────────────────
 if [ "${1:-}" = "--self-test" ]; then
+  BROWSER_PROFILES_DIR=/profiles
+  export BROWSER_PROFILES_DIR
   fail=0
   check() { # check <expect-prefix> <tool> <cmd> <user_data_dir>
     local got; got=$(verdict "$2" "${3:-}" "${4:-}")
@@ -101,11 +121,16 @@ if [ "${1:-}" = "--self-test" ]; then
   check BLOCK  "mcp__cloak_shop_checkout__cloak_launch"
   check BLOCK  "mcp__cloak_shop_checkout__cloak_launch" "" "/profiles/prj_shop_sv_other"
   check ALLOW  "mcp__cloak_shop_checkout__cloak_launch" "" "/profiles/prj_shop_sv_checkout"
+  check BLOCK  "mcp__cloak_shop_checkout__cloak_launch" "" "relative/prj_shop_sv_checkout"
+  check BLOCK  "mcp__cloak_shop_checkout__cloak_launch" "" "/tmp/prj_shop_sv_checkout"
+  check BLOCK  "mcp__cloak_shop_checkout__cloak_launch" "" "/profiles/prj_shop_sv_checkout/extra"
   check BLOCK  "mcp__playwright__browser_navigate"
   check BLOCK  "mcp__cloak__click"
   check BLOCK  "mcp__pw_myapp__navigate"           # thiếu _yy
   check ALLOW  "mcp__claude_ai_Notion__notion-search"  # non-browser MCP
-  check ALLOW  "Bash" "npx -y @playwright/mcp --user-data-dir=/Users/you/.browser-profiles/prj_myapp_sv_auth"
+  check ALLOW  "Bash" "npx -y @playwright/mcp --user-data-dir=/profiles/prj_myapp_sv_auth"
+  check BLOCK  "Bash" "npx -y @playwright/mcp --user-data-dir=/tmp/prj_myapp_sv_auth"
+  check BLOCK  "Bash" "npx -y @playwright/mcp --user-data-dir=relative/prj_myapp_sv_auth"
   check BLOCK  "Bash" "npx -y @playwright/mcp --headless"
   check BLOCK  "Bash" "npx -y @playwright/mcp --user-data-dir=/tmp/scratch"  # tên không phải prj_
   check ALLOW  "Bash" "git commit -m 'configure cloak per repo'" # không phải browser launch
