@@ -1,100 +1,100 @@
 ---
 name: production-deploy
-description: Safe in-place prod deploy for a multi-service host — pull + rebuild + up the TARGET service only, snapshot before / verify all services after, auto-rollback on healthcheck fail. Dùng khi user nói "deploy prod", "đẩy lên production", hoặc chạy /production-deploy.
+description: Deploy prod tại chỗ an toàn cho host nhiều service — chỉ pull + rebuild + up đúng service ĐÍCH, snapshot trước / verify mọi service sau, tự động rollback khi healthcheck fail. Dùng khi user nói "deploy prod", "đẩy lên production", hoặc chạy /production-deploy.
 user-invocable: true
 ---
 
-# /production-deploy — Safe in-place production deploy
+# /production-deploy — Deploy production tại chỗ an toàn
 
-Deploy `<service-name>` on `<deploy-ssh-host>` by pulling + rebuilding + `up`-ing that ONE
-service in place. The host runs multiple services — one service dying (bad image, bad healthcheck)
-must never take down its neighbors. This command snapshots state before, verifies every service
-(target + neighbors) after, and auto-rolls-back the target on healthcheck failure.
+Deploy `<service-name>` trên `<deploy-ssh-host>` bằng cách pull + rebuild + `up` đúng MỘT
+service đó tại chỗ. Host này chạy nhiều service — một service chết (image lỗi, healthcheck lỗi)
+KHÔNG BAO GIỜ được kéo sập các service hàng xóm. Command này snapshot trạng thái trước, verify mọi service
+(target + hàng xóm) sau, và tự động rollback service target khi healthcheck fail.
 
-> ⛔ **HARD RULES — never destructive:**
-> - Deploy is always pull + rebuild + `up` **in place**. NEVER `down -v`, `docker volume rm`,
->   `rm -rf`, `docker system prune --volumes`, or stop the whole host.
-> - **Service isolation** — only touch `<service-name>`. Other services/containers on the host
->   must not be restarted, recreated, or lose volumes.
-> - Prune (if needed for disk) = build-cache + dangling images ONLY. No `-a`, no `--volumes`.
+> ⛔ **QUY TẮC CỨNG — không bao giờ phá huỷ dữ liệu:**
+> - Deploy luôn là pull + rebuild + `up` **tại chỗ**. KHÔNG BAO GIỜ `down -v`, `docker volume rm`,
+>   `rm -rf`, `docker system prune --volumes`, hay dừng cả host.
+> - **Service isolation** — chỉ đụng đúng `<service-name>`. Các service/container khác trên host
+>   KHÔNG được restart, recreate, hay mất volume.
+> - Prune (nếu cần giải phóng disk) = CHỈ build-cache + dangling image. Không `-a`, không `--volumes`.
 
-## Steps
+## Các bước
 
-0. **Project guard — verify repo identity before any SSH/cloud/git production action.**
-   - Expected project slug: `ccswitch-cli-claude`; expected remote identity: `github.com/acegalaxy-co/ace_commons-ccswitch-cli`
-     (sanitized `host/owner/repo`, lowercase; deploy host `<deploy-ssh-host>`, service `<service-name>`).
-   - Compute repo-root slug from `basename "$(git rev-parse --show-toplevel)"` (lowercase,
-     non-alnum → `-`) and require it to match `ccswitch-cli-claude`.
-   - Read `git config --get remote.origin.url`, but never print or persist the raw URL. Missing origin → STOP.
-   - Sanitize origin to lowercase `host/owner/repo`: support `git@host:org/repo.git`,
-     `https://[userinfo@]host/org/repo.git`, and `ssh://[userinfo@]host/org/repo.git`; strip userinfo,
-     leading slash, and trailing `.git`.
-   - Require sanitized origin identity to exactly match `github.com/acegalaxy-co/ace_commons-ccswitch-cli`. If `github.com/acegalaxy-co/ace_commons-ccswitch-cli`
-     is placeholder-shaped (`<...>`), origin is unparseable, repo-root slug mismatches, or remote identity
-     mismatches → STOP immediately; tell the user this command belongs to `ccswitch-cli-claude` / `github.com/acegalaxy-co/ace_commons-ccswitch-cli`,
-     current repo/root/origin is `<repo identity>` — not running deploy. No override.
-   - If any config used by this command is still placeholder-shaped (`<...>`) — `<deploy-ssh-host>`, `<service-name>`, `<remote-repo-path>`, `<healthcheck-cmd>` — STOP;
-     deploy config is incomplete (re-run install.sh with HARNESS_DEPLOY_* env vars).
+0. **Project guard — verify repo identity trước mọi hành động SSH/cloud/git production.**
+   - Project slug kỳ vọng: `ccswitch-cli-claude`; remote identity kỳ vọng: `github.com/acegalaxy-co/ace_commons-ccswitch-cli`
+     (đã sanitize `host/owner/repo`, lowercase; deploy host `<deploy-ssh-host>`, service `<service-name>`).
+   - Tính repo-root slug từ `basename "$(git rev-parse --show-toplevel)"` (lowercase,
+     ký tự non-alnum → `-`) và yêu cầu khớp `ccswitch-cli-claude`.
+   - Đọc `git config --get remote.origin.url`, nhưng KHÔNG BAO GIỜ in hoặc lưu URL gốc. Thiếu origin → STOP.
+   - Sanitize origin về lowercase `host/owner/repo`: hỗ trợ `git@host:org/repo.git`,
+     `https://[userinfo@]host/org/repo.git`, và `ssh://[userinfo@]host/org/repo.git`; bỏ userinfo,
+     dấu `/` đầu, và `.git` cuối.
+   - Yêu cầu sanitized origin identity khớp CHÍNH XÁC `github.com/acegalaxy-co/ace_commons-ccswitch-cli`. Nếu `github.com/acegalaxy-co/ace_commons-ccswitch-cli`
+     có dạng placeholder (`<...>`), origin không parse được, repo-root slug lệch, hoặc remote identity
+     lệch → STOP ngay lập tức; báo user command này thuộc về `ccswitch-cli-claude` / `github.com/acegalaxy-co/ace_commons-ccswitch-cli`,
+     repo/root/origin hiện tại là `<repo identity>` — không chạy deploy. Không có override.
+   - Nếu bất kỳ config nào command này dùng vẫn còn dạng placeholder (`<...>`) — `<deploy-ssh-host>`, `<service-name>`, `<remote-repo-path>`, `<healthcheck-cmd>` — STOP;
+     deploy config chưa đủ (chạy lại install.sh với env var HARNESS_DEPLOY_*).
 
 1. **Verify branch + working tree.**
-   - `git branch --show-current` must be `dev`. If not, tell the user to merge into
-     `dev` first — do not proceed.
-   - `git status --short` — warn if dirty (uncommitted work won't be deployed).
-   - **Commits to ship:** `git log origin/dev..dev --oneline`.
-     Empty → tell the user there's nothing to deploy and stop.
+   - `git branch --show-current` phải là `dev`. Nếu không, báo user merge vào
+     `dev` trước — không tiến hành.
+   - `git status --short` — cảnh báo nếu dirty (uncommitted work sẽ không được deploy).
+   - **Commit sẽ ship:** `git log origin/dev..dev --oneline`.
+     Rỗng → báo user không có gì để deploy rồi dừng.
 
-2. **Confirm (prod, downtime-causing — pause for user OK unless pre-authorized in the prompt).**
-   Print:
-   - Commits to ship (from step 1, count + one-liner each).
-   - Change type: code/runtime · config · docs · mix (`git diff origin/dev..dev --stat`).
-   - Impact: rebuild + restart `<service-name>` → short downtime on that service only.
-   Wait for explicit user OK before proceeding, unless the user's request already pre-authorized
-   an end-to-end run.
+2. **Confirm (prod, gây downtime — dừng chờ user OK trừ khi đã pre-authorize sẵn trong prompt).**
+   In ra:
+   - Commit sẽ ship (từ bước 1, số lượng + tóm tắt 1 dòng mỗi commit).
+   - Loại thay đổi: code/runtime · config · docs · mix (`git diff origin/dev..dev --stat`).
+   - Tác động: rebuild + restart `<service-name>` → downtime ngắn chỉ trên service đó.
+   Chờ user OK rõ ràng trước khi tiến hành, trừ khi request của user đã pre-authorize sẵn
+   một lượt chạy end-to-end.
 
-3. **Pre-deploy snapshot** (so rollback + multi-service verify have a baseline):
+3. **Snapshot trước khi deploy** (để rollback + verify multi-service có baseline):
    ```bash
    ssh <deploy-ssh-host> 'echo "=== services ==="; docker ps --format "{{.Names}}\t{{.Status}}"; \
      echo "=== disk ==="; df -h /; docker system df; \
      echo "=== rollback ref ==="; docker inspect --format "{{.Image}}" <service-name>'
    ```
-   Record: full `docker ps` (every service), disk %, and the rollback image ref (current image id of
-   `<service-name>`). Disk > ~80% → suggest running `/production-cleanup` first.
+   Ghi lại: `docker ps` đầy đủ (mọi service), disk %, và rollback image ref (image id hiện tại của
+   `<service-name>`). Disk > ~80% → gợi ý chạy `/production-cleanup` trước.
 
 4. **Push + deploy.**
    ```bash
    git push origin dev
    ssh <deploy-ssh-host> 'cd <remote-repo-path> && (bash bootstrap.sh || (git pull origin dev && docker compose up -d --build <service-name>))'
    ```
-   Use whichever exists on the host — a `bootstrap.sh` (pull + rebuild + up in place) if the repo has
-   one, else `git pull` + `docker compose up -d --build <service-name>` directly. Either way this
-   only touches `<service-name>`; named volumes are preserved.
+   Dùng cái nào có sẵn trên host — `bootstrap.sh` (pull + rebuild + up tại chỗ) nếu repo có,
+   không thì `git pull` + `docker compose up -d --build <service-name>` trực tiếp. Dù cách nào thì cũng
+   chỉ đụng đúng `<service-name>`; named volume được giữ nguyên.
 
 5. **Verify target.**
    ```bash
    ssh <deploy-ssh-host> '<healthcheck-cmd>'
    ```
-   Expect a healthy/200 result.
+   Kỳ vọng kết quả healthy/200.
 
-6. **Verify multi-service (regression-spill check).** Re-run `docker ps` on the host and diff against
-   the step-3 snapshot — every OTHER service must still be `Up`/healthy with the same container id
-   (not recreated). Any neighbor regressed or restarted → warn loudly, this is exactly the failure
-   mode this command exists to catch.
+6. **Verify multi-service (kiểm tra regression lan sang service khác).** Chạy lại `docker ps` trên host và diff với
+   snapshot ở bước 3 — mọi service KHÁC phải vẫn `Up`/healthy với cùng container id
+   (không bị recreate). Bất kỳ hàng xóm nào bị regress hoặc restart → cảnh báo lớn, đây chính xác là failure
+   mode mà command này sinh ra để bắt.
 
-7. **Fail → auto-rollback.** If step 5's healthcheck fails:
+7. **Fail → tự động rollback.** Nếu healthcheck ở bước 5 fail:
    ```bash
    ssh <deploy-ssh-host> 'docker service update --image <rollback-ref> <service-name> || docker compose up -d --no-build <service-name>'
    ```
-   `<rollback-ref>` = the image id recorded in step 3. Re-run step 5's healthcheck; report **FAIL +
-   rolled back** — do not leave the host half-deployed.
+   `<rollback-ref>` = image id đã ghi ở bước 3. Chạy lại healthcheck bước 5; báo cáo **FAIL +
+   đã rollback** — không được để host deploy dở dang.
 
-8. **Report.** Commits shipped · disk before/after · state of ALL services (target + neighbors,
-   before/after).
+8. **Báo cáo.** Commit đã ship · disk trước/sau · trạng thái TẤT CẢ service (target + hàng xóm,
+   trước/sau).
 
 ## Guardrails
 
-- The environment's permission layer still gates SSH/deploy Bash calls at runtime — if a call is
-  denied or the host is unreachable, fall back to printing the host commands for the user to run
-  manually rather than forcing it.
-- Never wipe data — no `down -v`, no `docker volume rm`, no `rm -rf`, no `--volumes` prune.
-- Push only to `origin`.
-- Do not touch any service other than `<service-name>`.
+- Permission layer của môi trường vẫn gate các Bash call SSH/deploy tại runtime — nếu call
+  bị deny hoặc host không reachable, fallback về in ra host command để user tự chạy
+  thủ công thay vì ép chạy.
+- KHÔNG BAO GIỜ xoá data — không `down -v`, không `docker volume rm`, không `rm -rf`, không prune `--volumes`.
+- Chỉ push lên `origin`.
+- KHÔNG đụng service nào khác ngoài `<service-name>`.
