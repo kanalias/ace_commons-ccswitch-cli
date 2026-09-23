@@ -2,7 +2,10 @@
 name: auto-commit
 description: Tự động commit local ngay sau khi 1 task/feature/fix làm xong (todo hoàn tất, test pass), tránh quên commit rồi dồn nhiều thay đổi không liên quan vào 1 commit. Tự stage đúng scope + tự soạn message + tự chạy `git commit`, không dừng hỏi xác nhận — chỉ báo lại hash+subject sau khi commit xong. Dùng khi vừa xong 1 vòng sửa code còn uncommitted changes, hoặc user nói "auto commit", "nhớ commit giúp", "đừng để tôi quên commit".
 user-invocable: true
+disable-model-invocation: true
 ---
+> **Invocation gate:** Run only when the user explicitly invokes `/auto-commit`; completion of a task alone does not authorize a commit. Once invoked, the local-commit workflow below applies.
+
 
 # auto-commit — tự commit local sau khi xong task/feature
 

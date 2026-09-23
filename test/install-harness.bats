@@ -8,6 +8,7 @@
 load test_helper.bash
 
 setup() {
+  setup_fake_home
   ROOT="$(repo_root)"
   TARGET="$BATS_TEST_TMPDIR/target-repo"
   mkdir -p "$TARGET"
@@ -28,6 +29,60 @@ run_install() {
   HARNESS_GROUP_SESSIONLIMIT="N" \
   HARNESS_OVERWRITE="all" \
   run bash "$ROOT/harness/install.sh" </dev/null
+}
+
+@test "dry run leaves missing target and temporary directory untouched" {
+  export HARNESS_DRY_RUN=1
+  export TMPDIR="$BATS_TEST_TMPDIR/dry-tmp"
+  mkdir -p "$TMPDIR"
+  TARGET="$BATS_TEST_TMPDIR/absent/nested"
+  run_install
+  [ "$status" -eq 0 ]
+  [ ! -e "$TARGET" ]
+  [ -z "$(find "$TMPDIR" -mindepth 1 -print)" ]
+  [[ "$output" == *"DRY RUN"* ]]
+}
+
+@test "dry run preserves existing files byte for byte" {
+  mkdir -p "$TARGET/.claude"
+  printf '{"env":{"CUSTOM":"keep"}}\n' > "$TARGET/.claude/settings.json"
+  printf 'User instructions\n' > "$TARGET/CLAUDE.md"
+  before="$(find "$TARGET" -type f -exec shasum {} \; | sort)"
+  HARNESS_DRY_RUN=1 run_install
+  [ "$status" -eq 0 ]
+  after="$(find "$TARGET" -type f -exec shasum {} \; | sort)"
+  [ "$before" = "$after" ]
+}
+
+@test "target branch is detected and source-only sync rule is excluded" {
+  git -C "$TARGET" symbolic-ref HEAD refs/heads/custom-main
+  HARNESS_ROUTE_DIR="$TARGET" run bash "$ROOT/harness/install.sh" </dev/null
+  [ "$status" -eq 0 ]
+  grep -q '`custom-main`' "$TARGET/.claude/rules/project/git-workflow.md"
+  [ ! -e "$TARGET/.claude/rules/project/sync-template.md" ]
+  grep -qi 'native.*rules' "$TARGET/CLAUDE.md"
+  ! grep -q 'không có cơ chế.*built-in' "$TARGET/CLAUDE.md"
+}
+
+@test "guard and quality groups both disabled still writes a valid manifest (empty deny/env)" {
+  HARNESS_ROUTE_DIR="$TARGET" \
+  HARNESS_CORE_DIRS="src,lib" \
+  HARNESS_PROJECT_SLUG="testproj" \
+  HARNESS_BRANCH="dev" \
+  HARNESS_TEST_CMD="npm test" \
+  HARNESS_GROUP_SUBAGENTS="N" \
+  HARNESS_GROUP_GUARD="N" \
+  HARNESS_GROUP_QUALITY="N" \
+  HARNESS_GROUP_SESSIONLIMIT="N" \
+  HARNESS_OVERWRITE="all" \
+  run bash "$ROOT/harness/install.sh" </dev/null
+  [ "$status" -eq 0 ]
+
+  manifest="$TARGET/.claude/harness-manifest.json"
+  [ -f "$manifest" ]
+  run jq empty "$manifest"
+  [ "$status" -eq 0 ]
+  jq -e '.schemaVersion == 1 and (.settings.deny == []) and (.settings.env == {})' "$manifest"
 }
 
 @test "installs 3 default groups: files land, no @@ tokens, settings.json wired" {

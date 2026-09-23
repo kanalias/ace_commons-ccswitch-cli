@@ -47,7 +47,7 @@ reboot** via the provider's API/console.
    ssh -o ConnectTimeout=15 @@DEPLOY_SSH_HOST@@ 'echo SSH_OK; uptime' 2>&1 | head -2
    ```
    - **If SSH returns `SSH_OK`** → host is NOT wedged. Do **not** reboot. Run
-     [/production-cleanup](production-cleanup.md) instead (likely just disk pressure).
+     [/production-cleanup](../production-cleanup/SKILL.md) instead (likely just disk pressure).
    - Wedged signature: port open (TCP connects) but SSH banner-timeout and the healthcheck times out.
 
 2. **Out-of-band reboot — example, adapt to your cloud provider.** SSH/console are unreachable, so
@@ -76,7 +76,7 @@ reboot** via the provider's API/console.
    ```
 
 5. **Cleanup + verify.** The reboot regains SSH but does NOT free disk on its own — run
-   [/production-cleanup](production-cleanup.md) to prune build cache/dangling images and verify
+   [/production-cleanup](../production-cleanup/SKILL.md) to prune build cache/dangling images and verify
    `@@DEPLOY_SERVICE@@` plus every other service on the host.
 
 ## Guardrails

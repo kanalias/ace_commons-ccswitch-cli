@@ -70,4 +70,4 @@ volumes or running containers.
   on image prune, never `down -v` / `rm -rf`.
 - Never restart/recreate any service here — this is disk cleanup, not a deploy.
 - If the host is fully wedged (SSH hangs at banner exchange), cleanup can't run — use
-  [/production-reboot](production-reboot.md) first to regain SSH, then run this.
+  [/production-reboot](../production-reboot/SKILL.md) first to regain SSH, then run this.

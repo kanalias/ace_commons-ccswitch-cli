@@ -15,6 +15,19 @@ Mỗi session nuốt vào context: global rules (always) + project rules + CLAUD
 
 Quy tắc: **project rule mặc định LAZY (`paths:`)**. Chỉ always-load nếu vượt được gate P0 dưới đây.
 
+## Native loading ≠ runtime enforcement
+
+Claude Code có native rule loading: tự tìm Markdown đệ quy trong `.claude/rules/`.
+Rule không có `paths:` load vô điều kiện; YAML `paths:` scope theo glob và load khi
+Claude đọc file khớp, không phải check thực thi ở mọi tool call. Markdown link chỉ
+là điều hướng, không phải điều kiện để native loader tìm thấy project rule.
+Nguồn: tài liệu chính thức Claude Code, *How Claude remembers your project*, mục
+*Organize rules with .claude/rules/* và *Path-specific rules*.
+
+Rules vẫn là instruction/governance, không phải surface runtime thứ sáu. Logic
+thực thi phải qua command, hook, subagent, MCP hoặc permission deny; gate bắt buộc
+block thao tác cần hook/permission, không chỉ lời nhắc trong Markdown.
+
 ## Gate — rule nào được always-load
 
 Always-load CHỈ khi rule đúng **cả 2**:
