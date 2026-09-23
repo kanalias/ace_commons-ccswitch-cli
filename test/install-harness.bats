@@ -124,6 +124,9 @@ run_install() {
   [ -s "$TARGET/.claude/commands/git-push-safety.md" ]
   [ -f "$TARGET/.claude/commands/task-loop-feature.md" ]
   [ -f "$TARGET/.claude/commands/update-claude.md" ]
+  [ -f "$TARGET/.claude/commands/update-codex.md" ]
+  [ -f "$TARGET/.claude/commands/update-gemini.md" ]
+  [ -f "$TARGET/.claude/commands/update-deepseek.md" ]
   [ -f "$TARGET/.claude/commands/doctor-memory.md" ]
   [ -f "$TARGET/.claude/commands/git-commit.md" ]
   ! grep -q '9router' "$TARGET/.claude/commands/git-push-safety.md" || false

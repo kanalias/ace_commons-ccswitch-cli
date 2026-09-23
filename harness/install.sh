@@ -27,7 +27,7 @@
 #   HARNESS_GROUP_SUBAGENTS      y/n — delegate subagents+wrappers, no prompt (default: Y)
 #   HARNESS_GROUP_GUARD          y/n — guard hooks, no prompt        (default: Y)
 #   HARNESS_GROUP_QUALITY        y/n — quality hooks, no prompt      (default: Y)
-#   HARNESS_GROUP_COMMANDS       y/n — push-to-git + conventional-commit + branch-cleanup + clean-up-project + pr-describe + dep-audit + loop-feature + lazy-load-audit + audit-memory-harness + commit + force-snapshot + update-claude slash-commands, no prompt (default: Y)
+#   HARNESS_GROUP_COMMANDS       y/n — push-to-git + conventional-commit + branch-cleanup + clean-up-project + pr-describe + dep-audit + loop-feature + lazy-load-audit + audit-memory-harness + commit + force-snapshot + update-claude + update-codex + update-gemini + update-deepseek slash-commands, no prompt (default: Y)
 #   HARNESS_GROUP_SKILLS         y/n — lazy-load-health + dep-ladder-check + auto-commit + check-hardcode + audit-git-leak + orchestrate skills, no prompt (default: Y)
 #   HARNESS_GROUP_RULES          y/n — rules: common/ (9 invariant guardrails, always overwrite) + project/ (git-workflow, skill-superpowers — kept if exist), no prompt (default: Y)
 #   HARNESS_GROUP_GITHOOKS       y/n — git pre-push hook (gitleaks secret scan) into .git/hooks/, no prompt (default: Y; skipped if target not a git repo)
@@ -428,6 +428,9 @@ if [ "$SEL_COMMANDS" -eq 1 ]; then
   install_file "commands/audit-claude-md.md"      ".claude/commands/audit-claude-md.md"
   install_file "commands/task-loop-feature.md"    ".claude/commands/task-loop-feature.md"
   install_file "commands/update-claude.md"        ".claude/commands/update-claude.md"
+  install_file "commands/update-codex.md"         ".claude/commands/update-codex.md"
+  install_file "commands/update-gemini.md"        ".claude/commands/update-gemini.md"
+  install_file "commands/update-deepseek.md"      ".claude/commands/update-deepseek.md"
 fi
 
 if [ "$SEL_DEPLOY" -eq 1 ]; then
