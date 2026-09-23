@@ -50,16 +50,31 @@ esac
 } >&2
 
 # ── Health probe + auto-switch (chỉ cho router) ───────────────────
+# Decision (probe/auto-switch) dùng DUY NHẤT settings.json env — đây là lựa chọn user đã
+# persist (ccswitch), KHÔNG dùng process env (① có thể là router cũ từ 1 session mở lúc
+# trước khi user đổi sang subscription — banner phía trên vẫn hiển thị process env để
+# thông tin, nhưng quyết định auto-switch không được đọc nó, nếu không auto-switch có thể
+# tự flip settings.json ngược lại target user vừa chọn).
 command -v curl >/dev/null 2>&1 || exit 0
 [ -f "$SETTINGS" ] || exit 0
-case "$base" in
+settings_base=$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$SETTINGS" 2>/dev/null || true)
+case "$settings_base" in
   *9router.proxy.example.com*) ;;
-  *) exit 0 ;;   # subscription/custom → không có "cấp trên" để fallback
+  *)
+    # settings.json không ở router → không có "cấp trên" để probe/fallback.
+    # Nếu process env (session hiện tại) vẫn còn trỏ router trong khi settings.json đã
+    # là subscription/custom → cảnh báo 1 dòng: session này cần restart để nạp env mới.
+    case "$base" in
+      *9router.proxy.example.com*)
+        if [ "$base" != "$settings_base" ]; then
+          echo "⚠️  session này vẫn chạy trên router cũ ($base) dù settings.json đã đổi — restart Claude Code để nạp env mới." >&2
+        fi ;;
+    esac
+    exit 0 ;;
 esac
 
 tok=$(jq -r '.env.ANTHROPIC_AUTH_TOKEN // empty' "$SETTINGS" 2>/dev/null || true)
-[ -n "${ANTHROPIC_AUTH_TOKEN:-}" ] && tok="$ANTHROPIC_AUTH_TOKEN"
-code=$(curl -s -m 4 "${base%/}/models" ${tok:+-H "Authorization: Bearer $tok"} \
+code=$(curl -s -m 4 "${settings_base%/}/models" ${tok:+-H "Authorization: Bearer $tok"} \
          -o /dev/null -w "%{http_code}" 2>/dev/null); [ -n "$code" ] || code="000"
 
 # healthy → nothing more to do

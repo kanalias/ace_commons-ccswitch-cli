@@ -34,14 +34,20 @@ write_fake_kimi_env() {
 }
 
 setup() {
-  command -v pwsh >/dev/null 2>&1 || skip "pwsh not installed"
   setup_fake_home
   stage_repo
   # setup.ps1 reads $env:USERPROFILE, not $HOME — point it at the same fake home.
   export USERPROFILE="$HOME"
 }
 
+# Tests that actually invoke pwsh need it available; call this first thing inside those tests.
+# The static source-grep tests below don't touch pwsh and run regardless.
+require_pwsh() {
+  command -v pwsh >/dev/null 2>&1 || skip "pwsh not installed"
+}
+
 @test "non-interactive: complete .env applies host+key AND reaches later install steps (Bug A regression)" {
+  require_pwsh
   write_fake_env_pro "$TEST_HOST" "$TEST_KEY"
   run bash -c "cd '$STAGE' && env USERPROFILE='$HOME' pwsh -NoProfile -File ai-proxy/setup.ps1 </dev/null"
   [ "$status" -eq 0 ]
@@ -59,6 +65,7 @@ setup() {
 }
 
 @test "non-interactive: no .env present skips key prompt, still reaches later install steps" {
+  require_pwsh
   rm -f "$STAGE/.env"
   run bash -c "cd '$STAGE' && env USERPROFILE='$HOME' pwsh -NoProfile -File ai-proxy/setup.ps1 </dev/null"
   [ "$status" -eq 0 ]
@@ -70,6 +77,7 @@ setup() {
 }
 
 @test "settings.json after full install has no .model key (Bug B regression)" {
+  require_pwsh
   write_fake_env_pro "$TEST_HOST" "$TEST_KEY"
   run bash -c "cd '$STAGE' && env USERPROFILE='$HOME' pwsh -NoProfile -File ai-proxy/setup.ps1 </dev/null"
   [ "$status" -eq 0 ]
@@ -80,6 +88,7 @@ setup() {
 }
 
 @test "non-interactive: .env ALWAYS overrides even when a profile already holds a real key" {
+  require_pwsh
   write_fake_env_pro "$TEST_HOST" "$TEST_KEY"
   mkdir -p "$HOME/.claude/profiles"
   jq '.ANTHROPIC_AUTH_TOKEN = "existing-real-key"' "$STAGE/ai-proxy/profiles/claude.json" > "$HOME/.claude/profiles/claude.json"
@@ -92,6 +101,7 @@ setup() {
 }
 
 @test "non-interactive: kimi force subscription applies kimi_api_key only to kimi profile" {
+  require_pwsh
   write_fake_kimi_env "$TEST_KEY"
   run bash -c "cd '$STAGE' && env USERPROFILE='$HOME' pwsh -NoProfile -File ai-proxy/setup.ps1 </dev/null"
   [ "$status" -eq 0 ]
@@ -102,4 +112,26 @@ setup() {
   [ "$base" = "https://api.moonshot.ai/anthropic" ]
   [ "$key" = "$TEST_KEY" ]
   [[ "$claude_key" == *"<your-9router-key>"* ]]
+}
+
+# Static parity: ccswitch.ps1's `fallback` must never promote a bare subscription (no env
+# block) into a router, and every settings write must record the active target in the
+# .ccswitch-target marker. No pwsh required — these are plain source-text checks.
+@test "static: fallback has the subscription no-promote branch" {
+  run grep -F 'fallback never promotes to a router' "$(repo_root)/ai-proxy/ccswitch.ps1"
+  [ "$status" -eq 0 ]
+}
+
+@test "static: fallback skips the rewrite when the active router is already healthy" {
+  run grep -F 'router healthy: $t (no change)' "$(repo_root)/ai-proxy/ccswitch.ps1"
+  [ "$status" -eq 0 ]
+}
+
+@test "static: settings writes record the target in .ccswitch-target" {
+  run grep -F '.ccswitch-target' "$(repo_root)/ai-proxy/ccswitch.ps1"
+  [ "$status" -eq 0 ]
+  run grep -F 'Write-Marker "subscription"' "$(repo_root)/ai-proxy/ccswitch.ps1"
+  [ "$status" -eq 0 ]
+  run grep -F 'Write-Marker $name' "$(repo_root)/ai-proxy/ccswitch.ps1"
+  [ "$status" -eq 0 ]
 }

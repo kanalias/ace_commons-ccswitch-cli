@@ -17,6 +17,12 @@ command -v curl >/dev/null 2>&1 || { echo "❌ 'curl' required."; exit 1; }
 
 mkdir -p "$PROFILES" "$HOOKS"
 
+# Detect a pre-existing install BEFORE step 1 overwrites it — used in step 5 to
+# avoid auto-activating 'claude' for users who already had ccswitch installed
+# (e.g. already deliberately on subscription) but predate the marker file.
+PRIOR_INSTALL=0
+{ [ -e "$CLAUDE_DIR/ccswitch.sh" ] || [ -L "$CLAUDE_DIR/ccswitch.sh" ]; } && PRIOR_INSTALL=1
+
 # 1. tool + hook (always refreshed — no secrets inside)
 ln -sfn "$SRC/ccswitch.sh" "$CLAUDE_DIR/ccswitch.sh"
 cp "$SRC/hooks/check-router.sh" "$HOOKS/check-router.sh"
@@ -265,22 +271,35 @@ for pair in claude:cc codex:cx deepseek:ds kimi:km; do
   fi
 done
 
-# 5. auto-activate 'claude' — only if it now holds a real (non-placeholder) key, so
-#    settings.json is ready to use without a separate manual `ccswitch claude` step.
+# 5. auto-activate 'claude' — ONLY on a true first install: the marker file
+#    (~/.claude/.ccswitch-target, written by ccswitch after every switch) is absent AND
+#    settings.json has no `env` block yet. Re-running setup.sh must NEVER silently flip a
+#    user who deliberately switched to `subscription` (or another router) back to claude —
+#    that used to happen on every re-install/re-sync.
 echo
 AUTO_SWITCHED=0
+MARKER="$CLAUDE_DIR/.ccswitch-target"
 claude_tok=$(jq -r '.ANTHROPIC_AUTH_TOKEN // empty' "$PROFILES/claude.json" 2>/dev/null || true)
-if [ -n "$claude_tok" ] && ! printf '%s' "$claude_tok" | grep -q '<your-9router-key>'; then
-  echo "▶ auto-activating 'claude' profile into settings.json ..."
+settings_has_env="false"
+[ -f "$SETTINGS" ] && settings_has_env=$(jq 'has("env")' "$SETTINGS" 2>/dev/null || echo false)
+if [ -z "$claude_tok" ] || printf '%s' "$claude_tok" | grep -q '<your-9router-key>'; then
+  echo "  • profiles/claude.json still has a placeholder key — skipping auto-switch"
+elif [ -f "$MARKER" ] || [ "$settings_has_env" = "true" ] || [ "$PRIOR_INSTALL" = "1" ]; then
+  cur_target=""
+  [ -f "$MARKER" ] && cur_target=$(cat "$MARKER" 2>/dev/null || true)
+  if [ -z "$cur_target" ]; then
+    if [ "$settings_has_env" = "true" ]; then cur_target="router (settings.json env)"; else cur_target="subscription"; fi
+  fi
+  echo "  • keeping current target: ${cur_target} — not auto-switching"
+else
+  echo "▶ auto-activating 'claude' profile into settings.json (first install) ..."
   if bash "$CLAUDE_DIR/ccswitch.sh" claude; then
     AUTO_SWITCHED=1
   else
     echo "  ⚠️  auto-switch failed — activate manually: ccswitch claude"
   fi
-else
-  echo "  • profiles/claude.json still has a placeholder key — skipping auto-switch"
 fi
-unset claude_tok
+unset claude_tok settings_has_env PRIOR_INSTALL
 
 echo
 echo "✅ Installed. Next steps:"

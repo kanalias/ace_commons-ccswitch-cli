@@ -155,3 +155,49 @@ setup() {
   key=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/kimi.json")
   [[ "$key" == *"<your-9router-key>"* ]]
 }
+
+# --- step 5 auto-activate guard: PRIOR_INSTALL + marker + env (see ai-proxy/setup.sh) ---
+
+@test "step 5: true first install (no ~/.claude/ccswitch.sh, no marker, no env) auto-activates claude" {
+  write_fake_env_pro "$TEST_HOST" "$TEST_KEY"
+  run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"(first install)"* ]]
+  has_env=$(jq 'has("env")' "$HOME/.claude/settings.json")
+  [ "$has_env" = "true" ]
+}
+
+@test "step 5: prior install already on subscription (ccswitch.sh present, no marker) keeps subscription" {
+  write_fake_env_pro "$TEST_HOST" "$TEST_KEY"
+  mkdir -p "$HOME/.claude"
+  echo '#!/usr/bin/env bash' > "$HOME/.claude/ccswitch.sh"
+  chmod +x "$HOME/.claude/ccswitch.sh"
+  echo '{"model":"opus"}' > "$HOME/.claude/settings.json"
+  run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"keeping current target: subscription"* ]]
+  has_env=$(jq 'has("env")' "$HOME/.claude/settings.json")
+  [ "$has_env" = "false" ]
+}
+
+@test "step 5: marker says subscription (ccswitch.sh absent) keeps subscription, no env written" {
+  write_fake_env_pro "$TEST_HOST" "$TEST_KEY"
+  mkdir -p "$HOME/.claude"
+  printf 'subscription\n' > "$HOME/.claude/.ccswitch-target"
+  run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"keeping current target: subscription"* ]]
+  has_env=$(jq 'has("env")' "$HOME/.claude/settings.json")
+  [ "$has_env" = "false" ]
+}
+
+@test "step 5: settings.json already has a router env block keeps it unchanged" {
+  write_fake_env_pro "$TEST_HOST" "$TEST_KEY"
+  mkdir -p "$HOME/.claude"
+  echo '{"env":{"ANTHROPIC_BASE_URL":"https://existing-router.test/v1"}}' > "$HOME/.claude/settings.json"
+  run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"keeping current target: router (settings.json env)"* ]]
+  base=$(jq -r '.env.ANTHROPIC_BASE_URL' "$HOME/.claude/settings.json")
+  [ "$base" = "https://existing-router.test/v1" ]
+}

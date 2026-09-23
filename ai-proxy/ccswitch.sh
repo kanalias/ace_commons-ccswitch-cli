@@ -45,11 +45,22 @@ set -euo pipefail
 CLAUDE_DIR="$HOME/.claude"
 SETTINGS="$CLAUDE_DIR/settings.json"
 PROFILES="$CLAUDE_DIR/profiles"
+# persisted user choice — claude|codex|deepseek|kimi|subscription, written after EVERY
+# successful settings.json write (apply() / clear_env()). Read by check-router.sh and
+# setup.sh so they never silently override what the user last picked.
+MARKER="$CLAUDE_DIR/.ccswitch-target"
 
 # real profile files; subscription is env-clear, not a file.
 ORDER=(claude codex deepseek kimi)
 
 die() { echo "❌ $*" >&2; exit 1; }
+
+# write_marker <name> — atomic (tmp+mv) record of the resolved target the user last chose.
+write_marker() {
+  local name="$1" tmp
+  tmp="$MARKER.tmp.$$"
+  printf '%s\n' "$name" > "$tmp" && mv "$tmp" "$MARKER"
+}
 
 # resolve alias -> canonical target name
 canon() {
@@ -178,6 +189,7 @@ clear_env() {
   jq 'del(.env)' "$SETTINGS.bak" > "$SETTINGS.tmp" \
     || die "jq del failed (settings unchanged, see $SETTINGS.bak)"
   mv "$SETTINGS.tmp" "$SETTINGS"
+  write_marker subscription
   echo "✅ switched to 'subscription' — removed env block (backup: $SETTINGS.bak)."
   echo "   Claude Code will use its OAuth subscription login (run 'claude' + login if needed)."
   echo "↻ restart Claude Code (quit + reopen) to load new env."
@@ -195,6 +207,7 @@ apply() {
   jq --slurpfile e "$prof" '.env = $e[0]' "$SETTINGS.bak" > "$SETTINGS.tmp" \
     || die "jq merge failed (settings unchanged, see $SETTINGS.bak)"
   mv "$SETTINGS.tmp" "$SETTINGS"
+  write_marker "$name"
   echo "✅ switched to '$name' profile (backup: $SETTINGS.bak)"
   echo "↻ restart Claude Code (quit + reopen) to load new env."
   ping_verify "$prof"
@@ -427,9 +440,23 @@ case "${1:-status}" in
     # `subscription` is the guaranteed SAFE-HARBOR terminal: removes the env block so Claude Code
     # uses its own OAuth login — always reachable, no key/probe. Claude never stays stuck on a
     # dead router. All profiles share one router, so a router outage means subscription.
+    #
+    # IMPORTANT: fallback only ever DEMOTES router -> subscription; it never PROMOTES
+    # subscription -> router. On subscription there is no active router profile — probing
+    # `active_router_profile`'s default (claude) and applying it would silently flip the
+    # user's own choice back onto 9router. So: no env block -> no-op.
+    cur_base=$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$SETTINGS" 2>/dev/null || true)
+    if [ -z "$cur_base" ]; then
+      echo "→ on subscription — fallback never promotes to a router; nothing to do"
+      exit 0
+    fi
     t=$(active_router_profile)
     c=$(probe "$t")
-    if [ "$c" = "200" ]; then echo "→ router healthy: $t"; apply "$t"; exit 0; fi
+    if [ "$c" = "200" ]; then
+      # already healthy -> do NOT rewrite settings.json (no apply, no ping); nothing changed.
+      echo "→ router healthy: $t (no change)"
+      exit 0
+    fi
     echo "  $t down ($c) → safe-harbor: subscription (OAuth)"
     apply subscription ;;
   spawn)

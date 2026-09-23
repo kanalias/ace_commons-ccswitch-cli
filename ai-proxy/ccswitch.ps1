@@ -48,9 +48,25 @@ $ErrorActionPreference = "Stop"
 $ClaudeDir = Join-Path $env:USERPROFILE ".claude"
 $Settings  = Join-Path $ClaudeDir "settings.json"
 $Profiles  = Join-Path $ClaudeDir "profiles"
+$Marker    = Join-Path $ClaudeDir ".ccswitch-target"     # records last target explicitly applied
 $Order     = @("claude", "codex", "deepseek", "kimi")   # profile files; subscription is env-clear
 
 function Die($msg) { Write-Host "❌ $msg" -ForegroundColor Red; exit 1 }
+
+# Write-Marker <name> — record the target that was just applied to settings.json (claude|codex|
+# deepseek|kimi|subscription), so `fallback` can tell a deliberate subscription switch apart from
+# a machine that never had a router configured. Written via temp file + Move-Item -Force so a
+# crash mid-write never leaves a half-written marker behind. Never fails the caller's switch —
+# a marker write failure is advisory only.
+function Write-Marker($name) {
+  try {
+    $tmp = "$Marker.tmp"
+    Set-Content -Path $tmp -Value $name -Encoding UTF8
+    Move-Item -Path $tmp -Destination $Marker -Force
+  } catch {
+    Write-Host "  ⚠ could not update $Marker (target switch still applied)" -ForegroundColor Yellow
+  }
+}
 
 # Get-RepoRoot — find the ccswitch-cli-claude repo root so `ccswitch install <name>` can run
 # a repo installer script from anywhere. ccswitch.ps1 itself is a standalone copy in
@@ -144,6 +160,7 @@ function Clear-Env {
   $s = Get-Content $Settings -Raw | ConvertFrom-Json
   if ($s.PSObject.Properties.Name -contains "env") { $s.PSObject.Properties.Remove("env") }
   $s | ConvertTo-Json -Depth 10 | Set-Content $Settings -Encoding UTF8
+  Write-Marker "subscription"
   Write-Host "✅ switched to 'subscription' — removed env block (backup: $Settings.bak)." -ForegroundColor Green
   Write-Host "   Claude Code will use its OAuth subscription login (run 'claude' + login if needed)."
   Write-Host "↻ restart Claude Code (quit + reopen) to load new env."
@@ -167,6 +184,7 @@ function Set-ProfileEnv($rawName) {
   $s | Add-Member -NotePropertyName env -NotePropertyValue $profObj -Force
   # depth 10 preserves nested hooks/permissions objects
   $s | ConvertTo-Json -Depth 10 | Set-Content $Settings -Encoding UTF8
+  Write-Marker $name
 
   Write-Host "✅ switched to '$name' profile (backup: $Settings.bak)" -ForegroundColor Green
   Write-Host "↻ restart Claude Code (quit + reopen) to load new env."
@@ -295,9 +313,17 @@ switch ($Command) {
   "check" { Show-Health }
   "fallback" {
     # Keep the currently-active router profile if healthy (don't force claude when the user is on
-    # deepseek). Resolve active target from settings.json's model prefix; default claude.
-    # `subscription` is the guaranteed SAFE-HARBOR terminal — env-clear OAuth, always reachable.
+    # deepseek). `subscription` is the guaranteed SAFE-HARBOR terminal — env-clear OAuth, always
+    # reachable. IMPORTANT: fallback must never PROMOTE a bare subscription (no env block) into a
+    # router — that used to happen because the active-target resolver defaulted to "claude" when
+    # settings.json had no env block at all, silently flipping a subscription user back onto
+    # 9router (Claude Code hot-reloads settings.json, so a running session would suddenly start
+    # sending subscription model ids to the router → "model may not exist").
     $s = Get-Content $Settings -Raw | ConvertFrom-Json
+    if (-not $s.env -or -not $s.env.ANTHROPIC_BASE_URL) {
+      Write-Host "→ on subscription — fallback never promotes to a router; nothing to do"
+      exit 0
+    }
     $t = switch -Wildcard ($s.env.ANTHROPIC_DEFAULT_OPUS_MODEL) {
       "cx/*"  { "codex" }
       "ds/*"  { "deepseek" }
@@ -306,7 +332,7 @@ switch ($Command) {
       default { "claude" }
     }
     $c = Test-Profile $t
-    if ($c -eq "200") { Write-Host "→ router healthy: $t"; Set-ProfileEnv $t; exit 0 }
+    if ($c -eq "200") { Write-Host "→ router healthy: $t (no change)"; exit 0 }
     Write-Host "  $t down ($c) → safe-harbor: subscription (OAuth)"
     Set-ProfileEnv "subscription"
   }
