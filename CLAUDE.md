@@ -8,7 +8,7 @@
 - [.claude/rules/project/git-workflow.md](.claude/rules/project/git-workflow.md) — branching, working branch rule, protected-branch deploy confirm, worktree, cleanup
 - [.claude/rules/common/feature-redflags.md](.claude/rules/common/feature-redflags.md) — safe minimal changes + RED FLAGS cognitive wedge
 - Thêm/sửa rule → đọc [.claude/rules/common/rule-loading-policy.md](.claude/rules/common/rule-loading-policy.md) trước (rule mới mặc định LAZY `paths:`)
-- Ghi memory type project → mirror vào [.claude/memory/](.claude/memory/) theo [.claude/rules/common/memory-mirror.md](.claude/rules/common/memory-mirror.md)
+- Ghi memory type project → xem [.claude/rules/common/memory-mirror.md](.claude/rules/common/memory-mirror.md) (mirror git-tracked; chưa kích hoạt ở repo này)
 - ⭐⭐⭐ **Harness Architecture (P0)** — xem section dưới
 
 ## ⭐⭐⭐ Harness Architecture (P0 — đọc kỹ)

@@ -3,6 +3,7 @@ name: memory-mirror
 description: Project-type memory (fact/decision công việc) có bản mirror git-tracked tại .claude/memory/ trong repo, song song với auto-memory private (~/.claude/projects/<hash>/memory/). Write/edit order khác delete order.
 paths:
   - ".claude/memory/**"
+  - ".claude/rules/**"
 ---
 
 # Memory mirror — auto-memory ↔ `.claude/memory/`

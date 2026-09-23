@@ -3,9 +3,12 @@ name: memory-mirror
 description: Project-type memory (fact/decision công việc) có bản mirror git-tracked tại .claude/memory/ trong repo, song song với auto-memory private (~/.claude/projects/<hash>/memory/). Write/edit order khác delete order.
 paths:
   - ".claude/memory/**"
+  - ".claude/rules/**"
 ---
 
 # Memory mirror — auto-memory ↔ `.claude/memory/`
+
+> **Trạng thái repo này (2026-09-23):** `.claude/memory/` CHƯA tồn tại — convention dưới đây chưa kích hoạt. Ghi project memory mới → tạo dir + mirror theo đúng thứ tự dưới, hoặc hỏi user nếu không chắc có muốn git-track memory không.
 
 Auto-memory (`~/.claude/projects/<hash>/memory/`) là **private per-máy**, không git-tracked — chỉ session Claude trên máy đó đọc được. Loại **project** (fact/decision/state công việc) có thêm bản mirror **git-tracked** tại `.claude/memory/` trong repo này, để team clone repo đọc được. `.claude/memory/MEMORY.md` là index review, không phải nguồn dữ liệu chính — auto-memory vẫn là source-of-truth.
 
