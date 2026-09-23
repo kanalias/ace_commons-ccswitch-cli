@@ -263,7 +263,7 @@ Delegate wrapper là **bash-only** — Windows cần WSL hoặc Git Bash (không
 | **subagents + wrappers** | `HARNESS_GROUP_SUBAGENTS` | `.claude/agents/delegate-{deepseek,gemini,codex,sonnet}.md` + `scripts/delegate/*.sh` (`_common`, `run-aider-deepseek`, `run-codex`, `run-gemini`, `doctor` + `lib/`) |
 | **guard hooks** | `HARNESS_GROUP_GUARD` | `.claude/hooks/{pre-edit-orchestrator-gate,pre-bash-orchestrator-gate,pre-edit-secret-scan}.sh` (wire `PreToolUse` cho `Edit`/`Write`/`MultiEdit`/`Bash`) |
 | **quality hooks** | `HARNESS_GROUP_QUALITY` | `.claude/hooks/post-edit-syntax-check.sh` (wire `PostToolUse`) + `session-start-banner.sh` (wire `SessionStart`) |
-| **commands** | `HARNESS_GROUP_COMMANDS` | `.claude/commands/{git-push-safety,git-commit,git-commit-describe,git-cleanup-branch,git-force-snapshot,clean-up,doctor-memory,audit-context-memory,audit-dependency,audit-vietnamese,audit-claude-md,task-loop-feature}.md` |
+| **commands** | `HARNESS_GROUP_COMMANDS` | `.claude/commands/{git-push-safety,git-commit,git-commit-describe,git-cleanup-branch,git-force-snapshot,clean-up-project,doctor-memory,audit-context-memory,audit-dependency,audit-vietnamese,audit-claude-md,task-loop-feature}.md` |
 | **skills** | `HARNESS_GROUP_SKILLS` | `.claude/skills/{lazy-load-health,dep-ladder-check,auto-commit,check-hardcode,audit-git-leak,fix-ledger}/SKILL.md` |
 | **rules** | `HARNESS_GROUP_RULES` | `.claude/rules/common/*.md` (8 invariant guardrail — always overwrite) + `.claude/rules/project/{git-workflow,skill-superpowers}.md` (giữ nguyên nếu đã tồn tại) |
 | **git pre-push hook** | `HARNESS_GROUP_GITHOOKS` | `.git/hooks/pre-push` (gitleaks secret scan) — bỏ qua nếu target không phải git repo |

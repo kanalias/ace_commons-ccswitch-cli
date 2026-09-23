@@ -23,7 +23,7 @@
 #   HARNESS_GROUP_SUBAGENTS      y/n — delegate subagents+wrappers, no prompt (default: Y)
 #   HARNESS_GROUP_GUARD          y/n — guard hooks, no prompt        (default: Y)
 #   HARNESS_GROUP_QUALITY        y/n — quality hooks, no prompt      (default: Y)
-#   HARNESS_GROUP_COMMANDS       y/n — push-to-git + conventional-commit + branch-cleanup + clean-up + pr-describe + dep-audit + loop-feature + lazy-load-audit + audit-memory-harness + commit + force-snapshot slash-commands, no prompt (default: Y)
+#   HARNESS_GROUP_COMMANDS       y/n — push-to-git + conventional-commit + branch-cleanup + clean-up-project + pr-describe + dep-audit + loop-feature + lazy-load-audit + audit-memory-harness + commit + force-snapshot slash-commands, no prompt (default: Y)
 #   HARNESS_GROUP_SKILLS         y/n — lazy-load-health + dep-ladder-check + auto-commit + check-hardcode + audit-git-leak + orchestrate skills, no prompt (default: Y)
 #   HARNESS_GROUP_RULES          y/n — rules: common/ (9 invariant guardrails, always overwrite) + project/ (git-workflow, skill-superpowers — kept if exist), no prompt (default: Y)
 #   HARNESS_GROUP_GITHOOKS       y/n — git pre-push hook (gitleaks secret scan) into .git/hooks/, no prompt (default: Y; skipped if target not a git repo)
@@ -339,7 +339,7 @@ if [ "$SEL_COMMANDS" -eq 1 ]; then
   install_file "commands/git-commit-describe.md"  ".claude/commands/git-commit-describe.md"
   install_file "commands/git-cleanup-branch.md"   ".claude/commands/git-cleanup-branch.md"
   install_file "commands/git-force-snapshot.md"   ".claude/commands/git-force-snapshot.md"
-  install_file "commands/clean-up.md"             ".claude/commands/clean-up.md"
+  install_file "commands/clean-up-project.md"     ".claude/commands/clean-up-project.md"
   install_file "commands/doctor-memory.md"        ".claude/commands/doctor-memory.md"
   install_file "commands/audit-context-memory.md" ".claude/commands/audit-context-memory.md"
   install_file "commands/audit-dependency.md"     ".claude/commands/audit-dependency.md"
