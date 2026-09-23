@@ -135,3 +135,22 @@ require_pwsh() {
   run grep -F 'Write-Marker $name' "$(repo_root)/ai-proxy/ccswitch.ps1"
   [ "$status" -eq 0 ]
 }
+
+# Static parity: Get-Tag must detect the router by matching the base URL's host against the
+# host of any real profiles/*.json ANTHROPIC_BASE_URL (not just the repo's placeholder host),
+# so real installs with a custom router host aren't mistagged "custom". No pwsh required.
+@test "static: Test-RouterUrl helper is defined" {
+  run grep -F 'function Test-RouterUrl' "$(repo_root)/ai-proxy/ccswitch.ps1"
+  [ "$status" -eq 0 ]
+}
+
+@test "static: Get-Tag calls Test-RouterUrl" {
+  run grep -F 'if (Test-RouterUrl $base)' "$(repo_root)/ai-proxy/ccswitch.ps1"
+  [ "$status" -eq 0 ]
+}
+
+@test "static: no leftover router-detection by placeholder host outside Test-RouterUrl" {
+  run grep -c -F '"*9router.proxy.example.com*"' "$(repo_root)/ai-proxy/ccswitch.ps1"
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+}

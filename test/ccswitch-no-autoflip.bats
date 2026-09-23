@@ -126,3 +126,69 @@ setup() {
   marker=$(cat "$HOME/.claude/.ccswitch-target")
   [ "$marker" = "subscription" ]
 }
+
+# Custom-host regression: real installs route through a router host that is NOT the repo's
+# placeholder (*9router.proxy.example.com*) — set via setup.sh .env proxy_host / `ccswitch
+# set-host`. is_router_url() must still recognize it (host matches a profile's
+# ANTHROPIC_BASE_URL), not fall through to "custom".
+
+@test "ccswitch check/current tags a custom router host (not the placeholder) as its target, not custom" {
+  local custom="https://router.custom.test/v1"
+  for p in claude codex deepseek kimi; do
+    tmp=$(mktemp)
+    jq --arg url "$custom" '.ANTHROPIC_BASE_URL = $url' "$HOME/.claude/profiles/$p.json" > "$tmp"
+    mv "$tmp" "$HOME/.claude/profiles/$p.json"
+  done
+  echo '{}' > "$HOME/.claude/settings.json"
+  "$CC" claude >/dev/null
+  stub_curl 000
+  run "$CC" status
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"→  claude"* ]]
+  [[ "$output" != *"→  custom"* ]]
+}
+
+@test "check-router.sh: custom router host active + dead stub still auto-switches to subscription" {
+  local custom="https://router.custom.test/v1"
+  for p in claude codex deepseek kimi; do
+    tmp=$(mktemp)
+    jq --arg url "$custom" '.ANTHROPIC_BASE_URL = $url' "$HOME/.claude/profiles/$p.json" > "$tmp"
+    mv "$tmp" "$HOME/.claude/profiles/$p.json"
+  done
+  echo '{}' > "$HOME/.claude/settings.json"
+  "$CC" claude >/dev/null
+  stub_curl 000
+  run env -u ANTHROPIC_BASE_URL -u ANTHROPIC_DEFAULT_OPUS_MODEL HOME="$HOME" bash "$CHECK_ROUTER"
+  [ "$status" -eq 0 ]
+  has_env=$(jq 'has("env")' "$HOME/.claude/settings.json")
+  [ "$has_env" = "false" ]
+  marker=$(cat "$HOME/.claude/.ccswitch-target")
+  [ "$marker" = "subscription" ]
+}
+
+@test "check-router.sh: settings.json env points to an unrelated non-router host -> no mutation" {
+  echo '{"env":{"ANTHROPIC_BASE_URL":"https://other.test/v1"}}' > "$HOME/.claude/settings.json"
+  stub_curl 000
+  run env -u ANTHROPIC_BASE_URL -u ANTHROPIC_DEFAULT_OPUS_MODEL HOME="$HOME" bash "$CHECK_ROUTER"
+  [ "$status" -eq 0 ]
+  after=$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$HOME/.claude/settings.json")
+  [ "$after" = "https://other.test/v1" ]
+}
+
+@test "check-router.sh: process env on custom-host router but settings.json is subscription -> warns, no mutation" {
+  local custom="https://router.custom.test/v1"
+  for p in claude codex deepseek kimi; do
+    tmp=$(mktemp)
+    jq --arg url "$custom" '.ANTHROPIC_BASE_URL = $url' "$HOME/.claude/profiles/$p.json" > "$tmp"
+    mv "$tmp" "$HOME/.claude/profiles/$p.json"
+  done
+  echo '{}' > "$HOME/.claude/settings.json"
+  stub_curl 000
+  run env ANTHROPIC_BASE_URL="$custom" \
+      ANTHROPIC_DEFAULT_OPUS_MODEL="cc/claude-opus-5" \
+      HOME="$HOME" bash "$CHECK_ROUTER"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"cần restart Claude Code"* ]]
+  has_env=$(jq 'has("env")' "$HOME/.claude/settings.json")
+  [ "$has_env" = "false" ]
+}

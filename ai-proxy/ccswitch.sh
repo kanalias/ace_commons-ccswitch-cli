@@ -94,6 +94,46 @@ probe() {
   [ -n "$code" ] && echo "$code" || echo "000"
 }
 
+# _host_of <url> — lowercase "scheme://host[:port]" (everything up to the first "/" after
+# "://"; a url with no "://" is lowercased and truncated at its first "/"). Empty in -> empty out.
+_host_of() {
+  local u
+  u="${1:-}"
+  [ -n "$u" ] || { echo ""; return; }
+  u=$(printf '%s' "$u" | tr '[:upper:]' '[:lower:]')
+  case "$u" in
+    *://*)
+      local rest="${u#*://}"
+      printf '%s://%s\n' "${u%%://*}" "${rest%%/*}" ;;
+    *)
+      printf '%s\n' "${u%%/*}" ;;
+  esac
+}
+
+# is_router_url <url> — 0 (true) if <url> is the 9router: its host matches the host of ANY
+# existing profile's ANTHROPIC_BASE_URL (claude/codex/deepseek/kimi — missing/unreadable/empty
+# profiles skipped), OR the legacy placeholder host (kept for back-compat / docs). 1 otherwise,
+# including empty <url>. Prints nothing.
+is_router_url() {
+  local url="${1:-}"
+  [ -n "$url" ] || return 1
+  case "$url" in
+    *9router.proxy.example.com*) return 0 ;;
+  esac
+  local target_host prof f base host
+  target_host=$(_host_of "$url")
+  [ -n "$target_host" ] || return 1
+  for prof in claude codex deepseek kimi; do
+    f="$PROFILES/$prof.json"
+    [ -f "$f" ] && [ -r "$f" ] || continue
+    base=$(jq -r '.ANTHROPIC_BASE_URL // empty' "$f" 2>/dev/null || true)
+    [ -n "$base" ] || continue
+    host=$(_host_of "$base")
+    [ -n "$host" ] && [ "$host" = "$target_host" ] && return 0
+  done
+  return 1
+}
+
 # Resolve which layer wins per Claude Code's precedence (MECHANISM §2):
 #   ① process env         (exported before `claude` launched)      — beats everything
 #   ② settings.local.json .env  (project-scoped, gitignored)
@@ -116,18 +156,19 @@ current() {
   # so the model prefix (cc/ vs cx/ vs ds/ vs kimi/) is what tells them apart.
   tag() {
     local url="$1" model="$2"
-    case "$url" in
-      *9router.proxy.example.com*)
-        case "$model" in
-          cx/*) echo "codex" ;;
-          ds/*) echo "deepseek" ;;
-          cc/*) echo "claude" ;;
-          kimi*) echo "kimi" ;;
-          *)    echo "claude" ;;
-        esac ;;
-      "") echo "subscription" ;;
-      *)  echo "custom" ;;
-    esac
+    if [ -z "$url" ]; then
+      echo "subscription"
+    elif is_router_url "$url"; then
+      case "$model" in
+        cx/*) echo "codex" ;;
+        ds/*) echo "deepseek" ;;
+        cc/*) echo "claude" ;;
+        kimi*) echo "kimi" ;;
+        *)    echo "claude" ;;
+      esac
+    else
+      echo "custom"
+    fi
   }
 
   echo "── effective source (Claude Code precedence §2) ──"

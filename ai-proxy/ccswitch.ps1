@@ -117,10 +117,48 @@ function Test-Profile($name) {
   }
 }
 
+# host-only compare: lowercase "scheme://host[:port]" (everything before the first "/" after "://").
+# no "://" -> lowercase string up to first "/". empty/null -> "".
+function Get-UrlHost($url) {
+  if (-not $url) { return "" }
+  $u = $url.ToLowerInvariant()
+  $schemeIdx = $u.IndexOf("://")
+  if ($schemeIdx -ge 0) {
+    $afterScheme = $schemeIdx + 3
+    $slashIdx = $u.IndexOf("/", $afterScheme)
+    if ($slashIdx -ge 0) { return $u.Substring(0, $slashIdx) }
+    return $u
+  }
+  $slashIdx = $u.IndexOf("/")
+  if ($slashIdx -ge 0) { return $u.Substring(0, $slashIdx) }
+  return $u
+}
+
+# $url is the router iff its host matches the host of any existing profiles/{claude,codex,deepseek,kimi}.json
+# ANTHROPIC_BASE_URL, OR it matches the legacy repo placeholder host (fallback for stock/unconfigured installs).
+function Test-RouterUrl($url) {
+  if (-not $url) { return $false }
+  $targetHost = Get-UrlHost $url
+  if ($targetHost) {
+    foreach ($name in @("claude", "codex", "deepseek", "kimi")) {
+      $prof = Join-Path $Profiles "$name.json"
+      if (-not (Test-Path $prof)) { continue }
+      try {
+        $p = Get-Content $prof -Raw | ConvertFrom-Json
+      } catch { continue }
+      $pBase = $p.ANTHROPIC_BASE_URL
+      if (-not $pBase) { continue }
+      if ((Get-UrlHost $pBase) -eq $targetHost) { return $true }
+    }
+  }
+  if ($url -like "*9router.proxy.example.com*") { return $true }
+  return $false
+}
+
 # claude / codex / deepseek / kimi share one base URL (9router) → tell them apart by model prefix.
 function Get-Tag($base, $model) {
   if (-not $base) { return "subscription" }
-  if ($base -like "*9router.proxy.example.com*") {
+  if (Test-RouterUrl $base) {
     switch -Wildcard ($model) {
       "cx/*"  { return "codex" }
       "ds/*"  { return "deepseek" }
