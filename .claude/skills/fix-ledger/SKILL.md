@@ -1,6 +1,6 @@
 ---
 name: fix-ledger
-description: Ghi lại fix/feature quan trọng đã merge vào .claude/fix-ledger.md (repo-tracked, không phải Claude memory global) để lần merge sau không vô tình đè mất fix — VÀ check ledger trước khi merge branch khác vào working branch/protected branch. Dùng khi 1 bugfix/feature có rủi ro bị branch cũ đè lại vừa xong (test pass), hoặc trước git merge, hoặc user nói "ghi vào fix ledger", "check có bị đè fix không", "nhớ tính năng này tránh mất khi merge".
+description: "Ghi fix/feature quan trọng vào .claude/fix-ledger.md và check ledger trước khi merge để không đè mất fix. Dùng khi \"ghi vào fix ledger\", trước git merge."
 user-invocable: true
 ---
 

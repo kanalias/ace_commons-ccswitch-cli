@@ -1,6 +1,6 @@
 ---
 name: production-deploy
-description: Deploy prod tại chỗ an toàn cho host nhiều service — chỉ pull + rebuild + up đúng service ĐÍCH, snapshot trước / verify mọi service sau, tự động rollback khi healthcheck fail. Dùng khi user nói "deploy prod", "đẩy lên production", hoặc chạy /production-deploy.
+description: "Deploy prod tại chỗ cho host nhiều service: pull + rebuild + up đúng service đích, verify, tự rollback khi healthcheck fail. Dùng khi \"deploy prod\" hoặc /production-deploy."
 user-invocable: true
 disable-model-invocation: true
 ---

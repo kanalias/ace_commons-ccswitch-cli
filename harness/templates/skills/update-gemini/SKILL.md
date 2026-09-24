@@ -1,6 +1,6 @@
 ---
 name: update-gemini
-description: Kiểm tra + cập nhật Google Gemini CLI (macOS/Linux, Homebrew hoặc npm) — so version brew (formula `gemini-cli`) đang chạy trên PATH với bản mới nhất trên npm registry, chạy `brew upgrade gemini-cli` nếu cũ, và kiểm tra agent auto-upgrade định kỳ (LaunchAgent/cron) còn sống. Chạy /update-gemini, hoặc khi user hỏi "gemini đã cập nhật chưa", "update gemini", "cron cập nhật gemini cli".
+description: "Kiểm tra + cập nhật Google Gemini CLI (Homebrew/npm), check agent auto-upgrade còn sống. Dùng /update-gemini hoặc \"update gemini\"."
 user-invocable: true
 ---
 

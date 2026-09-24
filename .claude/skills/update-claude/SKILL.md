@@ -1,6 +1,6 @@
 ---
 name: update-claude
-description: Kiểm tra + cập nhật Claude Code CLI lên bản mới nhất (macOS/Linux, Homebrew hoặc npm) — so version bản đang chạy (native `~/.local/bin`) với bản Homebrew (nếu có), chạy `claude update` nếu cũ, và kiểm tra agent auto-upgrade định kỳ (LaunchAgent/cron) còn sống. Chạy /update-claude, hoặc khi user hỏi "claude đã cập nhật chưa", "update claude", "cron cập nhật claude".
+description: "Kiểm tra + cập nhật Claude Code CLI lên bản mới nhất (Homebrew/npm/native), check agent auto-upgrade còn sống. Dùng /update-claude hoặc \"update claude\"."
 user-invocable: true
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: git-commit-describe
-description: Soạn PR title và body từ commit và diff so với base branch, rồi tuỳ chọn tạo/update bằng gh. Dùng khi user nói "write PR description", "generate pull request body", hoặc chạy /git-commit-describe.
+description: "Soạn PR title và body từ commit + diff so với base branch, tuỳ chọn tạo/update bằng gh. Dùng khi \"write PR description\" hoặc /git-commit-describe."
 user-invocable: true
 disable-model-invocation: true
 ---

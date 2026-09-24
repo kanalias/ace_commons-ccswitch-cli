@@ -1,6 +1,6 @@
 ---
 name: resume-orchestration
-description: Đọc ledger orchestration dở dang (.claude/state/orchestrator-ledger.md), tái tạo bảng phân rã, chỉ re-dispatch subtask failed/pending. Dùng khi user nói "resume orchestration", "tiếp tục task dở dang", hoặc chạy /resume-orchestration.
+description: "Đọc ledger orchestration dở dang, tái tạo bảng phân rã, re-dispatch subtask failed/pending. Dùng khi \"resume orchestration\" hoặc /resume-orchestration."
 user-invocable: true
 ---
 

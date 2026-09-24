@@ -1,6 +1,6 @@
 ---
 name: doctor-memory
-description: Audit + auto-fix auto-memory system — quét mọi memory dir (global tới project hiện tại, từ ~/.claude/projects/<slug>/memory), phát hiện broken link/orphan/naming lệch/nội dung nhét thẳng MEMORY.md/thừa-trùng/stale/not-memory-worthy, tự sửa case chắc chắn (cấu trúc, không mất nội dung), liệt kê + hỏi confirm trước khi xoá. Thêm `--report-only` để chỉ audit + report, không tự sửa gì (dùng khi chỉ muốn xem tình trạng memory). BỎ QUA `harness/templates/` khi verify claim. Chạy /doctor-memory, /doctor-memory --report-only, hoặc khi user hỏi "dọn memory", "memory nào thừa", "health check memory", "audit memory system", "memory nào nạp ngay memory nào nạp động", "chuyển memory sang load động".
+description: "Health-check + auto-fix auto-memory: sửa broken link/orphan/naming, hỏi confirm trước khi xoá file thừa/stale. Dùng /doctor-memory hoặc \"dọn memory\"."
 user-invocable: true
 disable-model-invocation: true
 ---

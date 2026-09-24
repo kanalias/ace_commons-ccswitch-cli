@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: Stage và commit thay đổi vào local git only, không push. Thêm `--conventional` để soạn message theo Conventional Commit (type prefix). Thêm `--auto` để tự commit ngay không hỏi xác nhận, sau khi xong 1 đơn vị việc (todo done, test pass). Dùng khi user nói "commit", "commit local", "commit this", "gen commit message", "write conventional commit", "auto commit", "nhớ commit giúp", "đừng để tôi quên commit", hoặc chạy /git-commit, /git-commit --conventional, /git-commit --auto.
+description: "Stage và commit local, không push. `--conventional` soạn Conventional Commit, `--auto` tự commit không hỏi. Dùng khi nói \"commit\" hoặc /git-commit."
 user-invocable: true
 disable-model-invocation: true
 ---

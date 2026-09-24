@@ -1,6 +1,6 @@
 ---
 name: audit-claude-md
-description: Audit file CLAUDE.md — phát hiện nội dung trùng lặp, link chết (dead link), và bảo vệ BLOCK harness rules do install.sh quản lý (giữa marker BEGIN/END HARNESS RULES). Nếu phát hiện trùng lặp thì edit gộp lại, LUÔN ưu tiên giữ nội dung trong BLOCK harness. Dùng khi user gõ /audit-claude-md hoặc yêu cầu "kiểm tra CLAUDE.md", "audit CLAUDE.md", "dọn CLAUDE.md trùng lặp".
+description: "Audit CLAUDE.md: phát hiện nội dung trùng lặp, link chết, bảo vệ BLOCK harness rules (marker BEGIN/END). Dùng khi gõ /audit-claude-md hoặc \"audit CLAUDE.md\"."
 user-invocable: true
 ---
 

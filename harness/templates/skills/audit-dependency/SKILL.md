@@ -1,6 +1,6 @@
 ---
 name: audit-dependency
-description: Phát hiện package ecosystem của project và chạy audit read-only vulnerability + outdated-dependency, rồi tóm tắt kết quả. Dùng khi user nói "audit dependencies", "check for vulnerable packages", "outdated deps", hoặc chạy /audit-dependency.
+description: "Phát hiện package ecosystem, chạy audit read-only vulnerability + outdated dependency, tóm tắt kết quả. Dùng khi nói \"audit dependencies\" hoặc /audit-dependency."
 user-invocable: true
 ---
 

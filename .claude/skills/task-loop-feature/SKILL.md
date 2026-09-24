@@ -1,6 +1,6 @@
 ---
 name: task-loop-feature
-description: Chạy vòng lặp code → sửa → viết testcase → test cho task được giao tới khi thật sự xong (test xanh, đạt acceptance criteria). Dùng khi user nói "làm tới khi xong", "loop code test fix cho đến khi hoàn thiện", "cứ lặp sửa cho tới khi pass", hoặc chạy /task-loop-feature <task>. Không dùng cho sửa một lần — chỉ cho task cần lặp implement/verify nhiều vòng.
+description: "Vòng lặp code → sửa → viết test → chạy test tới khi xong (test xanh, đạt acceptance). Dùng khi \"làm tới khi xong\" hoặc /task-loop-feature <task>."
 user-invocable: true
 ---
 

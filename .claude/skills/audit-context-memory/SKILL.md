@@ -1,6 +1,6 @@
 ---
 name: audit-context-memory
-description: Audit toàn bộ static context load mỗi session — global rules (~/.claude/rules/), CLAUDE.md project, project rules trong .claude/rules (phân loại ALWAYS vs LAZY, chấm gate, đề xuất paths:), và MEMORY.md index (auto-memory) — đọc nội dung thật, phát hiện trùng lặp/derivable/phình, rồi sau khi user xác nhận thì áp fix trực tiếp (thêm paths:, sync index). Cờ `--rules-only` chỉ audit project rules và tự sửa case chắc chắn không cần hỏi. Dùng khi user hỏi "context session có gì", "tối ưu context window", "file nào đang load", "rule nào đang always-load", "giảm context session", "kiểm tra lazy load", "rule nào nên lazy", "kiểm tra + sửa lazy load", hoặc chạy /audit-context-memory [--rules-only].
+description: "Audit context load mỗi session (rules, CLAUDE.md, MEMORY.md): phát hiện trùng lặp/phình, đề xuất lazy `paths:`, fix sau khi user xác nhận. Dùng /audit-context-memory [--rules-only]."
 user-invocable: true
 ---
 

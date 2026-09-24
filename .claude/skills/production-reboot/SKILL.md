@@ -1,6 +1,6 @@
 ---
 name: production-reboot
-description: Khôi phục host prod bị WEDGED (TCP mở nhưng HTTP=000 / SSH banner-timeout — thường do disk-full ENOSPC) qua reboot out-of-band từ provider, sau đó cleanup + verify. Dùng khi user nói "prod bị treo", "host wedged", hoặc chạy /production-reboot.
+description: "Khôi phục host prod WEDGED (TCP mở, HTTP=000/SSH timeout) qua reboot out-of-band, rồi cleanup + verify. Dùng khi \"prod bị treo\" hoặc /production-reboot."
 user-invocable: true
 disable-model-invocation: true
 ---

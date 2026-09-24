@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: Quy trình orchestration chuẩn cho task M trở lên — plan-first, ghi task-graph artifact vào .claude/state/task-graph/<slug>.md (per-worktree), fan-out Sonnet song song theo wave, review + integration verify, cleanup. Dùng khi user giao task lớn nhiều mảnh, nói "orchestrate", "chia task chạy song song", hoặc resume task-graph dở dang từ session trước.
+description: "Quy trình orchestration task M+: plan-first, task-graph, fan-out Sonnet song song theo wave, review + integration verify. Dùng khi \"orchestrate\" hoặc chia task chạy song song."
 user-invocable: true
 ---
 

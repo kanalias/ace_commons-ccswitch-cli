@@ -1,6 +1,6 @@
 ---
 name: git-cleanup-branch
-description: Audit local branch đã merge và worktree stale, rồi chỉ xoá những gì user xác nhận. Dùng khi user nói "clean up merged branches", "delete stale branches", "prune worktrees", hoặc chạy /git-cleanup-branch.
+description: "Audit branch đã merge và worktree stale, chỉ xoá những gì user xác nhận. Dùng khi \"clean up merged branches\", \"prune worktrees\" hoặc /git-cleanup-branch."
 user-invocable: true
 disable-model-invocation: true
 ---

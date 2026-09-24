@@ -1,6 +1,6 @@
 ---
 name: production-cleanup
-description: Giải phóng disk trên prod host — chỉ prune Docker build cache + dangling image, sau đó verify service mục tiêu và các service lân cận. An toàn, không downtime, không mất dữ liệu. Dùng khi user nói "dọn disk prod", "cleanup production", hoặc chạy /production-cleanup.
+description: "Giải phóng disk prod host: chỉ prune Docker build cache + dangling image, verify service. An toàn, không downtime. Dùng khi \"dọn disk prod\" hoặc /production-cleanup."
 user-invocable: true
 disable-model-invocation: true
 ---

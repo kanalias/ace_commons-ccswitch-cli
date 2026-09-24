@@ -1,6 +1,6 @@
 ---
 name: check-hardcode
-description: Scan code source tìm hardcode secret/credential (token, password, key, connection string, url, ip, domain, email...) rồi báo cáo + gợi ý fix, KHÔNG tự sửa. Dùng khi user hỏi "check hardcode", "quét secret trong code", trước commit/push, hoặc review diff.
+description: "Scan code tìm hardcode secret/credential (token, password, key, url, ip...), báo cáo + gợi ý fix, KHÔNG tự sửa. Dùng khi \"check hardcode\", trước commit/push."
 user-invocable: true
 ---
 

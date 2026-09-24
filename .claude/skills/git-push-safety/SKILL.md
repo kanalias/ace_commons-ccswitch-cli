@@ -1,6 +1,6 @@
 ---
 name: git-push-safety
-description: Chạy test, gitleaks, sensitive-content scan; chỉ push nếu cả 3 pass. Cờ `--scan-only` chỉ chạy gitleaks + sensitive-content scan (không test, không push) — dùng khi user nói "audit git leak", "check leak trước khi push".
+description: "Chạy test, gitleaks, sensitive-content scan; chỉ push nếu cả 3 pass. `--scan-only` chỉ scan, không test/push. Dùng khi \"check leak trước khi push\"."
 disable-model-invocation: true
 user-invocable: true
 ---

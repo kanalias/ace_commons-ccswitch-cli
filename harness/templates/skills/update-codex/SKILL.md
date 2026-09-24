@@ -1,6 +1,6 @@
 ---
 name: update-codex
-description: Kiểm tra + cập nhật OpenAI Codex CLI lên bản mới nhất (macOS/Linux, Homebrew hoặc npm) — so version binary đang chạy với bản mới nhất, chạy `brew upgrade codex` nếu cũ, và kiểm tra agent auto-upgrade định kỳ (LaunchAgent/cron) còn sống. Chạy /update-codex, hoặc khi user hỏi "codex đã cập nhật chưa", "update codex", "cron cập nhật codex".
+description: "Kiểm tra + cập nhật OpenAI Codex CLI lên bản mới nhất (Homebrew/npm), check agent auto-upgrade còn sống. Dùng /update-codex hoặc \"update codex\"."
 user-invocable: true
 ---
 

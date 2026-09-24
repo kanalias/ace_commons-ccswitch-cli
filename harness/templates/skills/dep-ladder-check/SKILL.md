@@ -1,6 +1,6 @@
 ---
 name: dep-ladder-check
-description: Đi qua thang build-vs-buy trước khi thêm dependency mới hoặc viết code mới không tầm thường. Dùng trước khi chạy npm install / pip install / go get / cargo add / gem install / composer require, trước khi thêm một thư viện dependency mới, hoặc trước khi viết một abstraction/helper mới không tầm thường.
+description: Đi thang build-vs-buy trước khi thêm dependency mới hoặc viết abstraction/helper không tầm thường. Dùng trước npm install / pip install / cargo add / go get.
 user-invocable: true
 ---
 

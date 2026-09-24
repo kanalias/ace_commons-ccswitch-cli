@@ -1,6 +1,6 @@
 ---
 name: git-force-snapshot
-description: Squash toàn bộ git history thành 1 commit duy nhất để cắt đứt vĩnh viễn secret bị lộ khỏi history. Destructive và irreversible sau khi force-push — mọi collaborator phải re-clone. Chỉ dùng khi user nói rõ "force snapshot", "squash history", "xoá lịch sử git", "reset history vì leak", hoặc chạy /git-force-snapshot.
+description: "Squash toàn bộ git history thành 1 commit để cắt secret bị lộ. Destructive, irreversible sau force-push. Chỉ dùng khi user nói rõ \"force snapshot\" hoặc /git-force-snapshot."
 user-invocable: true
 disable-model-invocation: true
 ---

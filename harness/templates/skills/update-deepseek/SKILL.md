@@ -1,6 +1,6 @@
 ---
 name: update-deepseek
-description: Kiểm tra + cập nhật công cụ đứng sau delegate-deepseek (Aider CLI qua Homebrew, macOS/Linux) trên máy, và kiểm tra read-only proxy/endpoint DeepSeek còn reachable — không in secret. Chạy /update-deepseek, hoặc khi user hỏi "update deepseek", "update aider", "aider đã cập nhật chưa".
+description: "Kiểm tra + cập nhật Aider CLI (đứng sau delegate-deepseek) và check endpoint DeepSeek reachable, không in secret. Dùng /update-deepseek hoặc \"update aider\"."
 user-invocable: true
 ---
 
