@@ -13,7 +13,7 @@ Bộ script cá nhân/team quản lý setup Claude Code: đổi endpoint auth nh
 
 ### Yêu cầu hệ thống
 
-| Dependency | Cần cho | Cài |
+| Phụ thuộc | Cần cho | Cài |
 |---|---|---|
 | `bash` | Tất cả (mac/linux native; Windows qua Git Bash/WSL/Cygwin) | có sẵn mac/linux; Windows: Git Bash hoặc WSL |
 | `jq` | Phần 1 (profile JSON), Phần 2 (wire `settings.json`), Phần 3 (`autoCompactWindow`), Phần 4 (`disableWorkflows`) | `brew install jq` / `apt install jq` |
@@ -87,7 +87,7 @@ kimi_api_key_force_subscription=1
 kimi_api_key=<your-kimi-key>
 ```
 
-(mẫu có sẵn ở `.env.example`). Khi `setup.sh`/`setup.ps1` chạy và thấy file này có đủ cả 2 biến, nó **ghi thẳng** `proxy_host` + `proxy_key` vào cả 4 file (`claude.json` / `codex.json` / `deepseek.json` / `kimi.json`) — không hỏi, interactive hay non-interactive đều như nhau. Nếu `kimi_api_key_force_subscription=1` + `kimi_api_key` có mặt, nó ghi riêng `~/.claude/profiles/kimi.json` với endpoint Anthropic-compatible thật của Kimi `https://api.moonshot.ai/anthropic` (bỏ qua 9router). `.env` là source of truth: một profile đã có key thật vẫn bị ghi đè (có in thông báo overwrite), chạy lại script bất kỳ lúc nào để resync theo `.env` mới nhất.
+(mẫu có sẵn ở `.env.example`). Khi `setup.sh`/`setup.ps1` chạy và thấy file này có đủ cả 2 biến, nó **ghi thẳng** `proxy_host` + `proxy_key` vào cả 4 file (`claude.json` / `codex.json` / `deepseek.json` / `kimi.json`) — không hỏi, interactive hay non-interactive đều như nhau. Nếu `kimi_api_key_force_subscription=1` + `kimi_api_key` có mặt, nó ghi riêng `~/.claude/profiles/kimi.json` với endpoint Anthropic-compatible thật của Kimi `https://api.moonshot.ai/anthropic` (bỏ qua 9router). `.env` là nguồn chuẩn duy nhất (source of truth): một profile đã có key thật vẫn bị ghi đè (có in thông báo ghi đè), chạy lại script bất kỳ lúc nào để resync theo `.env` mới nhất.
 
 Không có `.env`, hoặc thiếu 1 trong 2 biến → bỏ qua bước này, dùng flow nhập tay:
 
@@ -208,7 +208,7 @@ Model qua 9router **phải** có prefix. Mỗi profile map sẵn 4 tier (Opus/So
 
 Thiếu prefix → lỗi `model_not_found`. Xem model id đầy đủ trong `~/.claude/profiles/<target>.json`, hoặc list live: `curl -s https://9router.proxy.example.com/v1/models -H "Authorization: Bearer <key>" | jq -r '.data[].id'`. (Ở `subscription` — không có env block — Claude Code tự dùng model mặc định của tài khoản, không cần prefix.)
 
-### 1.5 Troubleshoot
+### 1.5 Xử lý sự cố
 
 **`ccswitch` báo `claude: 000 DOWN` nhưng endpoint vẫn sống**
 Thường do **IPv6 route hỏng** — host resolve ra cả A (IPv4) + AAAA (IPv6), nhưng path IPv6 timeout. Claude Code (Node) tự né sang IPv4 nên vẫn chạy; chỉ `curl`/health-probe bị kẹt. Xác minh:
@@ -348,7 +348,7 @@ bats test/*.bats
 
 Test dùng `$HOME` giả (`$BATS_TEST_TMPDIR`) — không đụng `~/.claude` thật của máy chạy test.
 
-### 2.5 Troubleshoot
+### 2.5 Xử lý sự cố
 
 **Cài xong nhưng hook không chạy trong project đích**
 Kiểm tra `.claude/settings.json` project đích có block `hooks.PreToolUse`/`PostToolUse`/... trỏ đúng script không — `jq . .claude/settings.json` xem JSON còn hợp lệ. Restart Claude Code sau khi wire hook (hook load lúc session start).
@@ -406,7 +406,7 @@ file: /Users/you/.claude/settings.json
   DISABLE_AUTO_COMPACT: unset (enabled)
 ```
 
-### 3.2 Troubleshoot
+### 3.2 Xử lý sự cố
 
 **`jq: command not found`**
 Script hard-require `jq` — cài `brew install jq` (mac) / `apt install jq` (linux) rồi chạy lại.
@@ -463,9 +463,9 @@ ccswitch-cli-claude/
 │   ├── statusline-context.sh       # Phần 1 — statusLine context-usage bar (cài kèm setup.sh)
 │   └── profiles/                   # Phần 1 — TEMPLATE (placeholder key, an toàn để commit)
 │       ├── claude.json                # claude cc/*
-│       ├── codex.json                 # codex cx/*  (same key as claude.json)
-│       ├── deepseek.json              # deepseek ds/*  (same key as claude.json)
-│       └── kimi.json                  # kimi kimi/*  (same key; direct-endpoint mode nếu force-subscription)
+│       ├── codex.json                 # codex cx/*  (chung key với claude.json)
+│       ├── deepseek.json              # deepseek ds/*  (chung key với claude.json)
+│       └── kimi.json                  # kimi kimi/*  (chung key; chế độ direct-endpoint nếu force-subscription)
 │                                       # subscription không có file — nó là env-clear
 │
 ├── install-harness.sh   # Phần 2 — entry point (thin wrapper, exec harness/install.sh)
