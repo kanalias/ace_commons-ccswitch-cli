@@ -9,9 +9,20 @@ disable-model-invocation: true
 
 # git-cleanup-branch — audit + confirm-delete branch đã merge và worktree stale
 
-## 1. Xác định default branch
+## 1. Xác định remote chính + default branch
 
-Chạy `git symbolic-ref refs/remotes/origin/HEAD` và lấy basename (vd
+Resolve remote chính (`$R`):
+
+```sh
+b=$(git branch --show-current)
+R=$(git config --get "branch.$b.remote" 2>/dev/null || true)
+[ "$R" = "." ] && R=
+[ -z "$R" ] && git remote | grep -qx origin && R=origin
+[ -z "$R" ] && [ "$(git remote | wc -l | tr -d ' ')" = 1 ] && R=$(git remote)
+[ -z "$R" ] && echo "STOP: không xác định được remote chính — hỏi user" >&2
+```
+
+Chạy `git symbolic-ref refs/remotes/$R/HEAD` và lấy basename (vd
 `main`). Nếu lệnh fail (không có remote tracking ref), hỏi user branch
 nào là default — không đoán giữa `main`/`master`.
 
@@ -53,8 +64,8 @@ Với mỗi branch đã xác nhận: `git branch -d <branch>` (chỉ safe delete
 git từ chối vì unmerged, DỪNG, báo branch đó, và KHÔNG force bằng
 `-D` — quyết định đó thuộc về user, không phải command này.
 
-Sau đó thử cleanup remote, best-effort, chỉ `origin`:
-`git push origin --delete <branch>`. Nếu fail (branch đã mất, vấn đề
+Sau đó thử cleanup remote, best-effort, chỉ remote chính (`$R`):
+`git push $R --delete <branch>`. Nếu fail (branch đã mất, vấn đề
 permission, v.v), log warning và tiếp tục — không fail toàn bộ run vì một
 lần xoá remote lỗi.
 

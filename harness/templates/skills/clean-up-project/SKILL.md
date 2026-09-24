@@ -147,10 +147,10 @@ Apply rules:
 
 ### 5. Merged temp branches
 
-Không tự implement — logic dọn branch nằm DUY NHẤT ở skill `/git-cleanup-branch` (protected hard-block, whitelist `feat/` `fix/` `hotfix/` `chore/` `refactor/`, age guard 24h, confirm `[a]ll / [s]elect / [n]one`, `git branch -d` không bao giờ `-D`, remote delete best-effort chỉ `origin`).
+Không tự implement — logic dọn branch nằm DUY NHẤT ở skill `/git-cleanup-branch` (protected hard-block, whitelist `feat/` `fix/` `hotfix/` `chore/` `refactor/`, age guard 24h, confirm `[a]ll / [s]elect / [n]one`, `git branch -d` không bao giờ `-D`, remote delete best-effort chỉ remote chính (`$R`)).
 
 - Dry-run: chỉ liệt kê candidate từ `git branch --merged` vào báo cáo, category `branches`, action = `chạy /git-cleanup-branch`.
-- Apply: gọi `/git-cleanup-branch`, KHÔNG chạy `git branch -d` / `git push origin --delete` trực tiếp từ skill này.
+- Apply: gọi `/git-cleanup-branch`, KHÔNG chạy `git branch -d` / `git push $R --delete` trực tiếp từ skill này.
 
 ### 6. Stale logs
 
