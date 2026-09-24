@@ -264,7 +264,7 @@ Delegate wrapper là **bash-only** — Windows cần WSL hoặc Git Bash (không
 | **guard hooks** | `HARNESS_GROUP_GUARD` | `.claude/hooks/{pre-edit-orchestrator-gate,pre-bash-orchestrator-gate,pre-edit-secret-scan}.sh` (wire `PreToolUse` cho `Edit`/`Write`/`MultiEdit`/`Bash`) |
 | **quality hooks** | `HARNESS_GROUP_QUALITY` | `.claude/hooks/post-edit-syntax-check.sh` (wire `PostToolUse`) + `session-start-banner.sh` (wire `SessionStart`) |
 | **commands** | `HARNESS_GROUP_COMMANDS` | `.claude/skills/*/SKILL.md` (16 skill, gọi qua `/<name>`) |
-| **skills** | `HARNESS_GROUP_SKILLS` | `.claude/skills/*/SKILL.md` (23 skill) |
+| **skills** | `HARNESS_GROUP_SKILLS` | `.claude/skills/{check-hardcode,dep-ladder-check,fix-ledger,orchestrate}/SKILL.md` (4 skill) |
 | **rules** | `HARNESS_GROUP_RULES` | `.claude/rules/common/*.md` (8 invariant guardrail — always overwrite) + `.claude/rules/project/{git-workflow,skill-superpowers}.md` (giữ nguyên nếu đã tồn tại) |
 | **git pre-push hook** | `HARNESS_GROUP_GITHOOKS` | `.git/hooks/pre-push` (gitleaks secret scan) — bỏ qua nếu target không phải git repo |
 
