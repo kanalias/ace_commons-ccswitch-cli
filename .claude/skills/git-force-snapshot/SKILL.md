@@ -4,7 +4,7 @@ description: "Squash toàn bộ git history thành 1 commit để cắt secret b
 user-invocable: true
 disable-model-invocation: true
 ---
-> **Confirmation gate:** Explicit invocation is not confirmation. Before any destructive action, production change, or remote publish, list the exact targets, scope, and impact; ask the user for explicit confirmation in this conversation and wait. Preserve all stricter workflow-specific confirmations below.
+> **Confirmation gate:** Gọi lệnh rõ ràng không phải là xác nhận. Trước bất kỳ hành động phá huỷ, thay đổi production, hoặc publish ra remote nào, liệt kê rõ target, scope, và tác động; hỏi user xác nhận rõ ràng trong conversation này và chờ. Giữ nguyên mọi xác nhận chặt hơn theo từng workflow bên dưới.
 
 
 # git-force-snapshot — squash toàn bộ history thành 1 commit (destructive)

@@ -4,7 +4,7 @@ description: "Chạy test, gitleaks, sensitive-content scan; chỉ push nếu c�
 disable-model-invocation: true
 user-invocable: true
 ---
-> **Confirmation gate:** Explicit invocation is not confirmation. Before any destructive action, production change, or remote publish, list the exact targets, scope, and impact; ask the user for explicit confirmation in this conversation and wait. Preserve all stricter workflow-specific confirmations below.
+> **Confirmation gate:** Gọi lệnh rõ ràng không phải là xác nhận. Trước bất kỳ hành động phá huỷ, thay đổi production, hoặc publish ra remote nào, liệt kê rõ target, scope, và tác động; hỏi user xác nhận rõ ràng trong conversation này và chờ. Giữ nguyên mọi xác nhận chặt hơn theo từng workflow bên dưới.
 
 ## Chế độ `--scan-only`
 
