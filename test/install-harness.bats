@@ -213,6 +213,51 @@ run_install() {
   [ -f "$TARGET/.claude/skills/production-reboot/SKILL.md" ]
 }
 
+run_install_deploy() {
+  HARNESS_ROUTE_DIR="$TARGET" \
+  HARNESS_CORE_DIRS="src,lib" \
+  HARNESS_PROJECT_SLUG="testproj" \
+  HARNESS_BRANCH="dev" \
+  HARNESS_TEST_CMD="npm test" \
+  HARNESS_GROUP_SUBAGENTS="Y" \
+  HARNESS_GROUP_GUARD="Y" \
+  HARNESS_GROUP_QUALITY="Y" \
+  HARNESS_GROUP_SESSIONLIMIT="N" \
+  HARNESS_GROUP_DEPLOY="y" \
+  HARNESS_OVERWRITE="all" \
+  run bash "$ROOT/harness/install.sh" </dev/null
+}
+
+@test "PROJECT_REMOTE_ID: remote renamed to 'original' (only remote) is used" {
+  git -C "$TARGET" remote add original https://github.com/foo/bar.git
+  git -C "$TARGET" commit --allow-empty -qm init
+  run_install_deploy
+  [ "$status" -eq 0 ]
+  grep -q 'github.com/foo/bar' "$TARGET/.claude/skills/production-deploy/SKILL.md"
+  ! grep -q '<project-remote-id>' "$TARGET/.claude/skills/production-deploy/SKILL.md"
+}
+
+@test "PROJECT_REMOTE_ID: two remotes, branch upstream is non-origin, uses upstream" {
+  git -C "$TARGET" remote add upstreamx https://github.com/foo/up.git
+  git -C "$TARGET" remote add original https://github.com/foo/bar.git
+  git -C "$TARGET" commit --allow-empty -qm init
+  git -C "$TARGET" symbolic-ref HEAD refs/heads/dev
+  git -C "$TARGET" config branch.dev.remote upstreamx
+  run_install_deploy
+  [ "$status" -eq 0 ]
+  grep -q 'github.com/foo/up' "$TARGET/.claude/skills/production-deploy/SKILL.md"
+  ! grep -q 'github.com/foo/bar' "$TARGET/.claude/skills/production-deploy/SKILL.md"
+}
+
+@test "PROJECT_REMOTE_ID: >=2 remotes, no upstream, no origin falls back to placeholder" {
+  git -C "$TARGET" remote add a https://github.com/foo/a.git
+  git -C "$TARGET" remote add b https://github.com/foo/b.git
+  git -C "$TARGET" commit --allow-empty -qm init
+  run_install_deploy
+  [ "$status" -eq 0 ]
+  grep -q '<project-remote-id>' "$TARGET/.claude/skills/production-deploy/SKILL.md"
+}
+
 # check-session-limit.sh (old Session%/Weekly% mechanism) was fully removed
 # in the 16->8 hook consolidation, not merged into another hook — advisory-only,
 # superseded by the always-load token-budget.md rule (see MECHANISM.md 2026-07-31).
