@@ -1,10 +1,20 @@
 ---
 name: update-codex
-description: "Kiểm tra + cập nhật OpenAI Codex CLI lên bản mới nhất (Homebrew/npm), check agent auto-upgrade còn sống. Dùng /update-codex hoặc \"update codex\"."
+description: "Kiểm tra + cập nhật OpenAI Codex CLI lên bản mới nhất (Homebrew/npm) qua subagent haiku (main agent bị hook chặn gọi codex), check agent auto-upgrade còn sống. Dùng /update-codex hoặc \"update codex\"."
 user-invocable: true
 ---
 
 # update-codex — kiểm tra + cập nhật OpenAI Codex CLI
+
+## Cách chạy (BẮT BUỘC — main agent không tự chạy Bash)
+
+Hook `pre-bash-gate.sh` chặn main agent gọi `codex` qua Bash (kể cả `codex --version`), không có bypass → main agent **KHÔNG** chạy trực tiếp các bước dưới. Thay vào đó:
+
+1. In banner dispatch (persona + task + timeout).
+2. Gọi Agent tool với `subagent_type: general-purpose`, `model: haiku`, foreground, prompt self-contained gồm: Bước 1–2 dưới đây + verify `which -a codex` (copy nguyên lệnh từ các bước), cấm chạy Bước 3 (`codex update`) trừ khi user yêu cầu rõ, cấm sửa/load plist hay launch agent, không sửa file, không commit — yêu cầu trả summary <200 từ: version trước → sau, cask version, `which -a codex` (cảnh báo nếu nhiều bản), agent auto-upgrade (loaded? plist label, log path + lần chạy gần nhất + dòng cuối log), lỗi nếu có.
+3. Main agent chỉ làm Bước 4 (báo cáo) dựa trên kết quả subagent trả về.
+
+Repo khác không có `pre-bash-gate.sh` → main vẫn nên delegate cho đồng nhất (không cần Bash trực tiếp cho tác vụ update CLI).
 
 ## Bối cảnh (thường 1 bản cài, qua Homebrew Cask)
 
@@ -35,6 +45,22 @@ case "$(uname)" in
   *) { crontab -l 2>/dev/null | grep -i codex; systemctl --user list-timers 2>/dev/null | grep -i codex; } || echo "  (không cron/timer nào cho codex)" ;;
 esac
 echo "npm-global (nên rỗng nếu chỉ dùng cask): $(npm ls -g --depth=0 2>/dev/null | grep -i codex)"
+echo "which -a: $(which -a codex)"
+if [ "$(uname)" = "Darwin" ]; then
+  plist=$(ls ~/Library/LaunchAgents/*codex*.plist 2>/dev/null | head -1)
+  [ -z "$plist" ] && plist=$(grep -il codex ~/Library/LaunchAgents/*.plist 2>/dev/null | head -1)
+  if [ -n "$plist" ]; then
+    log=$(/usr/libexec/PlistBuddy -c 'Print :StandardOutPath' "$plist" 2>/dev/null)
+    if [ -n "$log" ] && [ -f "$log" ]; then
+      echo "agent log ($plist → $log), mtime $(stat -f '%Sm' "$log"):"
+      tail -n 5 "$log"
+    else
+      echo "agent log: plist $plist không có StandardOutPath hợp lệ"
+    fi
+  else
+    echo "agent log: không tìm thấy plist codex trong ~/Library/LaunchAgents"
+  fi
+fi
 ```
 
 ## Bước 2 — Cập nhật (brew cask)
@@ -57,7 +83,7 @@ Cảnh báo: `codex update` có thể ghi binary ra ngoài path quản lý bởi
 
 ## Bước 4 — Báo cáo
 
-Bảng ngắn: version trước → sau, cask version, trạng thái agent auto-upgrade (loaded? log gần nhất lúc nào?). Nhắc: session/wrapper `delegate-codex` đang chạy vẫn dùng binary cũ cho tới lần spawn tiếp theo.
+Main agent tổng hợp từ report của subagent (không tự chạy lại Bash): bảng ngắn version trước → sau, cask version, trạng thái agent auto-upgrade (loaded? log gần nhất lúc nào?). Nhắc: session/wrapper `delegate-codex` đang chạy vẫn dùng binary cũ cho tới lần spawn tiếp theo.
 
 ## Xử lý sự cố
 
