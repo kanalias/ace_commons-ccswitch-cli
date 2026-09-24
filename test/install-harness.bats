@@ -150,6 +150,11 @@ run_install() {
   grep -q '"src/\*\*"' "$TARGET/.claude/rules/project/skill-superpowers.md"
   grep -q '"lib/\*\*"' "$TARGET/.claude/rules/project/skill-superpowers.md"
 
+  # memory mirror index — scaffolded with rules group, slug substituted (preserve mode)
+  [ -f "$TARGET/.claude/memory/MEMORY.md" ]
+  grep -q 'testproj' "$TARGET/.claude/memory/MEMORY.md"
+  ! grep -q '@@PROJECT_SLUG@@' "$TARGET/.claude/memory/MEMORY.md" || false
+
   # no leftover placeholder tokens or 9router-specific hardcoding
   # (sync-template.md is a doc *about* the @@TOKEN@@ mechanism, so it intentionally
   # contains @@ as illustration — exclude only that one file, nothing else)
@@ -175,6 +180,16 @@ run_install() {
   # @@TEST_CMD@@ substituted into the Vietnamese phrase, no leftover token
   grep -q 'lệnh test của project: `npm test`' "$TARGET/.claude/skills/task-loop-feature/SKILL.md"
   ! grep -q '@@' "$TARGET/.claude/skills/task-loop-feature/SKILL.md" || false
+}
+
+@test "pre-existing .claude/memory/MEMORY.md custom content is kept unchanged, even with HARNESS_OVERWRITE=all" {
+  mkdir -p "$TARGET/.claude/memory"
+  printf '# My custom memory\n\n- [entry](entry.md) — do not clobber\n' > "$TARGET/.claude/memory/MEMORY.md"
+  before="$(cat "$TARGET/.claude/memory/MEMORY.md")"
+  run_install
+  [ "$status" -eq 0 ]
+  after="$(cat "$TARGET/.claude/memory/MEMORY.md")"
+  [ "$before" = "$after" ]
 }
 
 @test "HARNESS_GROUP_DEPLOY=y installs production-* skills" {

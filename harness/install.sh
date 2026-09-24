@@ -552,6 +552,8 @@ if [ "$SEL_RULES" -eq 1 ]; then
     [ "$b" = "sync-template.md" ] && continue # source-repository maintenance only
     install_file "rules/project/$b" ".claude/rules/project/$b" preserve
   done
+  # project memory mirror index — per-repo content, never overwrite
+  install_file "memory/MEMORY.md" ".claude/memory/MEMORY.md" preserve
 fi
 
 if [ "$SEL_GITHOOKS" -eq 1 ]; then
