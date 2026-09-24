@@ -7,9 +7,20 @@ disable-model-invocation: true
 
 # git-commit-describe — soạn PR title + body từ commit/diff
 
-## 1. Xác định base branch
+## 1. Xác định remote chính + base branch
 
-Thử `git symbolic-ref refs/remotes/origin/HEAD` và lấy basename. Nếu
+Resolve remote chính (`$R`):
+
+```sh
+b=$(git branch --show-current)
+R=$(git config --get "branch.$b.remote" 2>/dev/null || true)
+[ "$R" = "." ] && R=
+[ -z "$R" ] && git remote | grep -qx origin && R=origin
+[ -z "$R" ] && [ "$(git remote | wc -l | tr -d ' ')" = 1 ] && R=$(git remote)
+[ -z "$R" ] && echo "STOP: không xác định được remote chính — hỏi user" >&2
+```
+
+Thử `git symbolic-ref refs/remotes/$R/HEAD` và lấy basename. Nếu
 chưa set, hỏi user PR này target branch nào — không giả định
 `main` vs `master` vs release branch.
 
