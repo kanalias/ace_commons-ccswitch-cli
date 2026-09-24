@@ -221,6 +221,29 @@ DEPLOY_BRANCH="${HARNESS_DEPLOY_BRANCH:-$BRANCH}"
 DEPLOY_REMOTE="${HARNESS_DEPLOY_REMOTE:-origin}"
 DEPLOY_HEALTHCHECK="${HARNESS_DEPLOY_HEALTHCHECK:-<healthcheck-cmd>}"
 
+resolve_primary_remote() { # resolve_primary_remote <dir> → remote name or empty
+  local dir="$1" current upstream remotes count
+  current="$(git -C "$dir" branch --show-current 2>/dev/null || true)"
+  if [ -n "$current" ]; then
+    upstream="$(git -C "$dir" config --get "branch.$current.remote" 2>/dev/null || true)"
+    if [ -n "$upstream" ] && [ "$upstream" != "." ]; then
+      printf '%s' "$upstream"
+      return 0
+    fi
+  fi
+  remotes="$(git -C "$dir" remote 2>/dev/null || true)"
+  if printf '%s\n' "$remotes" | grep -qx origin; then
+    printf 'origin'
+    return 0
+  fi
+  count="$(printf '%s\n' "$remotes" | grep -c . || true)"
+  if [ "$count" = 1 ]; then
+    printf '%s' "$remotes"
+    return 0
+  fi
+  return 0
+}
+
 sanitize_remote_id() { # sanitize_remote_id <remote-url> → host/owner/repo lowercase, or placeholder
   local raw="$1" id host path
   case "$raw" in
@@ -236,7 +259,12 @@ sanitize_remote_id() { # sanitize_remote_id <remote-url> → host/owner/repo low
     printf '<project-remote-id>'
   fi
 }
-PROJECT_REMOTE_ID="$(sanitize_remote_id "$(git -C "$ROUTE_DIR" config --get remote.origin.url 2>/dev/null || true)")"
+PRIMARY_REMOTE="$(resolve_primary_remote "$ROUTE_DIR")"
+if [ -n "$PRIMARY_REMOTE" ]; then
+  PROJECT_REMOTE_ID="$(sanitize_remote_id "$(git -C "$ROUTE_DIR" config --get "remote.$PRIMARY_REMOTE.url" 2>/dev/null || true)")"
+else
+  PROJECT_REMOTE_ID="$(sanitize_remote_id "")"
+fi
 
 join_by() { local d="$1"; shift; local IFS="$d"; printf '%s' "$*"; }
 
