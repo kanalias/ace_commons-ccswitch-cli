@@ -50,7 +50,7 @@ Yêu cầu chưa rõ → Socratic hỏi thu hẹp trước khi plan:
 - Chốt scope + acceptance TRƯỚC khi thiết kế.
 - Đừng đoán ý user (red-flag "user chắc OK") — mơ hồ thì hỏi.
 
-## 5. Verify before done
+## 5. Verify trước khi xong
 
 Trước khi báo xong: chạy @@TEST_CMD@@, quan sát hành vi thật (không chỉ "code trông đúng"). Mất verify step = chưa xong.
 

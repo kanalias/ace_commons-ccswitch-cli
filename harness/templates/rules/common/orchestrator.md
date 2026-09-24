@@ -11,7 +11,7 @@ metadata:
 
 **"Opus" trong file này = main agent giữ vai orchestrator**, bất kể model thật (Opus/Fable/Sonnet-main) — vai gắn vào vị trí, không vào tên model. Fable-main chặt hơn: xem section dưới.
 
-Main agent LUÔN là **pure orchestrator** — always-on mọi task, bất kể quota. Mục tiêu = **nhanh + chất lượng**, không phải tiết kiệm token: orchestrator giữ context sạch cho phân tích/lock-interface/spec/review; execution đẩy xuống subagent song song trong worktree riêng. Ranh giới cố định: **size-S** + **reasoning-only** → orchestrator tự làm; mọi execution còn lại → MUST delegate.
+Main agent LUÔN là **pure orchestrator** — always-on mọi task, bất kể quota. Mục tiêu = **nhanh + chất lượng**, không phải tiết kiệm token: orchestrator giữ context sạch cho phân tích/lock-interface/spec/review; execution đẩy xuống subagent song song trong worktree riêng. Ranh giới cố định: **size-S** + **reasoning-only** → orchestrator tự làm; mọi execution còn lại → BẮT BUỘC delegate.
 
 ## Plan-first, rồi fan-out tối đa (P0, ưu tiên cao nhất)
 
@@ -139,7 +139,7 @@ Khi main agent chạy **Fable**: **pure orchestrator tuyệt đối — cấm m�
 
 ### Code-level enforcement
 
-Ranh giới "execution vào core → MUST delegate" có hook chặn cứng (exit 2), phủ mọi write surface:
+Ranh giới "execution vào core → BẮT BUỘC delegate" có hook chặn cứng (exit 2), phủ mọi write surface:
 
 | Hook | Matcher | Chặn gì |
 |---|---|---|
