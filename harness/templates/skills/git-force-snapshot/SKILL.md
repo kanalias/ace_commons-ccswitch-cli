@@ -79,10 +79,20 @@ bằng ngôn ngữ đơn giản, trước khi chạy:
   của secret bị lộ vẫn cần thiết bất kể push này.
 
 Chỉ sau khi user xác nhận rõ ràng (không phải approval trước đó
-đã cho — hỏi lại riêng cho lần push cụ thể này):
+đã cho — hỏi lại riêng cho lần push cụ thể này). Resolve remote chính
+(`$R`) trước khi push:
+
+```sh
+b=$(git branch --show-current)
+R=$(git config --get "branch.$b.remote" 2>/dev/null || true)
+[ "$R" = "." ] && R=
+[ -z "$R" ] && git remote | grep -qx origin && R=origin
+[ -z "$R" ] && [ "$(git remote | wc -l | tr -d ' ')" = 1 ] && R=$(git remote)
+[ -z "$R" ] && echo "STOP: không xác định được remote chính — hỏi user" >&2
+```
 
 ```bash
-git push --force origin <branch>
+git push --force $R <branch>
 ```
 
 ## 7. Report

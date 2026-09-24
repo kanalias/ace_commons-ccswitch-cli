@@ -36,7 +36,7 @@ Nhiều session mở cùng repo dir = chung working tree + chung `HEAD`/index �
 - **KHÔNG push thẳng protected branch.** Mọi commit trên đó PHẢI từ `git merge @@BRANCH@@`.
 - **KHÔNG tự động merge/push protected branch.** Chỉ khi user chỉ thị rõ ("deploy", "đẩy lên prod"...).
 - Trước push protected branch, BẮT BUỘC dừng hỏi user **confirm** kèm:
-  - Số commit + tóm tắt 1 dòng mỗi commit (`git log origin/<protected>..<protected> --oneline`)
+  - Số commit + tóm tắt 1 dòng mỗi commit (`git log <remote>/<protected>..<protected> --oneline`, `<remote>` = remote chính — theo thứ tự: upstream của branch hiện tại, rồi `origin` nếu tồn tại, rồi remote duy nhất, else hỏi user)
   - Loại thay đổi: code/runtime / docs / config / mix
   - Tác động: cần restart service? có downtime?
 - **Worktree bắt buộc** khi merge `@@BRANCH@@` → protected branch: dùng `.claude/worktrees/<protected>-deploy/` để giữ working tree ở `@@BRANCH@@`. Push xong → `git worktree remove`.
@@ -76,7 +76,7 @@ Branch tạm (`feat/`, `fix/`, `hotfix/`, `chore/`, `refactor/`) sau merge vào 
 
 1. **Worktree** — `git worktree remove <wt-path>`. Stale → `git worktree prune`.
 2. **Local branch** — `git branch -d feat/<slug>` (safe delete). Git từ chối (unmerged) → dừng, báo user. KHÔNG `-D` force.
-3. **Remote branch** — `git push origin --delete feat/<slug>` (best-effort). Lỗi → log warning, không fail flow. CHỈ trên `origin`.
+3. **Remote branch** — `git push <remote> --delete feat/<slug>` (best-effort). Lỗi → log warning, không fail flow. CHỈ trên remote chính (`<remote>`).
 
 **Whitelist cleanup**: `feat/`, `fix/`, `hotfix/`, `chore/`, `refactor/`.
 **Protected (HARD BLOCK)**: `@@BRANCH@@` + mọi protected/release branch khác.
