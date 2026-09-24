@@ -52,7 +52,7 @@ Yêu cầu chưa rõ → Socratic hỏi thu hẹp trước khi plan:
 
 ## 5. Verify before done
 
-Trước khi báo xong: chạy the project's test command (none configured — infer from README/CI, or ask before assuming), quan sát hành vi thật (không chỉ "code trông đúng"). Mất verify step = chưa xong.
+Trước khi báo xong: chạy lệnh test của project (chưa cấu hình — suy ra từ README/CI, hoặc hỏi trước khi giả định), quan sát hành vi thật (không chỉ "code trông đúng"). Mất verify step = chưa xong.
 
 ## 6. Executing plans (kỷ luật thực thi, khác writing-plans)
 

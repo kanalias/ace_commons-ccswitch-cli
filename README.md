@@ -263,7 +263,7 @@ Delegate wrapper là **bash-only** — Windows cần WSL hoặc Git Bash (không
 | **subagents + wrappers** | `HARNESS_GROUP_SUBAGENTS` | `.claude/agents/delegate-{deepseek,gemini,codex,sonnet}.md` + `scripts/delegate/*.sh` (`_common`, `run-aider-deepseek`, `run-codex`, `run-gemini`, `doctor` + `lib/`) |
 | **guard hooks** | `HARNESS_GROUP_GUARD` | `.claude/hooks/{pre-edit-orchestrator-gate,pre-bash-orchestrator-gate,pre-edit-secret-scan}.sh` (wire `PreToolUse` cho `Edit`/`Write`/`MultiEdit`/`Bash`) |
 | **quality hooks** | `HARNESS_GROUP_QUALITY` | `.claude/hooks/post-edit-syntax-check.sh` (wire `PostToolUse`) + `session-start-banner.sh` (wire `SessionStart`) |
-| **commands** | `HARNESS_GROUP_COMMANDS` | `.claude/commands/*.md` (16 slash command) |
+| **commands** | `HARNESS_GROUP_COMMANDS` | `.claude/skills/*/SKILL.md` (16 skill, gọi qua `/<name>`) |
 | **skills** | `HARNESS_GROUP_SKILLS` | `.claude/skills/*/SKILL.md` (23 skill) |
 | **rules** | `HARNESS_GROUP_RULES` | `.claude/rules/common/*.md` (8 invariant guardrail — always overwrite) + `.claude/rules/project/{git-workflow,skill-superpowers}.md` (giữ nguyên nếu đã tồn tại) |
 | **git pre-push hook** | `HARNESS_GROUP_GITHOOKS` | `.git/hooks/pre-push` (gitleaks secret scan) — bỏ qua nếu target không phải git repo |
@@ -475,8 +475,7 @@ ccswitch-cli-claude/
 │       ├── agents/delegate-{codex,deepseek,gemini,sonnet}.md
 │       ├── scripts/delegate/               # wrapper script (_common, run-aider-deepseek, run-codex, run-gemini, doctor + lib/)
 │       ├── hooks/{pre-edit-orchestrator-gate,pre-bash-orchestrator-gate,pre-edit-secret-scan,post-edit-syntax-check,session-start-banner}.sh
-│       ├── commands/*.md                   # 16 slash command
-│       ├── skills/*/SKILL.md               # 23 skill
+│       ├── skills/*/SKILL.md               # 23 skill (gồm 16 skill gọi qua `/<name>`, thay cho slash command cũ)
 │       ├── rules/{common,project}/*.md     # common (8 guardrail) + project (git-workflow, skill-superpowers)
 │       └── git-hooks/pre-push              # gitleaks scan trước push (cài vào .git/hooks/ project đích)
 │
@@ -484,6 +483,6 @@ ccswitch-cli-claude/
 ├── install-optimize-claude.sh    # Phần 4 — disableWorkflows từ .env, đứng riêng
 │
 ├── scripts/delegate/             # bản wrapper THẬT dùng trong repo này (đồng bộ với harness/templates/scripts/delegate/)
-├── .claude/                      # harness bản THẬT của repo này (agents, hooks, commands, skills, rules)
+├── .claude/                      # harness bản THẬT của repo này (agents, hooks, skills, rules)
 └── test/*.bats                   # bats suite (20 file, 309 test) — chạy qua /git-push-safety hoặc thủ công
 ```

@@ -31,7 +31,7 @@ if [ -f "$file_path" ]; then
   esac
 fi
 
-# ── 2) lazy-load-health reminder (.claude/rules/*.md) ───────────────────────
+# ── 2) lazy-load reminder (.claude/rules/*.md) ──────────────────────────────
 # Guarded with || true — REPO/rel computation must not abort other sections under -e.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd 2>/dev/null)" || REPO=""
 if [ -n "$REPO" ]; then
@@ -39,7 +39,7 @@ if [ -n "$REPO" ]; then
   case "$rel" in
     .claude/rules/*.md)
       cat >&2 <<MSG
-📋 Reminder: vừa sửa $rel — chạy /lazy-load-health để kiểm tra rule này còn đạt chuẩn lazy-load không (paths: frontmatter, gate P0-mọi-turn). Quyết định sửa hay bỏ qua là của bạn.
+📋 Reminder: vừa sửa $rel — chạy /audit-context-memory --rules-only để kiểm tra rule này còn đạt chuẩn lazy-load không (paths: frontmatter, gate P0-mọi-turn). Quyết định sửa hay bỏ qua là của bạn.
 MSG
       ;;
   esac

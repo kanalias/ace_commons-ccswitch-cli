@@ -81,7 +81,7 @@ Branch tạm (`feat/`, `fix/`, `hotfix/`, `chore/`, `refactor/`) sau merge vào 
 **Whitelist cleanup**: `feat/`, `fix/`, `hotfix/`, `chore/`, `refactor/`.
 **Protected (HARD BLOCK)**: `dev` + mọi protected/release branch khác.
 
-**Slash command**: [/git-push-safety](../commands/git-push-safety.md) gom push + smoke test + gitleaks + sensitive scan — tránh `git push` thô.
+**Skill**: [/git-push-safety](../../skills/git-push-safety/SKILL.md) gom push + smoke test + gitleaks + sensitive scan — tránh `git push` thô.
 
 **Confirm trước xoá**: BẮT BUỘC liệt kê candidates + hỏi `[a]ll / [s]elect / [n]one` trước delete. Destructive → không auto-execute không xác nhận.
 

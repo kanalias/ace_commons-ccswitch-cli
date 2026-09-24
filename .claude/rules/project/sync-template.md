@@ -6,7 +6,6 @@ updated: 2026-07-27
 paths:
   - ".claude/hooks/**"
   - ".claude/agents/**"
-  - ".claude/commands/**"
   - ".claude/skills/**"
   - ".claude/rules/**"
   - "harness/**"
@@ -27,8 +26,7 @@ metadata:
 |---|---|
 | `.claude/hooks/*.sh` | `harness/templates/hooks/*.sh` |
 | `.claude/agents/*.md` | `harness/templates/agents/*.md` |
-| `.claude/commands/*.md` | `harness/templates/commands/*.md` |
-| `.claude/skills/<name>/` | `harness/templates/skills/<name>/` |
+| `.claude/skills/<name>/` | `harness/templates/skills/<name>/` (slash commands, gọi `/<name>`, được implement dưới dạng skill) |
 | `.claude/rules/common/*.md` | `harness/templates/rules/common/*.md` |
 | `.claude/rules/project/*.md` | `harness/templates/rules/project/*.md` |
 | `scripts/delegate/*` | `harness/templates/scripts/delegate/*` |
@@ -43,7 +41,7 @@ Install-time `install.sh` thay `@@TOKEN@@` → giá trị repo. Mirror ngược 
 | `<working-branch>` (vd `main`) | `dev` |
 | `<repo-slug>` (vd `my-project`) | `ccswitch-cli-claude` |
 | core-dir literals (src…) | `@@CORE_DIRS_*@@` (YAML/CASE/ALT/HUMAN) |
-| test command | `the project's test command (none configured — infer from README/CI, or ask before assuming)` |
+| test command | `lệnh test của project (chưa cấu hình — suy ra từ README/CI, hoặc hỏi trước khi giả định)` |
 | model default từ `.env` | `gemini-3.1-pro-preview` / `gpt-5.5` / `openai/ds/deepseek-v4-pro` |
 
 Token đầy đủ: `grep -rhoE '@@[A-Z_]+@@' harness/templates | sort -u`.

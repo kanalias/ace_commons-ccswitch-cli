@@ -1,6 +1,6 @@
 ---
 name: audit-context-memory
-description: Audit toàn bộ static context load mỗi session — global rules (~/.claude/rules/), CLAUDE.md project, project rules trong .claude/rules (phân loại ALWAYS vs LAZY, chấm gate, đề xuất paths:), và MEMORY.md index (auto-memory) — đọc nội dung thật, phát hiện trùng lặp/derivable/phình, rồi sau khi user xác nhận thì áp fix trực tiếp (thêm paths:, sync index). Dùng khi user hỏi "context session có gì", "tối ưu context window", "file nào đang load", "rule nào đang always-load", "giảm context session", "kiểm tra lazy load", "rule nào nên lazy", hoặc chạy /audit-context-memory.
+description: Audit toàn bộ static context load mỗi session — global rules (~/.claude/rules/), CLAUDE.md project, project rules trong .claude/rules (phân loại ALWAYS vs LAZY, chấm gate, đề xuất paths:), và MEMORY.md index (auto-memory) — đọc nội dung thật, phát hiện trùng lặp/derivable/phình, rồi sau khi user xác nhận thì áp fix trực tiếp (thêm paths:, sync index). Cờ `--rules-only` chỉ audit project rules và tự sửa case chắc chắn không cần hỏi. Dùng khi user hỏi "context session có gì", "tối ưu context window", "file nào đang load", "rule nào đang always-load", "giảm context session", "kiểm tra lazy load", "rule nào nên lazy", "kiểm tra + sửa lazy load", hoặc chạy /audit-context-memory [--rules-only].
 user-invocable: true
 ---
 
@@ -11,6 +11,11 @@ Mỗi session nạp tĩnh (không cần Claude chủ động Read) từ nhiều 
 Nguồn chân lý cho gate: `rule-loading-policy` trong `~/.claude/rules/` (global, không nằm trong project — installer này không cài rule đó). Command KHÔNG lặp lại policy — chỉ **áp dụng** thành audit + fix chạy được. Gate/định nghĩa lệch policy → theo policy.
 
 Khác [[doctor-memory]] (chỉ memory content — broken link, orphan, naming, stale bên trong từng memory dir): command này audit **cái gì được nạp vào context**, doctor-memory audit **memory system tự nó có sạch không**. Hai phạm vi không chồng nhau: command này chỉ đọc `MEMORY.md` (index), không đọc/sửa từng file `user_*/feedback_*/project_*/reference_*.md` bên trong.
+
+## Args
+
+- (mặc định) — full audit như mô tả trên: tất cả nguồn (global rules, CLAUDE.md, project rules, MEMORY.md), chỉ sửa sau khi user chọn `[a]ll/[s]elect/[n]one` ở Bước 5.
+- `--rules-only` — chỉ audit project rules (`.claude/rules/**`): chạy phần PROJECT RULES của Bước 1, chấm theo gate ở Bước 3 mục 1 (gate always-load) + mục 7 (LAZY giả), rồi **tự áp fix không hỏi** cho case confident — rule ALWAYS rớt gate mà glob suy được chắc chắn từ bảng glob ở Bước 3 mục 1, và rule FAKE-LAZY (thu hẹp glob rộng). Case KHÔNG CHẮC glob → KHÔNG chạm file, chỉ flag hỏi user vùng áp dụng. Vẫn tuân Write-boundary dưới: rule `common/**` → sửa template `harness/templates/rules/common/<same>.md`, KHÔNG sửa live; repo không có `harness/templates/` → chỉ flag, không tự sửa. Bỏ qua global rules, CLAUDE.md, MEMORY.md — không đọc, không audit trong mode này. Report theo format: bảng mỗi rule → trạng thái trước (ALWAYS/FAKE-LAZY/LAZY) → hành động (ĐÃ SỬA + glob đã ghi / GIỮ ALWAYS / FLAG chờ user) → lý do 1 dòng (gate nào rớt); tổng số candidate/đã sửa/flag; kết quả verify chạy lại lệnh Bước 1.
 
 ## Khái niệm (project rules)
 
@@ -51,7 +56,17 @@ echo "=== PROJECT RULES (.claude/rules/**) — phân loại ALWAYS/LAZY + tier =
 find .claude/rules -name '*.md' ! -name '00-index.md' 2>/dev/null | sort | while read -r f; do
   n=$(wc -l < "$f")
   case "$f" in */common/*) tier="common:SYNC-overwrite" ;; *) tier="project:PRESERVE" ;; esac
-  head -20 "$f" | grep -q "^paths:" && echo "LAZY   $f [$tier] ($n dòng)" || echo "ALWAYS $f [$tier] ($n dòng)"
+  hdr="$(head -20 "$f")"
+  if echo "$hdr" | grep -q "^paths:"; then
+    # fake-lazy: glob rộng khớp mọi file (LAZY giả)
+    if echo "$hdr" | grep -qE '^[[:space:]]*-[[:space:]]*"?(\*\*|\*\*/\*|\*)"?[[:space:]]*$'; then
+      echo "FAKE-LAZY $f [$tier] ($n dòng)"
+    else
+      echo "LAZY      $f [$tier] ($n dòng)"
+    fi
+  else
+    echo "ALWAYS    $f [$tier] ($n dòng)"
+  fi
 done
 
 echo "=== MEMORY.md index (auto-memory, luôn load) ==="
@@ -77,6 +92,7 @@ Với từng file, chấm theo các tiêu chí:
 
 1. **Gate always-load** (theo [[rule-loading-policy]]) — file có vượt CẢ 2: (a) P0 guardrail (vi phạm gây mất data/leak secret/phá scope), (b) áp mọi-turn (không gắn được vào 1 vùng code cụ thể)? Global rule miễn gate này. Project rule/CLAUDE.md section rớt gate → flag CHUYỂN LAZY. Với mỗi rule ALWAYS rớt gate, xác định luôn glob đề xuất:
    - convention vùng X → glob vùng X (vd `"src/**"`, `"lib/**"`)
+   - test/spec → `"test/**"`, `"**/*.test.*"`, `"spec/**"`
    - infra/CI → `"infra/**"`, `"Dockerfile*"`, `".github/**"`, `"*.yml"`
    - meta (viết rule) → `".claude/rules/**"`
    - delegate infra → `"scripts/delegate/**"`

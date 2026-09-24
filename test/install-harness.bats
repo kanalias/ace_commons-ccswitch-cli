@@ -114,22 +114,33 @@ run_install() {
   [ ! -e "$TARGET/.claude/hooks/check-session-limit.sh" ]
 
   # skills group (default Y, not overridden above) — must land
-  [ -f "$TARGET/.claude/skills/lazy-load-health/SKILL.md" ]
+  [ ! -e "$TARGET/.claude/skills/lazy-load-health" ]
   [ -f "$TARGET/.claude/skills/dep-ladder-check/SKILL.md" ]
-  [ -f "$TARGET/.claude/skills/auto-commit/SKILL.md" ]
+  [ ! -e "$TARGET/.claude/skills/auto-commit" ]
   [ -f "$TARGET/.claude/skills/check-hardcode/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/fix-ledger/SKILL.md" ]
+  # merged into audit-context-memory / git-commit --auto / git-push-safety --scan-only
+  [ ! -e "$TARGET/.claude/skills/audit-git-leak" ]
 
-  # commands group (default Y) — must land, non-empty, generic (no 9router leak)
-  [ -s "$TARGET/.claude/commands/git-push-safety.md" ]
-  [ -f "$TARGET/.claude/commands/task-loop-feature.md" ]
-  [ -f "$TARGET/.claude/commands/update-claude.md" ]
-  [ -f "$TARGET/.claude/commands/update-codex.md" ]
-  [ -f "$TARGET/.claude/commands/update-gemini.md" ]
-  [ -f "$TARGET/.claude/commands/update-deepseek.md" ]
-  [ -f "$TARGET/.claude/commands/doctor-memory.md" ]
-  [ -f "$TARGET/.claude/commands/git-commit.md" ]
-  ! grep -q '9router' "$TARGET/.claude/commands/git-push-safety.md" || false
+  # production-* skills are deploy-group opt-in (default N) — must NOT land
+  [ ! -e "$TARGET/.claude/skills/production-deploy" ]
+  [ ! -e "$TARGET/.claude/skills/production-cleanup" ]
+  [ ! -e "$TARGET/.claude/skills/production-reboot" ]
+
+  # commands group (default Y) — every former slash-command now ships ONLY as a
+  # same-name skill; .claude/commands must never be created
+  [ -s "$TARGET/.claude/skills/git-push-safety/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/task-loop-feature/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/update-claude/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/update-codex/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/update-gemini/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/update-deepseek/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/doctor-memory/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/git-commit/SKILL.md" ]
+  # resume-orchestration follows the subagents group, not commands/skills
+  [ -f "$TARGET/.claude/skills/resume-orchestration/SKILL.md" ]
+  ! grep -q '9router' "$TARGET/.claude/skills/git-push-safety/SKILL.md" || false
+  [ ! -e "$TARGET/.claude/commands" ]
 
   # rules group (default Y) — common/ (synced) + project/ (preserved)
   [ -f "$TARGET/.claude/rules/common/orchestrator.md" ]
@@ -159,6 +170,31 @@ run_install() {
 
   # branch substitution actually happened
   grep -q '`dev`' "$TARGET/.claude/rules/project/git-workflow.md"
+
+  # @@TEST_CMD@@ substituted into the Vietnamese phrase, no leftover token
+  grep -q 'lệnh test của project: `npm test`' "$TARGET/.claude/skills/task-loop-feature/SKILL.md"
+  ! grep -q '@@' "$TARGET/.claude/skills/task-loop-feature/SKILL.md" || false
+}
+
+@test "HARNESS_GROUP_DEPLOY=y installs production-* skills" {
+  HARNESS_ROUTE_DIR="$TARGET" \
+  HARNESS_CORE_DIRS="src,lib" \
+  HARNESS_PROJECT_SLUG="testproj" \
+  HARNESS_BRANCH="dev" \
+  HARNESS_TEST_CMD="npm test" \
+  HARNESS_GROUP_SUBAGENTS="Y" \
+  HARNESS_GROUP_GUARD="Y" \
+  HARNESS_GROUP_QUALITY="Y" \
+  HARNESS_GROUP_SESSIONLIMIT="N" \
+  HARNESS_GROUP_DEPLOY="y" \
+  HARNESS_OVERWRITE="all" \
+  run bash "$ROOT/harness/install.sh" </dev/null
+  [ "$status" -eq 0 ]
+
+  [ ! -e "$TARGET/.claude/commands" ]
+  [ -f "$TARGET/.claude/skills/production-deploy/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/production-cleanup/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/production-reboot/SKILL.md" ]
 }
 
 # check-session-limit.sh (old Session%/Weekly% mechanism) was fully removed
@@ -258,6 +294,45 @@ run_install() {
   # Edit|Write|MultiEdit|NotebookEdit + Bash + Task + mcp-browser gate = 4 matchers; no legacy Edit|Write orphan
   [ "$events_len" -eq 4 ]
   [ "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Edit|Write")] | length' "$TARGET/.claude/settings.json")" -eq 0 ]
+}
+
+@test "migration: unmodified legacy .claude/commands/<name>.md (owned per previous manifest) is removed on reinstall" {
+  run_install
+  [ "$status" -eq 0 ]
+  # simulate a pre-skills-only install that still shipped this command,
+  # by hand-crafting a legacy commands/ file + manifest entry matching it.
+  mkdir -p "$TARGET/.claude/commands"
+  printf 'legacy content\n' > "$TARGET/.claude/commands/git-commit.md"
+  sha=$(shasum -a 256 "$TARGET/.claude/commands/git-commit.md" | cut -d' ' -f1)
+  tmp=$(mktemp)
+  jq --arg p ".claude/commands/git-commit.md" --arg h "$sha" \
+    '.syncFiles += [{path:$p, sha256:$h}]' "$TARGET/.claude/harness-manifest.json" > "$tmp"
+  mv "$tmp" "$TARGET/.claude/harness-manifest.json"
+
+  run_install
+  [ "$status" -eq 0 ]
+  [ ! -e "$TARGET/.claude/commands/git-commit.md" ]
+  [[ "$output" == *"removed"* ]]
+}
+
+@test "migration: modified legacy .claude/commands/<name>.md is kept with a warning" {
+  run_install
+  [ "$status" -eq 0 ]
+  mkdir -p "$TARGET/.claude/commands"
+  printf 'legacy content\n' > "$TARGET/.claude/commands/git-commit.md"
+  sha=$(shasum -a 256 "$TARGET/.claude/commands/git-commit.md" | cut -d' ' -f1)
+  tmp=$(mktemp)
+  jq --arg p ".claude/commands/git-commit.md" --arg h "$sha" \
+    '.syncFiles += [{path:$p, sha256:$h}]' "$TARGET/.claude/harness-manifest.json" > "$tmp"
+  mv "$tmp" "$TARGET/.claude/harness-manifest.json"
+  # user modified the file after our previous install — must be kept
+  printf 'user edited this\n' > "$TARGET/.claude/commands/git-commit.md"
+
+  run_install
+  [ "$status" -eq 0 ]
+  [ -f "$TARGET/.claude/commands/git-commit.md" ]
+  grep -q 'user edited this' "$TARGET/.claude/commands/git-commit.md"
+  [[ "$output" == *"WARN"*"git-commit.md modified — kept"* ]]
 }
 
 @test "self-install guard blocks symlink pointing at harness source dir" {

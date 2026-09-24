@@ -22,7 +22,7 @@ Trigger: 1 bugfix đã từng xảy ra thật xong (test pass, sắp/đã commit
    - **Verify:** lệnh chạy xác nhận guard còn đúng
    ```
 3. File `.claude/fix-ledger.md` chưa tồn tại → tạo mới với 1 dòng mô tả đầu file + entry đầu tiên. Đã tồn tại → append cuối file, không sửa entry cũ.
-4. Show entry cho user, hỏi xác nhận trước khi ghi (giống `auto-commit` — chủ động soạn sẵn, không tự ý ghi khi chưa hỏi).
+4. Show entry cho user, hỏi xác nhận trước khi ghi (chủ động soạn sẵn, không tự ý ghi khi chưa hỏi).
 
 ## Chế độ CHECK — trước khi merge branch khác vào working/protected branch
 

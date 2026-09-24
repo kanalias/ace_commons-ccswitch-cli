@@ -1,11 +1,20 @@
 ---
 name: git-push-safety
-description: Chạy test, gitleaks, sensitive-content scan; chỉ push nếu cả 3 pass
+description: Chạy test, gitleaks, sensitive-content scan; chỉ push nếu cả 3 pass. Cờ `--scan-only` chỉ chạy gitleaks + sensitive-content scan (không test, không push) — dùng khi user nói "audit git leak", "check leak trước khi push".
 disable-model-invocation: true
 user-invocable: true
 ---
 > **Confirmation gate:** Explicit invocation is not confirmation. Before any destructive action, production change, or remote publish, list the exact targets, scope, and impact; ask the user for explicit confirmation in this conversation and wait. Preserve all stricter workflow-specific confirmations below.
 
+## Chế độ `--scan-only`
+
+Khi được gọi với `--scan-only` (hoặc user chỉ muốn check leak, không push):
+chạy CHỈ bước 2 (gitleaks) + bước 3 (sensitive-content scan, gồm
+`/check-hardcode`) bên dưới. Bỏ qua bước 1 (tests), 3.5 (README drift) và
+bước 4 (push). Đây là chế độ read-only — không stage, không commit, không
+push gì. Dùng trước `/git-force-snapshot`, sau `/clean-up-project`, hoặc bất
+cứ khi nào user chỉ muốn xác nhận không có leak. Kết thúc: báo PASS/FAIL
+từng bước đã chạy (2 và 3) kèm finding đã redact.
 
 Chạy đúng pipeline này, theo thứ tự, dừng ở lần fail đầu tiên. Không skip
 bước hoặc tiếp tục qua một lần fail. Report kết quả từng bước cho user khi
@@ -62,7 +71,15 @@ Rồi chạy `git status` và `git diff --stat` (so với branch upstream/main, 
 - API key, token, credential thật (không phải placeholder như `<your-api-key>`
   hoặc `sk-...`)
 - URL, hostname, chi tiết infra nội bộ hardcode chưa từng xuất hiện
-  ở nơi khác trong repo
+  ở nơi khác trong repo — gồm **production IP** (IP thật gắn server
+  production, kể cả dải private `10.*`/`172.16-31.*`/`192.168.*` khi có
+  context server thật, không phải IP ví dụ như `127.0.0.1`/`0.0.0.0`/doc
+  example), **production domain/hostname thật** (endpoint router/proxy/API
+  thật, không phải placeholder `example.com`/`<your-domain>`), và
+  **domain/subdomain nội bộ của org** — kể cả trong comment, log mẫu,
+  config sample. Danh sách domain nội bộ cần cảnh giác lấy từ config
+  project (vd `.claude/allowed-hosts.txt` là host ĐÃ duyệt; host nội bộ
+  khác chưa duyệt → nghi ngờ), không hardcode tên org trong skill.
 - Thông tin cá nhân (email, tên) chưa public trong git history của repo
 - File nào trông như bị stage nhầm (vd `.env`, `*.bak`, file swap editor,
   credential dump)

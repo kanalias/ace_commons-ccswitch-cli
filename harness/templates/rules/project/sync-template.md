@@ -6,7 +6,6 @@ updated: 2026-07-27
 paths:
   - ".claude/hooks/**"
   - ".claude/agents/**"
-  - ".claude/commands/**"
   - ".claude/skills/**"
   - ".claude/rules/**"
   - "harness/**"
@@ -27,8 +26,7 @@ metadata:
 |---|---|
 | `.claude/hooks/*.sh` | `harness/templates/hooks/*.sh` |
 | `.claude/agents/*.md` | `harness/templates/agents/*.md` |
-| `.claude/commands/*.md` | `harness/templates/commands/*.md` |
-| `.claude/skills/<name>/` | `harness/templates/skills/<name>/` |
+| `.claude/skills/<name>/` | `harness/templates/skills/<name>/` (slash commands, gọi `/<name>`, được implement dưới dạng skill) |
 | `.claude/rules/common/*.md` | `harness/templates/rules/common/*.md` |
 | `.claude/rules/project/*.md` | `harness/templates/rules/project/*.md` |
 | `scripts/delegate/*` | `harness/templates/scripts/delegate/*` |

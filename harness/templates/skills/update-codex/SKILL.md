@@ -1,22 +1,22 @@
 ---
 name: update-codex
-description: Kiểm tra + cập nhật OpenAI Codex CLI lên bản mới nhất trên macOS — so version binary đang chạy (Homebrew Cask) với bản mới nhất, chạy `brew upgrade codex` nếu cũ, và kiểm tra LaunchAgent auto-upgrade hàng giờ còn sống. Chạy /update-codex, hoặc khi user hỏi "codex đã cập nhật chưa", "update codex", "cron cập nhật codex".
+description: Kiểm tra + cập nhật OpenAI Codex CLI lên bản mới nhất (macOS/Linux, Homebrew hoặc npm) — so version binary đang chạy với bản mới nhất, chạy `brew upgrade codex` nếu cũ, và kiểm tra agent auto-upgrade định kỳ (LaunchAgent/cron) còn sống. Chạy /update-codex, hoặc khi user hỏi "codex đã cập nhật chưa", "update codex", "cron cập nhật codex".
 user-invocable: true
 ---
 
 # update-codex — kiểm tra + cập nhật OpenAI Codex CLI
 
-## Bối cảnh (chỉ 1 bản cài trên máy này)
+## Bối cảnh (thường 1 bản cài, qua Homebrew Cask)
 
 | Bản | Path | Ai cập nhật |
 |---|---|---|
-| **Homebrew Cask** (bản duy nhất trên PATH) | `/opt/homebrew/bin/codex` → symlink vào `/opt/homebrew/Caskroom/codex/<version>/bin/codex` | LaunchAgent `com.user.brew-upgrade-codex` — `brew upgrade codex` mỗi 3600s + lúc login, log `/tmp/brew-upgrade-codex.log` |
+| **Homebrew Cask** (nếu đây là cách cài trên máy) | `$(command -v codex)` → symlink vào `$(brew --prefix)/Caskroom/codex/<version>/bin/codex` | Agent auto-upgrade định kỳ (nếu có) — `brew upgrade codex` |
 
-Không có bản npm-global (`@openai/codex`) hay standalone nào khác trên máy — kiểm tra vẫn nên chạy đủ để phát hiện nếu có bản thứ 2 xuất hiện sau này (npm global thường che PATH trước brew).
+Nếu có thêm bản npm-global (`@openai/codex`) hay standalone khác trên máy, kiểm tra Bước 1 sẽ phát hiện (npm global thường che PATH trước brew).
 
-`codex` có subcommand `codex update` riêng (tự tải bản mới), nhưng bản cài trên máy là **Homebrew Cask** — dùng `brew upgrade codex` làm cách chính để path/version khớp với cơ chế cask (symlink Caskroom). Không trộn 2 cơ chế update trên cùng 1 install.
+`codex` có subcommand `codex update` riêng (tự tải bản mới), nhưng nếu bản cài trên máy là **Homebrew Cask** thì dùng `brew upgrade codex` làm cách chính để path/version khớp với cơ chế cask (symlink Caskroom). Không trộn 2 cơ chế update trên cùng 1 install.
 
-Cùng pattern còn có `com.user.brew-upgrade-claude-code` và `com.user.brew-upgrade-gemini-cli`. Xem `/update-claude` cho Claude Code.
+Cùng pattern (nếu máy có cấu hình tương tự) còn áp dụng cho Claude Code/Gemini CLI — xem `/update-claude`.
 
 **Lưu ý delegate wrapper:** `scripts/delegate/` (persona `delegate-codex`) gọi thẳng binary `codex` trên PATH. Sau khi upgrade, chỉ session/process CLI mới spawn sau đó mới dùng bản mới — wrapper process đang chạy dở vẫn giữ binary cũ trong bộ nhớ.
 
@@ -24,17 +24,23 @@ Cùng pattern còn có `com.user.brew-upgrade-claude-code` và `com.user.brew-up
 
 ```bash
 echo "running : $(which codex) → $(codex --version 2>/dev/null)"
-echo "cask    : $(/opt/homebrew/bin/brew info --cask codex 2>/dev/null | head -1)"
-echo "agents  :"; launchctl list | grep -E "brew-upgrade" || echo "  (không agent nào loaded!)"
-stat -f "brew log sửa lần cuối: %Sm" /tmp/brew-upgrade-codex.log 2>/dev/null
-tail -n 2 /tmp/brew-upgrade-codex.log 2>/dev/null
-echo "npm-global (nên rỗng): $(npm ls -g --depth=0 2>/dev/null | grep -i codex)"
+if command -v brew >/dev/null; then
+  echo "cask    : $(brew info --cask codex 2>/dev/null | head -1)"
+else
+  echo "brew không có — kiểm tra cách cài khác (npm/pipx/native)"
+fi
+echo "agents  :"
+case "$(uname)" in
+  Darwin) launchctl list | grep -iE "brew-upgrade|codex" || echo "  (không agent nào loaded)" ;;
+  *) { crontab -l 2>/dev/null | grep -i codex; systemctl --user list-timers 2>/dev/null | grep -i codex; } || echo "  (không cron/timer nào cho codex)" ;;
+esac
+echo "npm-global (nên rỗng nếu chỉ dùng cask): $(npm ls -g --depth=0 2>/dev/null | grep -i codex)"
 ```
 
 ## Bước 2 — Cập nhật (brew cask)
 
 ```bash
-/opt/homebrew/bin/brew upgrade codex 2>&1 | tail -n 10
+command -v brew >/dev/null && brew upgrade codex 2>&1 | tail -n 10 || echo "brew không có — bỏ qua bước này"
 echo "sau update: $(codex --version)"
 ```
 
@@ -51,11 +57,11 @@ Cảnh báo: `codex update` có thể ghi binary ra ngoài path quản lý bởi
 
 ## Bước 4 — Báo cáo
 
-Bảng ngắn: version trước → sau, cask version, trạng thái LaunchAgent (loaded? log gần nhất lúc nào?). Nhắc: session/wrapper `delegate-codex` đang chạy vẫn dùng binary cũ cho tới lần spawn tiếp theo.
+Bảng ngắn: version trước → sau, cask version, trạng thái agent auto-upgrade (loaded? log gần nhất lúc nào?). Nhắc: session/wrapper `delegate-codex` đang chạy vẫn dùng binary cũ cho tới lần spawn tiếp theo.
 
 ## Xử lý sự cố
 
-- Agent không có trong `launchctl list` → load lại: `launchctl load ~/Library/LaunchAgents/com.user.brew-upgrade-codex.plist`
-- Log brew báo lỗi (không phải "already installed") → hiện lỗi cho user, KHÔNG tự sửa plist.
+- Agent auto-upgrade không thấy trong listing → nếu có plist cũ, load lại: `launchctl load ~/Library/LaunchAgents/<label>.plist` (label lấy từ tên file thực tế, macOS only). Linux dùng `systemctl --user enable --now <timer>` hoặc thêm dòng crontab tương ứng.
+- Log brew báo lỗi (không phải "already installed") → hiện lỗi cho user, KHÔNG tự sửa agent/plist.
 - `brew upgrade codex` fail → báo lỗi ngắn gọn (bản chất + nguồn), không dán log dài.
 - Thấy cả brew cask lẫn npm-global cùng có codex → cảnh báo user có 2 bản, `which -a codex` để xác định bản nào thắng PATH trước khi update.

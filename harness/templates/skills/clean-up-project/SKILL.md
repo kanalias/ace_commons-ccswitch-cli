@@ -7,7 +7,7 @@ disable-model-invocation: true
 > **Confirmation gate:** Explicit invocation is not confirmation. Before any destructive action, production change, or remote publish, list the exact targets, scope, and impact; ask the user for explicit confirmation in this conversation and wait. Preserve all stricter workflow-specific confirmations below.
 
 
-# /clean-up — cleanup project đúng nghĩa
+# /clean-up-project — cleanup project đúng nghĩa
 
 ## Mục tiêu
 
@@ -22,22 +22,22 @@ Dọn project theo hướng an toàn, có kiểm soát:
 ## Cách dùng / args
 
 ```text
-/clean-up
-/clean-up dry-run
-/clean-up apply
-/clean-up scope=<repo|worktree|branches|artifacts|logs|dead-code|all>
-/clean-up workers=<N>
-/clean-up --workers <N>
-/clean-up --workers=<N>
-/clean-up agents=<N>
-/clean-up subagents=<N>
-/clean-up since=<7d|30d|90d>
+/clean-up-project
+/clean-up-project dry-run
+/clean-up-project apply
+/clean-up-project scope=<repo|worktree|branches|artifacts|logs|dead-code|all>
+/clean-up-project workers=<N>
+/clean-up-project --workers <N>
+/clean-up-project --workers=<N>
+/clean-up-project agents=<N>
+/clean-up-project subagents=<N>
+/clean-up-project since=<7d|30d|90d>
 ```
 
 Mặc định nếu thiếu args:
 
 ```text
-/clean-up dry-run scope=all workers=10
+/clean-up-project dry-run scope=all workers=10
 ```
 
 Quy ước args:
@@ -104,8 +104,8 @@ Candidate thường gặp:
 Safe dry-run ví dụ:
 
 ```sh
-find . -path ./.git -prune -o -path ./node_modules -prune -o -path ./.worktrees -prune -o -name .DS_Store -print
-find . -path ./.git -prune -o -path ./node_modules -prune -o -path ./.worktrees -prune -o \( -name '*.tmp' -o -name '*.bak' -o -name '*.swp' \) -print
+find . -path ./.git -prune -o -path ./node_modules -prune -o -path ./.claude/worktrees -prune -o -name .DS_Store -print
+find . -path ./.git -prune -o -path ./node_modules -prune -o -path ./.claude/worktrees -prune -o \( -name '*.tmp' -o -name '*.bak' -o -name '*.swp' \) -print
 ```
 
 Apply chỉ xoá path đã duyệt. Không dùng `rm -rf`.
@@ -134,7 +134,7 @@ Dry-run:
 ```sh
 git worktree list
 git worktree prune --dry-run
-cd .worktrees && for d in */; do [ -e "$d/.git" ] || echo "ORPHAN non-worktree: $d"; done
+cd .claude/worktrees && for d in */; do [ -e "$d/.git" ] || echo "ORPHAN non-worktree: $d"; done
 ```
 
 Apply rules:
@@ -298,7 +298,7 @@ npm run typecheck --silent
 git diff --check
 ```
 
-Sau cleanup, invoke `/check-hardcode`. Trước mọi push/commit request, invoke `/audit-git-leak`.
+Sau cleanup, invoke `/check-hardcode`. Trước mọi push/commit request, invoke `/git-push-safety --scan-only`.
 
 Nếu scope chỉ markdown/config và repo không có test phù hợp, dùng verify tối thiểu:
 

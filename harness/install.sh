@@ -27,11 +27,11 @@
 #   HARNESS_GROUP_SUBAGENTS      y/n — delegate subagents+wrappers, no prompt (default: Y)
 #   HARNESS_GROUP_GUARD          y/n — guard hooks, no prompt        (default: Y)
 #   HARNESS_GROUP_QUALITY        y/n — quality hooks, no prompt      (default: Y)
-#   HARNESS_GROUP_COMMANDS       y/n — push-to-git + conventional-commit + branch-cleanup + clean-up-project + pr-describe + dep-audit + loop-feature + lazy-load-audit + audit-memory-harness + commit + force-snapshot + update-claude + update-codex + update-gemini + update-deepseek slash-commands, no prompt (default: Y)
-#   HARNESS_GROUP_SKILLS         y/n — lazy-load-health + dep-ladder-check + auto-commit + check-hardcode + audit-git-leak + orchestrate skills, no prompt (default: Y)
+#   HARNESS_GROUP_COMMANDS       y/n — audit-claude-md + audit-context-memory + audit-dependency + audit-vietnamese + clean-up-project + doctor-memory + git-cleanup-branch + git-commit + git-commit-describe + git-force-snapshot + git-push-safety + task-loop-feature + update-claude + update-codex + update-gemini + update-deepseek workflow skills (slash-invocable /<name>), no prompt (default: Y)
+#   HARNESS_GROUP_SKILLS         y/n — check-hardcode + dep-ladder-check + fix-ledger + orchestrate skills, no prompt (default: Y)
 #   HARNESS_GROUP_RULES          y/n — rules: common/ (9 invariant guardrails, always overwrite) + project/ (git-workflow, skill-superpowers — kept if exist), no prompt (default: Y)
 #   HARNESS_GROUP_GITHOOKS       y/n — git pre-push hook (gitleaks secret scan) into .git/hooks/, no prompt (default: Y; skipped if target not a git repo)
-#   HARNESS_GROUP_DEPLOY         y/n — production-deploy/-cleanup/-reboot slash-commands, no prompt (default: N — opt-in, most repos don't deploy to a prod host)
+#   HARNESS_GROUP_DEPLOY         y/n — production-deploy/-cleanup/-reboot skills (slash-invocable /production-*), no prompt (default: N — opt-in, most repos don't deploy to a prod host)
 #   HARNESS_DEPLOY_SSH_HOST      ssh alias of the prod host                (default: <deploy-ssh-host>)
 #   HARNESS_DEPLOY_SERVICE       target container/compose service name    (default: <service-name>)
 #   HARNESS_DEPLOY_PATH          repo path on the host                    (default: <remote-repo-path>)
@@ -278,9 +278,9 @@ PROJECT_SLUG="$(printf '%s' "$PROJECT_SLUG_RAW" | tr '[:upper:]' '[:lower:]' | s
 
 TEST_CMD_LOWER="$(printf '%s' "$TEST_CMD_RAW" | tr '[:upper:]' '[:lower:]')"
 if [ "$TEST_CMD_LOWER" = "none" ] || [ -z "$TEST_CMD_RAW" ]; then
-  TEST_CMD_PHRASE="the project's test command (none configured — infer from README/CI, or ask before assuming)"
+  TEST_CMD_PHRASE="lệnh test của project (chưa cấu hình — suy ra từ README/CI, hoặc hỏi trước khi giả định)"
 else
-  TEST_CMD_PHRASE="the project's test command: \`$TEST_CMD_RAW\`"
+  TEST_CMD_PHRASE="lệnh test của project: \`$TEST_CMD_RAW\`"
 fi
 
 # ── 3. component menu ───────────────────────────────────────────────────
@@ -297,7 +297,7 @@ group_on HARNESS_GROUP_COMMANDS     && SEL_COMMANDS=1
 group_on HARNESS_GROUP_SKILLS       && SEL_SKILLS=1
 group_on HARNESS_GROUP_RULES        && SEL_RULES=1
 group_on HARNESS_GROUP_GITHOOKS     && SEL_GITHOOKS=1
-prompt_yn HARNESS_GROUP_DEPLOY "Cài production-deploy/-cleanup/-reboot slash-commands (chỉ nếu repo này deploy lên 1 host multi-service)" "N" && SEL_DEPLOY=1
+prompt_yn HARNESS_GROUP_DEPLOY "Cài production-deploy/-cleanup/-reboot skills (chỉ nếu repo này deploy lên 1 host multi-service)" "N" && SEL_DEPLOY=1
 
 # ── 4. copy + substitute ────────────────────────────────────────────────
 should_overwrite() {
@@ -368,6 +368,10 @@ install_file() { # install_file <src-rel-under-templates/> <dest-rel-under-route
 
 echo "▶ Cài harness vào $ROUTE_DIR"
 
+# Read here (before we write anything) so migration checks below and the
+# hooks/deny/env ownership carry-forward further down can both use it.
+PREVIOUS_MANIFEST="$ROUTE_DIR/$MANIFEST_REL"
+
 if [ "$SEL_SUBAGENTS" -eq 1 ]; then
   echo "── delegate subagents + wrappers ──"
   for a in deepseek gemini codex sonnet; do
@@ -408,54 +412,88 @@ if [ "$SEL_QUALITY" -eq 1 ]; then
   install_file "hooks/post-bash-stuck-detector.sh" ".claude/hooks/post-bash-stuck-detector.sh"
   # merged: stop-verdict-record + subagent-stop-ledger
   install_file "hooks/subagent-stop-record.sh"    ".claude/hooks/subagent-stop-record.sh"
-  install_file "commands/resume-orchestration.md" ".claude/commands/resume-orchestration.md"
+  # resume-orchestration ships as a skill (SEL_SUBAGENTS group below), not a command
   # statusline — shows task-graph progress, chains ~/.claude/statusline-context.sh if present
   install_file "statusline-orchestration.sh"      ".claude/statusline-orchestration.sh"
 fi
 
-if [ "$SEL_COMMANDS" -eq 1 ]; then
-  echo "── commands ──"
-  install_file "commands/git-push-safety.md"     ".claude/commands/git-push-safety.md"
-  install_file "commands/git-commit.md"           ".claude/commands/git-commit.md"
-  install_file "commands/git-commit-describe.md"  ".claude/commands/git-commit-describe.md"
-  install_file "commands/git-cleanup-branch.md"   ".claude/commands/git-cleanup-branch.md"
-  install_file "commands/git-force-snapshot.md"   ".claude/commands/git-force-snapshot.md"
-  install_file "commands/clean-up-project.md"     ".claude/commands/clean-up-project.md"
-  install_file "commands/doctor-memory.md"        ".claude/commands/doctor-memory.md"
-  install_file "commands/audit-context-memory.md" ".claude/commands/audit-context-memory.md"
-  install_file "commands/audit-dependency.md"     ".claude/commands/audit-dependency.md"
-  install_file "commands/audit-vietnamese.md"     ".claude/commands/audit-vietnamese.md"
-  install_file "commands/audit-claude-md.md"      ".claude/commands/audit-claude-md.md"
-  install_file "commands/task-loop-feature.md"    ".claude/commands/task-loop-feature.md"
-  install_file "commands/update-claude.md"        ".claude/commands/update-claude.md"
-  install_file "commands/update-codex.md"         ".claude/commands/update-codex.md"
-  install_file "commands/update-gemini.md"        ".claude/commands/update-gemini.md"
-  install_file "commands/update-deepseek.md"      ".claude/commands/update-deepseek.md"
-fi
-
-if [ "$SEL_DEPLOY" -eq 1 ]; then
-  echo "── production deploy commands ──"
-  install_file "commands/production-deploy.md"  ".claude/commands/production-deploy.md"
-  install_file "commands/production-cleanup.md" ".claude/commands/production-cleanup.md"
-  install_file "commands/production-reboot.md"  ".claude/commands/production-reboot.md"
-  deploy_config_incomplete=0
-  for deploy_config_value in "$DEPLOY_SSH_HOST" "$DEPLOY_SERVICE" "$DEPLOY_PATH" "$DEPLOY_HEALTHCHECK"; do
-    case "$deploy_config_value" in
-      \<*\>) deploy_config_incomplete=1 ;;
+# Every workflow that used to ship as a slash-command template now ships ONLY
+# as a same-name skill (.claude/skills/<name>/SKILL.md, invoked with /<name>).
+# Group membership is derived from the skill's own name (no separate list to
+# keep in sync):
+#   production-*                                           → SEL_DEPLOY
+#   resume-orchestration                                   → SEL_SUBAGENTS (orchestration recorder set)
+#   check-hardcode / dep-ladder-check / fix-ledger / orchestrate → SEL_SKILLS (skill-only, never had a command)
+#   everything else (former slash-commands)                → SEL_COMMANDS
+if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -eq 1 ] || [ "$SEL_DEPLOY" -eq 1 ]; then
+  echo "── skills ──"
+  while IFS= read -r skill_dir; do
+    skill_name="$(basename "$skill_dir")"
+    group_flag=0
+    case "$skill_name" in
+      production-*) group_flag="$SEL_DEPLOY" ;;
+      resume-orchestration) group_flag="$SEL_SUBAGENTS" ;;
+      check-hardcode|dep-ladder-check|fix-ledger|orchestrate) group_flag="$SEL_SKILLS" ;;
+      *) group_flag="$SEL_COMMANDS" ;;
     esac
-  done
-  if [ "$deploy_config_incomplete" -eq 1 ]; then
-    echo "  ⚠ Deploy config chưa đầy đủ — /production-* sẽ tự STOP (project guard). Set HARNESS_DEPLOY_SSH_HOST/HARNESS_DEPLOY_SERVICE/HARNESS_DEPLOY_PATH/HARNESS_DEPLOY_HEALTHCHECK rồi chạy lại để kích hoạt."
+    [ "$group_flag" -eq 1 ] || continue
+    while IFS= read -r skill_file; do
+      skill_rel="${skill_file#$TEMPLATES_DIR/}"
+      install_file "$skill_rel" ".claude/$skill_rel"
+    done < <(find "$skill_dir" -type f | sort)
+  done < <(find "$TEMPLATES_DIR/skills" -mindepth 1 -maxdepth 1 -type d | sort)
+
+  if [ "$SEL_DEPLOY" -eq 1 ]; then
+    deploy_config_incomplete=0
+    for deploy_config_value in "$DEPLOY_SSH_HOST" "$DEPLOY_SERVICE" "$DEPLOY_PATH" "$DEPLOY_HEALTHCHECK"; do
+      case "$deploy_config_value" in
+        \<*\>) deploy_config_incomplete=1 ;;
+      esac
+    done
+    if [ "$deploy_config_incomplete" -eq 1 ]; then
+      echo "  ⚠ Deploy config chưa đầy đủ — /production-* sẽ tự STOP (project guard). Set HARNESS_DEPLOY_SSH_HOST/HARNESS_DEPLOY_SERVICE/HARNESS_DEPLOY_PATH/HARNESS_DEPLOY_HEALTHCHECK rồi chạy lại để kích hoạt."
+    fi
   fi
 fi
 
-if [ "$SEL_SKILLS" -eq 1 ]; then
-  echo "── skills ──"
-  while IFS= read -r skill_file; do
-    skill_rel="${skill_file#$TEMPLATES_DIR/}"
-    install_file "$skill_rel" ".claude/$skill_rel"
-  done < <(find "$TEMPLATES_DIR/skills" -type f | sort)
-fi
+# ── migration: legacy .claude/commands/<name>.md → skill (pre-skills-only install) ──
+# Same hash-based ownership check as OLD_HOOKS migration below: remove only if
+# the file is still exactly what WE installed last time (per previous manifest);
+# keep + warn if the user modified it, or if we can't prove we own it.
+LEGACY_COMMAND_NAMES=(
+  audit-claude-md audit-context-memory audit-dependency audit-vietnamese
+  clean-up-project doctor-memory git-cleanup-branch git-commit-describe
+  git-commit git-force-snapshot git-push-safety production-cleanup
+  production-deploy production-reboot resume-orchestration task-loop-feature
+  update-claude update-codex update-deepseek update-gemini
+)
+migrate_legacy_commands() {
+  local legacy_dir="$ROUTE_DIR/.claude/commands"
+  [ -d "$legacy_dir" ] || return 0
+  local name f rel expected actual
+  for name in "${LEGACY_COMMAND_NAMES[@]}"; do
+    f="$legacy_dir/$name.md"
+    [ -f "$f" ] || continue
+    rel=".claude/commands/$name.md"
+    expected=""
+    if [ -f "$PREVIOUS_MANIFEST" ]; then
+      expected="$(jq -r --arg p "$rel" '.syncFiles[]? | select(.path==$p) | .sha256' "$PREVIOUS_MANIFEST" 2>/dev/null)"
+    fi
+    if [ -z "$expected" ]; then
+      echo "WARN: legacy command $rel not in previous manifest — kept"
+      continue
+    fi
+    actual="$(sha256_file "$f")"
+    if [ "$actual" = "$expected" ]; then
+      rm -f "$f"
+      echo "  🗑  $rel (removed — replaced by skill)"
+    else
+      echo "WARN: legacy command $rel modified — kept"
+    fi
+  done
+  rmdir "$legacy_dir" 2>/dev/null || true
+}
+migrate_legacy_commands
 
 if [ "$SEL_RULES" -eq 1 ]; then
   echo "── rules ──"
@@ -513,7 +551,7 @@ BẮT BUỘC route qua 1 trong **5 surfaces** dưới đây. KHÔNG add ad-hoc s
 
 | Surface | Path | Khi nào dùng |
 |---|---|---|
-| **Slash command** | \`.claude/commands/<name>.md\` (vd \`/deploy\`, \`/test\`) | Workflow lặp lại user gõ \`/<name>\` |
+| **Skill (slash)** | \`.claude/skills/<name>/SKILL.md\` (gọi \`/<name>\`) | Workflow lặp lại user gõ \`/<name>\` |
 | **Hook** | \`.claude/hooks/<name>.sh\` + wire \`.claude/settings.json\` (vd \`protect-backup.sh\`, \`session-start.sh\`) | Auto-action khi event (Pre/Post/SessionStart/Stop/SubagentStop) |
 | **Subagent** | \`.claude/agents/<name>.md\` (vd \`smoke-tester\`) | Persona isolated context |
 | **MCP server** | \`mcp-servers/<name>/\` + \`.mcp.json\` ở root project | External tool / structured I/O |
@@ -537,7 +575,7 @@ BẮT BUỘC route qua 1 trong **5 surfaces** dưới đây. KHÔNG add ad-hoc s
 **Native rules loading.** Claude Code tự động khám phá Markdown trong \`.claude/rules/\`: rule không có \`paths:\` được nạp luôn; rule có \`paths:\` chỉ nạp khi đọc file khớp glob. Rules cung cấp instructions, không phải executable hooks hay permission enforcement. Feature logic → 5 surfaces ở trên; governance → rules.
 
 **Harness rules (bundled, self-contained).** Mọi session PHẢI đọc + tuân thủ trước khi action:
-- [.claude/rules/common/](.claude/rules/common/) — invariant guardrails (secret, vault, budget, orchestrator, delegate, git, red-flags, rule-loading, memory-mirror). Managed by harness install.sh: **overwrite** khi re-sync — KHÔNG sửa trực tiếp trong project (sửa upstream ở harness repo).
+- [.claude/rules/common/](.claude/rules/common/) — invariant guardrails (general/ngôn ngữ, secret, vault, budget, orchestrator, delegate, git, red-flags, rule-loading, memory-mirror). Managed by harness install.sh: **overwrite** khi re-sync — KHÔNG sửa trực tiếp trong project (sửa upstream ở harness repo).
 - [.claude/rules/project/](.claude/rules/project/) — rule riêng repo, LAZY trừ khi vượt gate P0-mọi-turn; install.sh **giữ nguyên** khi re-sync.
 $end"
 
@@ -574,7 +612,6 @@ OWNED_HOOKS=()
 OWNED_DENY=()
 OWNED_ENV_KEYS=()
 OWNED_STATUSLINE=""
-PREVIOUS_MANIFEST="$ROUTE_DIR/$MANIFEST_REL"
 if [ -f "$PREVIOUS_MANIFEST" ] && jq -e '.schemaVersion == 1' "$PREVIOUS_MANIFEST" >/dev/null 2>&1; then
   while IFS=$'\t' read -r event matcher command; do OWNED_HOOKS+=("$event" "$matcher" "$command"); done < <(jq -r '.settings.hooks[]? | [.event,.matcher,.command] | @tsv' "$PREVIOUS_MANIFEST")
   while IFS= read -r deny; do OWNED_DENY+=("$deny"); done < <(jq -r '.settings.deny[]?' "$PREVIOUS_MANIFEST")

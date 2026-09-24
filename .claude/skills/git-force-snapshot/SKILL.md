@@ -61,9 +61,10 @@ git branch -m <original-branch>
 ## 5. Re-check commit mới cho leak
 
 Squash xoá *history* nhưng secret bị lộ có thể vẫn còn nằm trong
-working tree hiện tại. Chạy skill audit-git-leak (gitleaks + sensitive-content
-scan) trên state 1-commit mới này trước khi push bất cứ gì. Bất kỳ finding
-nào → DỪNG, fix trong working tree, amend snapshot commit, scan lại.
+working tree hiện tại. Chạy `/git-push-safety --scan-only` (gitleaks +
+sensitive-content scan) trên state 1-commit mới này trước khi push bất cứ
+gì. Bất kỳ finding nào → DỪNG, fix trong working tree, amend snapshot
+commit, scan lại.
 
 ## 6. Force-push — cần xác nhận rõ ràng
 

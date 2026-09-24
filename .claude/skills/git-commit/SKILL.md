@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: Stage và commit thay đổi vào local git only, không push. Thêm `--conventional` để soạn message theo Conventional Commit (type prefix). Dùng khi user nói "commit", "commit local", "commit this", "gen commit message", "write conventional commit", hoặc chạy /commit, /commit --conventional.
+description: Stage và commit thay đổi vào local git only, không push. Thêm `--conventional` để soạn message theo Conventional Commit (type prefix). Thêm `--auto` để tự commit ngay không hỏi xác nhận, sau khi xong 1 đơn vị việc (todo done, test pass). Dùng khi user nói "commit", "commit local", "commit this", "gen commit message", "write conventional commit", "auto commit", "nhớ commit giúp", "đừng để tôi quên commit", hoặc chạy /git-commit, /git-commit --conventional, /git-commit --auto.
 user-invocable: true
 disable-model-invocation: true
 ---
@@ -24,8 +24,18 @@ disable-model-invocation: true
      - **ci** — thay đổi config CI/CD pipeline
      - Diff trải nhiều type → chọn type của thay đổi chính, không ghép nhiều prefix.
      - Chỉ thêm body nếu thêm thông tin thật (bullet `-` giải thích *tại sao*, không diễn lại diff). Không thêm trailer mà repo chưa dùng (vd `Signed-off-by`, `Co-Authored-By`) trừ khi history gần đây cho thấy convention đó.
-4. Hiện message đã soạn cho user, xác nhận trước khi chạy `git commit -m "..."`. Không bao giờ commit mà chưa có xác nhận, không tự sửa message thành thứ user chưa duyệt.
+4. Hiện message đã soạn cho user, xác nhận trước khi chạy `git commit -m "..."` (bỏ qua khi `--auto`). Không bao giờ commit mà chưa có xác nhận, không tự sửa message thành thứ user chưa duyệt.
 5. Không push.
 6. Report kết quả 1 dòng: commit hash + subject. Không giải thích thêm.
 
 Không bao giờ force, amend, hoặc skip hook. Nếu commit fail (hook reject), fix root cause rồi retry — không `--no-verify`.
+
+## `--auto` — commit không hỏi xác nhận
+
+- Chỉ chạy khi user gõ rõ `/git-commit --auto`; task xong không tự động là quyền commit.
+- Override có chủ đích bước 4 (hỏi xác nhận) — chỉ trong lần invoke này; push/merge/force vẫn theo rule bình thường.
+- Precondition: 1 đơn vị việc hoàn chỉnh (todo done, test pass). Task dở / test fail → DỪNG, báo user, không commit.
+- Quét file lạ/nhạy cảm (`.env`, `*.bak`, credential dump, editor swap) → loại khỏi commit, nêu trong report.
+- Stage theo tên file đúng phạm vi vừa xong, không `-A`/`.`.
+- Kết hợp được với `--conventional`.
+- Report 1 dòng hash + subject + file bị loại (lý do).
