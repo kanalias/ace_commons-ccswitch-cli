@@ -70,8 +70,6 @@ patterns = [
     ('/Users/', re.compile(r'/Users/')),
     ('/opt/homebrew', re.compile(r'/opt/homebrew')),
     ('com.user.', re.compile(r'com\.user\.')),
-    ('lanhnk', re.compile(r'lanhnk')),
-    ('kane@', re.compile(r'kane@')),
     ('claude-ctxbar', re.compile(r'claude-ctxbar')),
     ('9router (lowercase)', re.compile(r'9router')),
     ('absolute date YYYY-MM-DD', re.compile(r'\b20\d\d-\d\d-\d\d\b')),
