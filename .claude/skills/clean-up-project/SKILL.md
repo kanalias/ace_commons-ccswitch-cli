@@ -147,40 +147,10 @@ Apply rules:
 
 ### 5. Merged temp branches
 
-Chỉ xem xét branch prefix whitelist:
+Không tự implement — logic dọn branch nằm DUY NHẤT ở skill `/git-cleanup-branch` (protected hard-block, whitelist `feat/` `fix/` `hotfix/` `chore/` `refactor/`, age guard 24h, confirm `[a]ll / [s]elect / [n]one`, `git branch -d` không bao giờ `-D`, remote delete best-effort chỉ `origin`).
 
-- `feat/`
-- `fix/`
-- `hotfix/`
-- `chore/`
-- `refactor/`
-
-Cấm đụng:
-
-- `dev`
-- `main`
-- `stable`
-- `prod`
-- `release/*`
-- branch ngoài whitelist
-- branch commit cuối < 24h
-- branch chưa merge vào current branch
-
-Dry-run:
-
-```sh
-git branch --merged
-git for-each-ref --format='%(refname:short) %(committerdate:iso8601)' refs/heads
-```
-
-Apply sau confirm:
-
-```sh
-git branch -d <branch>
-git push origin --delete <branch>
-```
-
-Remote delete là best-effort, chỉ `origin`, chỉ sau user xác nhận.
+- Dry-run: chỉ liệt kê candidate từ `git branch --merged` vào báo cáo, category `branches`, action = `chạy /git-cleanup-branch`.
+- Apply: gọi `/git-cleanup-branch`, KHÔNG chạy `git branch -d` / `git push origin --delete` trực tiếp từ skill này.
 
 ### 6. Stale logs
 
