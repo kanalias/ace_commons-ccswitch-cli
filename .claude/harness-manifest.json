@@ -84,7 +84,7 @@
     },
     {
       "path": ".claude/rules/common/orchestrator.md",
-      "sha256": "6f46e7f69ab373c7ba9fc264786cca9807337bd44c81046d2eb7b1a6762e6372"
+      "sha256": "3d16e8c6772290c73ee71fe65a501860e7c749c07141c8c57ab6562871f550f1"
     },
     {
       "path": ".claude/rules/common/rule-loading-policy.md",
@@ -104,15 +104,15 @@
     },
     {
       "path": ".claude/skills/audit-claude-md/SKILL.md",
-      "sha256": "71b64e27432c266ae05ab375fe8769b2955500d52d07c7a515bc7acaa1ce70da"
+      "sha256": "d1935bdf446f5f5185410ed4cc5713eff387aabd3b36ca583e060357f754f0c4"
     },
     {
       "path": ".claude/skills/audit-context-memory/SKILL.md",
-      "sha256": "3c48732829ee4fa5888fca8b58e3e6041892951494465e840909ad8cb0ff4b4a"
+      "sha256": "05c9d4ea9ffd5b454e94340525141fdfdd58a4df71a61a759467c9614d9eab66"
     },
     {
       "path": ".claude/skills/audit-dependency/SKILL.md",
-      "sha256": "c214c0cab210af4845ca4de55c7a9a9d81463d19609874b037d71bd711f809c1"
+      "sha256": "e1f1da2049ec895a2cd060013b2dde68a1d41eb1c097f1edfb48ac55bf3de2c5"
     },
     {
       "path": ".claude/skills/audit-vietnamese/SKILL.md",
@@ -120,7 +120,7 @@
     },
     {
       "path": ".claude/skills/check-hardcode/SKILL.md",
-      "sha256": "fcad8f5045d7a216de60ff6b6a2b87351835f82cea7010f64e5c0a3e712dea75"
+      "sha256": "d1d3bcdc62b4fd097d99d82e52982fe258e4bfe5c6dbe35e9186592292ce9b4d"
     },
     {
       "path": ".claude/skills/clean-up-project/SKILL.md",
@@ -128,75 +128,71 @@
     },
     {
       "path": ".claude/skills/dep-ladder-check/SKILL.md",
-      "sha256": "c8e69b9a0ec791da0b91a721f8bdb08e272e7e455d8aaa5adc870cb1bd161f58"
+      "sha256": "81464896921356df2e0d00b6ac89a297f21b68e162732a13b467f3f0453d9b46"
     },
     {
       "path": ".claude/skills/doctor-memory/SKILL.md",
-      "sha256": "2b06ea93e19acdfafe5d7307a52d1a2e8be9de04321837ea538ccd96bbd9c40c"
+      "sha256": "f0dbb39f9b673fbc44e5a739d15c329ca748b5c7639ba8abaadf19b3012d5e1a"
     },
     {
       "path": ".claude/skills/fix-ledger/SKILL.md",
-      "sha256": "080f62012a10df989ad73598f6367dc75a638365359d1a3998f94a94f02a3ec1"
+      "sha256": "af921582095f064f5eae4c28b0a23552c77086379fd94c9ff29385224babbcc3"
     },
     {
       "path": ".claude/skills/git-cleanup-branch/SKILL.md",
-      "sha256": "5eff876e064daca219fceccb82974ae580514223c88d258d2bee5c783ac23c04"
+      "sha256": "05b423f2f5e98f327de4934999fb292d0bde304578b41302a4936be2fc6ff123"
     },
     {
       "path": ".claude/skills/git-commit-describe/SKILL.md",
-      "sha256": "c0976ca5709b8a007aa26a947923b807eb4da29b0512fe748851ed59f39423d6"
+      "sha256": "c58dad6307ce0a12a9dad9446496f53e28f0d7531c6a4954a0f383e59aafdfc0"
     },
     {
       "path": ".claude/skills/git-commit/SKILL.md",
-      "sha256": "0bd96d74972032795c2886bcf629b9a80ad45b0f0369b1c3fb576979e12bba42"
+      "sha256": "44ad26921858891c1d1a51c10f9823985b02aced7bb456e7e31e0b2f68495fd5"
     },
     {
       "path": ".claude/skills/git-force-snapshot/SKILL.md",
-      "sha256": "e19d052125bee5d17f303c4e3b051c79c267ad87080a72f965317150adfb1699"
+      "sha256": "da96de91e74738e133ea011b586783b428c4c66d5ed6e9c5a3e7adc0222fd024"
     },
     {
       "path": ".claude/skills/git-push-safety/SKILL.md",
-      "sha256": "0aa8fe9750b6bd1f59313466551feb2eeb6f4651de58fe7da0dcbffed2f784d7"
+      "sha256": "51da84cfd1ae4fc443ee10338cc6fc8714437f5f816f5af91bfec7980382e930"
     },
     {
       "path": ".claude/skills/orchestrate/SKILL.md",
-      "sha256": "9653e023311ca82d63f84ef5abfa1fc72f5bb9fb4207ec19d279f7ea2f644b7a"
+      "sha256": "f73723f68db9d5e3ed7d47b61a6a9df319067777fe0e03c5d0d414d797ff4c4e"
     },
     {
       "path": ".claude/skills/production-cleanup/SKILL.md",
-      "sha256": "69ada453f6ecd3b7e238004f0bdb0921e4bf9134414e49fb097d5d988695a72c"
+      "sha256": "20553ca15449e05af48bd376c78fb1feae825220d1fa86d135e2cc18085d132e"
     },
     {
       "path": ".claude/skills/production-deploy/SKILL.md",
-      "sha256": "6f8606ee2fb78606c8bfca0cfc3e5fbc3c66546ce65fd077910f3b4f4721023b"
+      "sha256": "b1ebae2d1fff3840875999c139bbb2832836199ae21cd8a36168de707bb6af37"
     },
     {
       "path": ".claude/skills/production-reboot/SKILL.md",
-      "sha256": "bb9cb2ab675de4e651c64c7325cd53fa1975e3f00e9cf4c86b7d4bda9f99903e"
-    },
-    {
-      "path": ".claude/skills/resume-orchestration/SKILL.md",
-      "sha256": "1097bb29e4e761535be785a991c6e53e3aa2f1817d53a454a8dad0238db77f08"
+      "sha256": "534f3c106d7f54144a18650267b4e2d591afca3b902106bea9742f236b8d6dc8"
     },
     {
       "path": ".claude/skills/task-loop-feature/SKILL.md",
-      "sha256": "2bbabefc5737d765cda41476b5a275a19eebfbe424655307680dbd445808d40c"
+      "sha256": "3135a3db9902f159e21260854f13f33c667093a161058676f13e590ec28b5c37"
     },
     {
       "path": ".claude/skills/update-claude/SKILL.md",
-      "sha256": "d061f43cff4eaa06f0421788b2bad846539de2f954f381e97c3fc2844147d0b0"
+      "sha256": "bd749a52d753e69155e03e3e54b0f17bc653629260b0940c45916499eb299511"
     },
     {
       "path": ".claude/skills/update-codex/SKILL.md",
-      "sha256": "b968cf94bf770af54b77aaf25cba6369bdc171e1366b6b9edabe8f2b553fcb5e"
+      "sha256": "89f8dfa47fb75f9fa62316e0ac6a6255ff6cf25cbf4044388830e6ff20994e55"
     },
     {
       "path": ".claude/skills/update-deepseek/SKILL.md",
-      "sha256": "c85718fb0178be1ae116d2303704df445bfe9c4d2c8e5bfff539c65161f0805a"
+      "sha256": "062ad0c3242ec040dbcea6bb9b76cd11faa1d00248593c476aa12c9d8119436b"
     },
     {
       "path": ".claude/skills/update-gemini/SKILL.md",
-      "sha256": "75001e346bd1ba6a9b018dd4d42fc7b54b39e0ab017cf7f082b568c25848a9d9"
+      "sha256": "0ba2c4bc827c331fee80de672fe2c88a1c019934179d6b7e9eaed5ff0a2c9311"
     },
     {
       "path": ".claude/statusline-orchestration.sh",

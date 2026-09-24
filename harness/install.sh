@@ -412,7 +412,7 @@ if [ "$SEL_QUALITY" -eq 1 ]; then
   install_file "hooks/post-bash-stuck-detector.sh" ".claude/hooks/post-bash-stuck-detector.sh"
   # merged: stop-verdict-record + subagent-stop-ledger
   install_file "hooks/subagent-stop-record.sh"    ".claude/hooks/subagent-stop-record.sh"
-  # resume-orchestration ships as a skill (SEL_SUBAGENTS group below), not a command
+  # resume is part of the skill `orchestrate` (SEL_SKILLS group below), not a command
   # statusline — shows task-graph progress, chains ~/.claude/statusline-context.sh if present
   install_file "statusline-orchestration.sh"      ".claude/statusline-orchestration.sh"
 fi
@@ -422,8 +422,8 @@ fi
 # Group membership is derived from the skill's own name (no separate list to
 # keep in sync):
 #   production-*                                           → SEL_DEPLOY
-#   resume-orchestration                                   → SEL_SUBAGENTS (orchestration recorder set)
-#   check-hardcode / dep-ladder-check / fix-ledger / orchestrate → SEL_SKILLS (skill-only, never had a command)
+#   check-hardcode / dep-ladder-check / fix-ledger / orchestrate → SEL_SKILLS (skill-only, never had a command;
+#                                                                    orchestrate also covers resume-orchestration)
 #   everything else (former slash-commands)                → SEL_COMMANDS
 if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -eq 1 ] || [ "$SEL_DEPLOY" -eq 1 ]; then
   echo "── skills ──"
@@ -432,7 +432,6 @@ if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -e
     group_flag=0
     case "$skill_name" in
       production-*) group_flag="$SEL_DEPLOY" ;;
-      resume-orchestration) group_flag="$SEL_SUBAGENTS" ;;
       check-hardcode|dep-ladder-check|fix-ledger|orchestrate) group_flag="$SEL_SKILLS" ;;
       *) group_flag="$SEL_COMMANDS" ;;
     esac
@@ -494,6 +493,49 @@ migrate_legacy_commands() {
   rmdir "$legacy_dir" 2>/dev/null || true
 }
 migrate_legacy_commands
+
+# ── migration: legacy skills merged into another skill (dedup pass) ──
+# Same hash-based ownership check as migrate_legacy_commands above: remove
+# only if the file is still exactly what WE installed last time (per previous
+# manifest); keep + warn if the user modified it or we can't prove ownership.
+LEGACY_SKILL_NAMES=(auto-commit audit-git-leak lazy-load-health resume-orchestration)
+legacy_skill_target() {
+  case "$1" in
+    auto-commit) echo "git-commit" ;;
+    audit-git-leak) echo "git-push-safety" ;;
+    lazy-load-health) echo "audit-context-memory" ;;
+    resume-orchestration) echo "orchestrate" ;;
+  esac
+}
+migrate_legacy_skills() {
+  local name dir f rel expected actual target
+  for name in "${LEGACY_SKILL_NAMES[@]}"; do
+    dir="$ROUTE_DIR/.claude/skills/$name"
+    f="$dir/SKILL.md"
+    [ -f "$f" ] || continue
+    rel=".claude/skills/$name/SKILL.md"
+    target="$(legacy_skill_target "$name")"
+    expected=""
+    if [ -f "$PREVIOUS_MANIFEST" ]; then
+      expected="$(jq -r --arg p "$rel" '.syncFiles[]? | select(.path==$p) | .sha256' "$PREVIOUS_MANIFEST" 2>/dev/null)"
+    fi
+    if [ -z "$expected" ]; then
+      echo "WARN: legacy skill $rel not in previous manifest — kept"
+      continue
+    fi
+    actual="$(sha256_file "$f")"
+    if [ "$actual" != "$expected" ]; then
+      echo "WARN: legacy skill $rel modified — kept"
+      continue
+    fi
+    rm -f "$f"
+    echo "  🗑  $rel (removed — merged into $target)"
+    if [ -d "$dir" ] && ! rmdir "$dir" 2>/dev/null; then
+      echo "WARN: legacy skill dir .claude/skills/$name/ has extra files — kept"
+    fi
+  done
+}
+migrate_legacy_skills
 
 if [ "$SEL_RULES" -eq 1 ]; then
   echo "── rules ──"

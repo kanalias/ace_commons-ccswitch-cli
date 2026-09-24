@@ -47,7 +47,7 @@ Fable/Opus:  review diff từng worktree → merge / reject → integration veri
 
 ≥2 dòng cùng wave → PHẢI gửi chung 1 message. Bảng 1 dòng duy nhất → giải thích tại sao không chẻ được. WRITE subtask chưa ✅ interface-locked → KHÔNG dispatch.
 
-- Task **M+ multi-agent WRITE** (≥2 subtask WRITE, hoặc có subtask L/XL) → PHẢI ghi blackboard `.claude/state/plan-<slug>.md` (cấu trúc: `/resume-orchestration` mục 0): contract/interface đã lock, edge cases, decisions log, bảng phân rã (kèm cột `agent_id` cho SendMessage resume — KHÔNG cột `status`, trạng thái sống ở `task-graph/<slug>.md`), section `## Questions`. Blackboard = shared source-of-truth cho mọi subagent.
+- Task **M+ multi-agent WRITE** (≥2 subtask WRITE, hoặc có subtask L/XL) → PHẢI ghi blackboard `.claude/state/plan-<slug>.md` (cấu trúc: skill `/orchestrate` mục "Blackboard template"): contract/interface đã lock, edge cases, decisions log, bảng phân rã (kèm cột `agent_id` cho SendMessage resume — KHÔNG cột `status`, trạng thái sống ở `task-graph/<slug>.md`), section `## Questions`. Blackboard = shared source-of-truth cho mọi subagent.
 - Task M đơn-agent hoặc READ-only fan-out → chỉ in bảng chat, blackboard optional.
 - Lifecycle: task xong → xoá plan file cùng lúc ledger. Plan file >48h không đụng → stale, audit trước khi tin.
 
@@ -235,7 +235,7 @@ Context window (~200K auto-compact): xem [[token-budget]] — orchestrator luôn
 | `pre-bash-gate.sh` | PreToolUse (Bash) | Chặn `git merge` khi verdict gần nhất REVISE; chặn commit khi integrating chưa pass |
 | `post-bash-stuck-detector.sh` | PostToolUse (Bash) | Cảnh báo lặp cùng lệnh ≥4 lần (thrashing) |
 | `subagent-stop-record.sh` | SubagentStop | Ghi verdict (PASS/REVISE) vào ledger + append metrics JSONL; nhiều dòng cùng `agent_id` = resume iterations |
-| `session-start.sh` | SessionStart | Đọc ledger, hiển thị task dở dang qua `/resume-orchestration` |
+| `session-start.sh` | SessionStart | Đọc ledger, hiển thị task dở dang — resume qua `/orchestrate --resume` |
 
 **Vai ledger (`orchestrator-ledger.md`):** audit-trail PHỤ, append-only, TTL 48h tự prune — KHÔNG phải state machine, vẫn 1 file dùng chung mọi session (an toàn vì append-only, không read-modify-write nên không race). `task-graph/<slug>.md` (per-worktree, xem mục "Task-graph artifact") là nguồn TRẠNG THÁI chính; ledger chỉ đối chiếu completion khi resume. Graph đã xoá mà ledger còn dòng cũ → bình thường.
 

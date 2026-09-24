@@ -10,6 +10,12 @@ setup() {
   [ ! -e "$REPO_ROOT/.claude/commands" ]
 }
 
+@test "merged-away skills are not in templates" {
+  for name in auto-commit audit-git-leak lazy-load-health resume-orchestration; do
+    [ ! -e "$TEMPLATE_ROOT/skills/$name" ]
+  done
+}
+
 @test "skills have valid discovery frontmatter and unique directory-matching names" {
   python3 - <<'PY'
 import os, re

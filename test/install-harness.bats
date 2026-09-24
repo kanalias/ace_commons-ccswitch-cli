@@ -137,8 +137,9 @@ run_install() {
   [ -f "$TARGET/.claude/skills/update-deepseek/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/doctor-memory/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/git-commit/SKILL.md" ]
-  # resume-orchestration follows the subagents group, not commands/skills
-  [ -f "$TARGET/.claude/skills/resume-orchestration/SKILL.md" ]
+  # resume-orchestration was merged into the orchestrate skill — must NOT land
+  [ ! -e "$TARGET/.claude/skills/resume-orchestration" ]
+  [ -f "$TARGET/.claude/skills/orchestrate/SKILL.md" ]
   ! grep -q '9router' "$TARGET/.claude/skills/git-push-safety/SKILL.md" || false
   [ ! -e "$TARGET/.claude/commands" ]
 
@@ -333,6 +334,67 @@ run_install() {
   [ -f "$TARGET/.claude/commands/git-commit.md" ]
   grep -q 'user edited this' "$TARGET/.claude/commands/git-commit.md"
   [[ "$output" == *"WARN"*"git-commit.md modified — kept"* ]]
+}
+
+@test "migration: unmodified legacy skill (owned per previous manifest) is removed and dir gone on reinstall" {
+  run_install
+  [ "$status" -eq 0 ]
+  # simulate a pre-merge install that still shipped this skill, by hand-crafting
+  # a legacy skill dir + manifest entry matching it (mirrors legacy-command tests).
+  mkdir -p "$TARGET/.claude/skills/lazy-load-health"
+  printf 'legacy content\n' > "$TARGET/.claude/skills/lazy-load-health/SKILL.md"
+  sha=$(shasum -a 256 "$TARGET/.claude/skills/lazy-load-health/SKILL.md" | cut -d' ' -f1)
+  tmp=$(mktemp)
+  jq --arg p ".claude/skills/lazy-load-health/SKILL.md" --arg h "$sha" \
+    '.syncFiles += [{path:$p, sha256:$h}]' "$TARGET/.claude/harness-manifest.json" > "$tmp"
+  mv "$tmp" "$TARGET/.claude/harness-manifest.json"
+
+  run_install
+  [ "$status" -eq 0 ]
+  [ ! -e "$TARGET/.claude/skills/lazy-load-health/SKILL.md" ]
+  [ ! -d "$TARGET/.claude/skills/lazy-load-health" ]
+  [[ "$output" == *"removed — merged into audit-context-memory"* ]]
+}
+
+@test "migration: modified legacy skill is kept with a warning" {
+  run_install
+  [ "$status" -eq 0 ]
+  mkdir -p "$TARGET/.claude/skills/lazy-load-health"
+  printf 'legacy content\n' > "$TARGET/.claude/skills/lazy-load-health/SKILL.md"
+  sha=$(shasum -a 256 "$TARGET/.claude/skills/lazy-load-health/SKILL.md" | cut -d' ' -f1)
+  tmp=$(mktemp)
+  jq --arg p ".claude/skills/lazy-load-health/SKILL.md" --arg h "$sha" \
+    '.syncFiles += [{path:$p, sha256:$h}]' "$TARGET/.claude/harness-manifest.json" > "$tmp"
+  mv "$tmp" "$TARGET/.claude/harness-manifest.json"
+  # user modified the file after our previous install — must be kept
+  printf 'user edited this\n' > "$TARGET/.claude/skills/lazy-load-health/SKILL.md"
+
+  run_install
+  [ "$status" -eq 0 ]
+  [ -f "$TARGET/.claude/skills/lazy-load-health/SKILL.md" ]
+  grep -q 'user edited this' "$TARGET/.claude/skills/lazy-load-health/SKILL.md"
+  [[ "$output" == *"WARN"*"lazy-load-health/SKILL.md modified — kept"* ]]
+}
+
+@test "migration: legacy skill dir with an extra file removes SKILL.md but keeps the dir with a warning" {
+  run_install
+  [ "$status" -eq 0 ]
+  mkdir -p "$TARGET/.claude/skills/lazy-load-health"
+  printf 'legacy content\n' > "$TARGET/.claude/skills/lazy-load-health/SKILL.md"
+  sha=$(shasum -a 256 "$TARGET/.claude/skills/lazy-load-health/SKILL.md" | cut -d' ' -f1)
+  tmp=$(mktemp)
+  jq --arg p ".claude/skills/lazy-load-health/SKILL.md" --arg h "$sha" \
+    '.syncFiles += [{path:$p, sha256:$h}]' "$TARGET/.claude/harness-manifest.json" > "$tmp"
+  mv "$tmp" "$TARGET/.claude/harness-manifest.json"
+  # extra user file left in the dir — rmdir must fail, dir stays
+  printf 'notes\n' > "$TARGET/.claude/skills/lazy-load-health/notes.txt"
+
+  run_install
+  [ "$status" -eq 0 ]
+  [ ! -e "$TARGET/.claude/skills/lazy-load-health/SKILL.md" ]
+  [ -d "$TARGET/.claude/skills/lazy-load-health" ]
+  [ -f "$TARGET/.claude/skills/lazy-load-health/notes.txt" ]
+  [[ "$output" == *"WARN: legacy skill dir .claude/skills/lazy-load-health/ has extra files — kept"* ]]
 }
 
 @test "self-install guard blocks symlink pointing at harness source dir" {

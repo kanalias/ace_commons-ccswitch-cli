@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: "Quy trình orchestration task M+: plan-first, task-graph, fan-out Sonnet song song theo wave, review + integration verify. Dùng khi \"orchestrate\" hoặc chia task chạy song song."
+description: "Quy trình orchestration task M+: plan-first, task-graph, fan-out Sonnet theo wave, review + integration verify, resume dở dang. Dùng khi \"orchestrate\", chia task song song, /orchestrate --resume."
 user-invocable: true
 ---
 
@@ -44,6 +44,7 @@ Chẻ tới đơn vị nhỏ nhất còn **độc lập thật** — đạt cả
 
 - Tạo/ghi `.claude/state/task-graph/<slug>.md` (`<slug>` = tự suy từ cwd/worktree session hiện tại, `main` nếu làm thẳng trên repo chính) theo format ở trên. `status: planning`.
 - Subtask cùng chạm 1 file → gộp thành 1 row hoặc set `deps` (không fan-out song song 2 row đụng cùng file).
+- Task M+ multi-agent WRITE (≥2 subtask WRITE, hoặc có subtask L/XL) → cũng ghi blackboard `.claude/state/plan-<slug>.md` theo template mục "Blackboard template" bên dưới, trước khi dispatch.
 - Trước khi chuyển sang dispatch: `status: dispatched`.
 
 ## 4. Dispatch theo wave
@@ -72,10 +73,77 @@ Sau khi merge ≥2 mảnh về cây làm việc:
 ## 7. Cleanup
 
 - Commit sau khi review xong (không phải subagent tự commit).
-- Set `status: done` — `session-start.sh` tự xoá graph file khi thấy `done` ở session sau; xoá tay ngay cũng được (`rm .claude/state/task-graph/<slug>.md`).
+- Set `status: done` — `session-start.sh` tự xoá graph file khi thấy `done` ở session sau (plan file KHÔNG tự xoá); xoá tay ngay cả hai: `rm .claude/state/task-graph/<slug>.md .claude/state/plan-<slug>.md`.
 - Cleanup worktree/branch theo `[[git-workflow]]` (worktree remove, branch delete sau merge).
 - Fix/feature có rủi ro bị merge đè sau này → ghi `fix-ledger` nếu áp dụng.
 
-## Resume
+## Blackboard template (plan-<slug>.md)
 
-Session mới thấy banner `📊 Task-graph dở dang (status: ...)` (từ `session-start.sh`, in kèm nội dung file — chỉ file khớp slug session hiện tại) → đọc `.claude/state/task-graph/<slug>.md`, tiếp tục đúng bước khớp `status` hiện tại (`planning`→bước 3, `dispatched`→bước 4/5, `review`→bước 5, `integrating`→bước 6) — không phân tích lại từ đầu, không tạo graph mới đè lên graph dở dang.
+Pattern giống LangGraph checkpoint / Mastra suspend-resume: blackboard giữ
+context/contract shared cho mọi subagent; task-graph giữ trạng thái. Task M+
+multi-agent WRITE ghi blackboard `.claude/state/plan-<slug>.md` lúc dispatch
+(xem [[orchestrator]] Planning gate) làm nguồn **CONTEXT/contract** (bảng
+subtask + contract đã lock + decisions + Questions) — **KHÔNG** dùng làm nguồn
+trạng thái. Trạng thái (status/wave/verdict) sống DUY NHẤT ở
+`.claude/state/task-graph/<slug>.md` (per-worktree — `<slug>` tự suy từ
+cwd/worktree của session hiện tại, `main` nếu làm thẳng trên repo chính;
+dual-artifact: xem [[orchestrator]] mục "Task-graph artifact") — plan file
+không tự giữ máy trạng thái riêng.
+
+Template chuẩn:
+
+```markdown
+# Plan: <slug>
+(trạng thái xem .claude/state/task-graph/<slug>.md — file này KHÔNG có field status riêng)
+## Contract (LOCKED — subagent không tự sửa)
+<signatures, types, ranh giới file/module>
+## Edge cases (đã quyết)
+## Decisions log
+- [ts] <quyết định> — <lý do>
+## Subtasks
+| # | subtask | persona | agent_id | interface✅ | phụ thuộc | wave | verify cmd |
+## Questions (subagent ghi mâu thuẫn spec rồi STOP — orchestrator trả lời rồi resume)
+```
+
+Không có plan file (task M đơn-agent hoặc READ-only) → bỏ qua mục này.
+
+## Resume (/orchestrate --resume)
+
+1. **Nguồn trạng thái ưu tiên** = task-graph của slug session hiện tại. Session
+   mới thấy banner `📊 Task-graph dở dang (status: ...)` (từ `session-start.sh`)
+   → đọc `.claude/state/task-graph/<slug>.md`, tiếp tục đúng bước khớp
+   `status` hiện tại (`planning`→bước 3, `dispatched`→bước 4/5, `review`→bước
+   5, `integrating`→bước 6) — KHÔNG phân tích lại từ đầu, KHÔNG tạo graph
+   mới đè lên graph dở dang.
+2. **Có blackboard** `plan-<slug>.md` → đọc để lấy contract/edge-cases/decisions/Questions
+   đã lock, tránh hỏi lại subagent những gì đã quyết.
+3. **Không có graph nhưng có ledger** (`.claude/state/orchestrator-ledger.md`)
+   → tái tạo bảng phân rã từ ledger: ledger có 2 loại dòng — dòng orchestrator
+   ghi lúc dispatch (subtask/persona/wave, xem quy ước mục 5 dưới) và dòng
+   hook `subagent-stop-record.sh` tự append lúc subagent xong
+   (`- [<ts>] subagent done: agent_id=<id> type=<subagent_type>`). Đối chiếu
+   2 loại dòng: subtask có dòng "subagent done" tương ứng → **done**; subtask
+   trong bảng gốc không có dòng done tương ứng → **pending/failed**. Nhiều
+   dòng "subagent done" cùng `agent_id` = iterations qua SendMessage resume
+   (REVISE lặp lại) — lấy dòng CUỐI làm trạng thái, không phải duplicate.
+   Không chắc match được → hỏi user xác nhận trước khi re-dispatch, không đoán.
+   Không có cả graph lẫn ledger → báo user không có orchestration nào dở
+   dang, dừng ở đây.
+4. **Re-dispatch CHỈ phần pending/failed.** Theo routing rules ở
+   `[[orchestrator]]` (persona, fallback chain, planning gate, fan-out ≤15
+   concurrent). Subtask đã done → KHÔNG chạy lại. Áp lại đúng persona +
+   fallback chain đã định, không tự ý đổi persona trừ khi lần trước đã fail
+   hết chain (khi đó theo loop guard: re-decompose, không quay lại model đã
+   fail).
+5. **Quy ước ghi ledger (orchestrator side).** Ledger = audit-trail PHỤ,
+   append-only, TTL 48h tự prune — KHÔNG phải state machine (state machine
+   là `task-graph/<slug>.md`). Hook `subagent-stop-record.sh` CHỈ ghi dòng
+   "subagent done" khi subagent kết thúc — nó không biết bảng phân rã. Vì
+   vậy tại thời điểm dispatch, orchestrator NÊN tự ghi bảng phân rã
+   (subtask/persona/wave) vào `.claude/state/orchestrator-ledger.md` trước
+   khi gọi Agent, để mục 3 ở trên có cái để đối chiếu khi resume.
+6. **Hoàn tất.** Khi task-graph chuyển `status: done` (tất cả subtask done +
+   integration verify pass) → xoá `.claude/state/task-graph/<slug>.md` **và**
+   `.claude/state/plan-<slug>.md` (nếu có) cùng lúc, báo user orchestration
+   đã hoàn tất. Ledger giữ nguyên (TTL 48h tự prune riêng) — graph/plan đã
+   xoá mà ledger còn dòng cũ là bình thường, không phải bug.
