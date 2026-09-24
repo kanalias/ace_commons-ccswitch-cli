@@ -31,14 +31,23 @@ out-of-band** qua API/console của provider.
      (đã sanitize `host/owner/repo`, lowercase; deploy host `@@DEPLOY_SSH_HOST@@`, service `@@DEPLOY_SERVICE@@`).
    - Tính repo-root slug từ `basename "$(git rev-parse --show-toplevel)"` (lowercase,
      non-alnum → `-`) và yêu cầu nó khớp `@@PROJECT_SLUG@@`.
-   - Đọc `git config --get remote.origin.url`, nhưng KHÔNG bao giờ in hoặc lưu raw URL. Thiếu origin → STOP.
-   - Sanitize origin về lowercase `host/owner/repo`: hỗ trợ `git@host:org/repo.git`,
+   - Resolve remote chính (`$R`) bằng snippet chuẩn:
+     ```sh
+     b=$(git branch --show-current)
+     R=$(git config --get "branch.$b.remote" 2>/dev/null || true)
+     [ "$R" = "." ] && R=
+     [ -z "$R" ] && git remote | grep -qx origin && R=origin
+     [ -z "$R" ] && [ "$(git remote | wc -l | tr -d ' ')" = 1 ] && R=$(git remote)
+     [ -z "$R" ] && echo "STOP: không xác định được remote chính — hỏi user" >&2
+     ```
+   - Đọc `git config --get "remote.$R.url"`, nhưng KHÔNG bao giờ in hoặc lưu raw URL. Không resolve được `$R` hoặc thiếu URL → STOP.
+   - Sanitize URL của remote chính về lowercase `host/owner/repo`: hỗ trợ `git@host:org/repo.git`,
      `https://[userinfo@]host/org/repo.git`, và `ssh://[userinfo@]host/org/repo.git`; strip userinfo,
      leading slash, và trailing `.git`.
-   - Yêu cầu sanitized origin identity khớp CHÍNH XÁC `@@PROJECT_REMOTE_ID@@`. Nếu `@@PROJECT_REMOTE_ID@@`
-     có dạng placeholder (`<...>`), origin không parse được, repo-root slug không khớp, hoặc remote identity
+   - Yêu cầu sanitized remote-chính identity khớp CHÍNH XÁC `@@PROJECT_REMOTE_ID@@`. Nếu `@@PROJECT_REMOTE_ID@@`
+     có dạng placeholder (`<...>`), remote chính không parse được, repo-root slug không khớp, hoặc remote identity
      không khớp → STOP ngay; báo user rằng command này thuộc về `@@PROJECT_SLUG@@` / `@@PROJECT_REMOTE_ID@@`,
-     repo/root/origin hiện tại là `<repo identity>` — không chạy reboot. Không có override.
+     repo/root/remote chính hiện tại là `<repo identity>` — không chạy reboot. Không có override.
    - Nếu bất kỳ config nào command này dùng vẫn còn dạng placeholder (`<...>`) — `@@DEPLOY_SSH_HOST@@`, `@@DEPLOY_SERVICE@@` — STOP;
      deploy config chưa đầy đủ (chạy lại install.sh với biến env HARNESS_DEPLOY_*).
 
