@@ -21,7 +21,11 @@ setup() {
   run "$CC" claude
   [ "$status" -eq 0 ]
   model=$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL' "$HOME/.claude/settings.json")
-  [ "$model" = "cc/claude-opus-5-5" ]
+  # [1m] suffix declares a 1M context window to Claude Code (else it assumes 200k for
+  # proxy IDs and auto-compacts at ~190k); 9router strips it before routing.
+  [ "$model" = "cc/claude-opus-5-5[1m]" ]
+  haiku=$(jq -r '.env.ANTHROPIC_DEFAULT_HAIKU_MODEL' "$HOME/.claude/settings.json")
+  [ "$haiku" = "cc/claude-haiku-4-5-20251001" ]   # haiku is a 200k model — no suffix
 }
 
 @test "apply codex writes current GPT model tiers and high effort" {

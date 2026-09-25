@@ -9,14 +9,14 @@ Bộ script cá nhân/team quản lý setup Claude Code: đổi endpoint auth nh
 | Đổi model/endpoint Claude Code nhanh (Claude/Codex/DeepSeek/Kimi qua proxy 9router, hoặc quay lại subscription) | **Phần 1** |
 | Cài mechanism delegate subagent + rules + guard hooks + git pre-push scan vào **project khác** | **Phần 2** |
 | Chỉnh mốc Claude Code tự nén hội thoại (hoặc tắt hẳn) | **Phần 3** |
-| Giảm context window bằng cách tắt tính năng Claude Code không cần (`disableWorkflows`) | **Phần 4** |
+| Giảm context window bằng cách tắt tính năng / tool Claude Code không cần (`disableWorkflows`, `denyTools`) | **Phần 4** |
 
 ### Yêu cầu hệ thống
 
 | Phụ thuộc | Cần cho | Cài |
 |---|---|---|
 | `bash` | Tất cả (mac/linux native; Windows qua Git Bash/WSL/Cygwin) | có sẵn mac/linux; Windows: Git Bash hoặc WSL |
-| `jq` | Phần 1 (profile JSON), Phần 2 (wire `settings.json`), Phần 3 (`autoCompactWindow`), Phần 4 (`disableWorkflows`) | `brew install jq` / `apt install jq` |
+| `jq` | Phần 1 (profile JSON), Phần 2 (wire `settings.json`), Phần 3 (`autoCompactWindow`), Phần 4 (`disableWorkflows`, `denyTools`) | `brew install jq` / `apt install jq` |
 | `curl` | Phần 1 (health-check proxy) | có sẵn hầu hết hệ thống |
 | `git` | Phần 2 (worktree isolation cho delegate wrapper + git pre-push hook) | `brew install git` / `apt install git` |
 | `gitleaks` | Phần 2 (git pre-push scan) | `brew install gitleaks` — thiếu thì hook advisory-skip, không chặn |
@@ -28,7 +28,7 @@ Repo này gồm 4 phần độc lập:
 1. **[`install-9router-proxy.sh`](#phần-1--ccswitch-endpoint-switcher)** — `ccswitch` CLI, đổi endpoint auth của Claude Code (9router / subscription). Lần đầu clone chạy [`install-first-time.sh`](#phần-1--ccswitch-endpoint-switcher) (alias của script này, tên rõ nghĩa hơn).
 2. **[`install-harness.sh`](#phần-2--harness-orchestrator--subagent)** — cài mechanism orchestrator + delegate subagent (agent persona, wrapper script, rules, guard/quality hooks, slash commands, skills, git pre-push hook) vào **project khác**.
 3. **[`install-auto-compact.sh`](#phần-3--auto-compact-window)** — chỉnh mốc `autoCompactWindow` (khi nào Claude Code tự nén context) hoặc tắt hẳn tính năng, qua `~/.claude/settings.json` (hoặc `./.claude/settings.json` cho riêng project).
-4. **[`install-optimize-claude.sh`](#phần-4--optimize-claude)** — đọc `.env` (repo root), ghi `~/.claude/settings.json` để tắt tính năng nặng (vd `disableWorkflows`) nhằm giảm context window.
+4. **[`install-optimize-claude.sh`](#phần-4--optimize-claude)** — đọc `.env` (repo root), ghi `~/.claude/settings.json` để tắt tính năng nặng (`disableWorkflows`) + deny tool built-in không dùng (`denyTools`, bỏ schema tool khỏi context) nhằm giảm context window.
 
 Phần 1 tự detect OS (macOS/Linux chạy bash trực tiếp; Windows qua Git Bash/WSL/Cygwin tự gọi PowerShell) — không cần chọn `.sh` hay `.ps1` thủ công. Phần 2 — delegate wrapper bash-only, Windows cần WSL/Git-Bash, không chạy CMD/PowerShell thuần. Phần 3 và 4 — thuần bash + `jq`, không có bản `.ps1`, chạy trên Windows cần Git Bash/WSL.
 
@@ -201,12 +201,14 @@ Model qua 9router **phải** có prefix. Mỗi profile map sẵn 4 tier (Opus/So
 
 | Target | Prefix | Ví dụ (Opus tier) |
 |---|---|---|
-| `claude` | `cc/` (claude) | `cc/claude-opus-5` |
+| `claude` | `cc/` (claude) | `cc/claude-opus-5-5[1m]` |
 | `codex` | `cx/` | `cx/gpt-5.6-luna` (default) |
 | `deepseek` | `ds/` | `ds/deepseek-v4-pro-max` |
 | `kimi` | `kimi/` | `kimi/kimi-k3` |
 
 Thiếu prefix → lỗi `model_not_found`. Xem model id đầy đủ trong `~/.claude/profiles/<target>.json`, hoặc list live: `curl -s https://9router.proxy.example.com/v1/models -H "Authorization: Bearer <key>" | jq -r '.data[].id'`. (Ở `subscription` — không có env block — Claude Code tự dùng model mặc định của tài khoản, không cần prefix.)
+
+**Hậu tố `[1m]`** (profile `claude` đặt sẵn cho Opus/Sonnet/Fable; Haiku là model 200k nên không đặt): khai báo với Claude Code model có window **1M**. Thiếu hậu tố → Claude Code assume 200k cho mọi ID qua proxy → auto-compact sớm ở ~190k dù model chịu được 1M. 9router tự strip hậu tố trước khi route, ID gửi đi vẫn là `cc/claude-opus-5-5`. Xem thêm Phần 3.
 
 ### 1.5 Xử lý sự cố
 
@@ -371,7 +373,7 @@ Chạy `scripts/delegate/doctor.sh` trong project đích trước — báo rõ C
 
 Chỉnh khi nào Claude Code tự nén (compact) hội thoại để tránh tràn context, hoặc tắt hẳn tính năng — đứng riêng, không phụ thuộc phần khác (không cài `ccswitch`).
 
-Key config: `autoCompactWindow` (số token tuyệt đối). Ngưỡng thực compact = `min(autoCompactWindow, model max context)`. Ví dụ Opus context ~200k → set `190000` ≈ 95%. Anthropic khuyến nghị để **auto** (Claude tự chọn theo model) — đặt mốc thấp = compact sớm hơn, có thể mất context giữa task nặng.
+Key config: `autoCompactWindow` (số token tuyệt đối). Ngưỡng thực compact = `min(autoCompactWindow, window Claude Code assume cho model)`. Model qua proxy (`cc/...`) bị assume **200k** trừ khi ID mang hậu tố `[1m]` trong `ANTHROPIC_DEFAULT_*_MODEL` (vd `cc/claude-fable-5-1[1m]`) → 1M, compact mặc định ~967k. Model 200k → set `190000` ≈ 95%. Anthropic khuyến nghị để **auto** (Claude tự chọn theo model) — đặt mốc thấp = compact sớm hơn, có thể mất context giữa task nặng.
 
 ### 3.1 Dùng
 
@@ -382,7 +384,7 @@ install-auto-compact.sh [--global|--project] <command>
 Target (mặc định `--global` → `~/.claude/settings.json`; `--project` → `./.claude/settings.json`, đè global cho riêng project hiện tại):
 
 ```bash
-install-auto-compact.sh set 190000    # đặt mốc compact ở 190k token (~95%, khuyến nghị cho task nặng)
+install-auto-compact.sh set 190000    # đặt mốc compact ở 190k token (~95% của model 200k)
 install-auto-compact.sh set 170000    # mốc sớm hơn (~85%), dư địa an toàn hơn
 install-auto-compact.sh auto          # bỏ mốc cứng, trả về Claude tự chọn (mặc định khuyến nghị)
 install-auto-compact.sh off           # TẮT HẲN auto-compact (env.DISABLE_AUTO_COMPACT=1) — tự /compact thủ công
@@ -432,15 +434,17 @@ Giảm context window bằng cách tắt tính năng nặng của Claude Code kh
 install-optimize-claude.sh
 ```
 
-Script đọc key `disableWorkflows` trong `.env` (repo root):
+Script đọc 2 key trong `.env` (repo root) — key nào thiếu thì bỏ qua key đó:
 
 ```bash
 # trong .env
 disableWorkflows=true
+denyTools=Artifact,ArtifactComments,ArtifactData,CronCreate,CronDelete,CronList,DesignSync,ListAgents,NotebookEdit,PushNotification,ReportFindings,ScheduleWakeup
 ```
 
 - `disableWorkflows=true` → ghi `settings.json` tắt "Dynamic workflows" (script JS Claude tự viết để orchestrate nhiều subagent quy mô lớn — KHÁC `.claude/workflows/` CI/CD). Tắt xong `/deep-research`, keyword `ultracode`, `/workflows` view không dùng được. KHÔNG ảnh hưởng Subagent (Agent tool), Skill, `/loop`, orchestrator routing rule.
-- `.env` không có `disableWorkflows` → script bỏ qua, không đụng gì.
+- `denyTools=<tên tool, cách nhau dấu phẩy>` → union vào `permissions.deny` của `settings.json` (idempotent, giữ entry deny có sẵn, không gỡ tool đã bỏ khỏi list — muốn dùng lại thì tự xoá trong `settings.json`). Deny theo **tên trần** = Claude Code không nạp schema tool đó vào context; 12 tool mặc định trong `.env.example` ≈ 23k token/session. Chỉ nhận tên tool (`[A-Za-z0-9_]`), không nhận pattern `Bash(...)`. Deny thắng allow.
+- `.env` không có key nào → script bỏ qua, không đụng gì.
 
 Yêu cầu `jq`. Tự tạo `settings.json` (`{}`) nếu chưa có. Cần **session mới** để Claude Code đọc lại settings sau khi chạy.
 
@@ -480,7 +484,7 @@ ccswitch-cli-claude/
 │       └── git-hooks/pre-push              # gitleaks scan trước push (cài vào .git/hooks/ project đích)
 │
 ├── install-auto-compact.sh       # Phần 3 — set/auto/off/on/status autoCompactWindow, đứng riêng
-├── install-optimize-claude.sh    # Phần 4 — disableWorkflows từ .env, đứng riêng
+├── install-optimize-claude.sh    # Phần 4 — disableWorkflows + denyTools từ .env, đứng riêng
 │
 ├── scripts/delegate/             # bản wrapper THẬT dùng trong repo này (đồng bộ với harness/templates/scripts/delegate/)
 ├── .claude/                      # harness bản THẬT của repo này (agents, hooks, skills, rules)

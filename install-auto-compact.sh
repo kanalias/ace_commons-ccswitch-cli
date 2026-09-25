@@ -2,7 +2,9 @@
 # claude-auto-compact.sh — chỉnh mốc auto-compact của Claude Code qua settings.json.
 #
 # Key config: autoCompactWindow (số token tuyệt đối). Ngưỡng thực compact =
-#   min(autoCompactWindow, model max context). Opus window ~200k → set 190000 ≈ 95%.
+#   min(autoCompactWindow, window Claude Code ASSUME cho model). Model qua proxy
+#   (cc/...) bị assume 200k trừ khi ID mang hậu tố `[1m]` (đặt trong
+#   ANTHROPIC_DEFAULT_*_MODEL) → 1M, mặc định compact ~967k. Model 200k → 190000 ≈ 95%.
 # Tắt hẳn auto-compact: env.DISABLE_AUTO_COMPACT="1" (tự gõ /compact thủ công).
 #
 # LƯU Ý: Anthropic khuyến nghị để "auto" (Claude tự chọn window theo model).
@@ -18,8 +20,9 @@ Script này chỉnh 2 thứ trong settings.json:
   • autoCompactWindow      — MỐC token để bắt đầu compact (số tuyệt đối)
   • env.DISABLE_AUTO_COMPACT — công tắc TẮT HẲN tính năng
 
-Ngưỡng thực = min(autoCompactWindow, max context của model).
-  Opus context ~200k → set 190000 = compact ở 190k (~95%).
+Ngưỡng thực = min(autoCompactWindow, window Claude Code assume cho model).
+  Model 200k → set 190000 = compact ở 190k (~95%).
+  Model 1M (ID có hậu tố [1m], vd cc/claude-fable-5-1[1m]) → để 'auto' (~967k).
 
 Cú pháp:
   claude-auto-compact.sh [--global|--project] <command>
@@ -33,8 +36,8 @@ Target (mặc định --global):
 ═══════════════════════════════════════════════════════════════════
   set <tokens>   Đặt autoCompactWindow. <tokens> là int > 0.
                  Số CÀNG NHỎ → compact CÀNG SỚM (giữ ít context, an toàn tràn).
-                 Số càng lớn (sát 200k) → compact muộn, giữ nhiều context hơn.
-     set 190000  →  compact ở 190k  (~95%, khuyến nghị cho task nặng)
+                 Số càng lớn (sát trần window) → compact muộn, giữ nhiều context hơn.
+     set 190000  →  compact ở 190k  (~95% của model 200k)
      set 170000  →  compact ở 170k  (~85%, sớm hơn, dư địa an toàn)
      set 150000  →  compact ở 150k  (~75%, rất sớm)
 

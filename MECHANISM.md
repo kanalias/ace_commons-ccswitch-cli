@@ -62,7 +62,7 @@ ccswitch-cli-claude/
 ├── install-9router-proxy.sh     # entry point Phần 1, tự detect OS
 ├── install-harness.sh  # entry point Phần 2 — thin wrapper, exec harness/install.sh
 ├── install-auto-compact.sh      # Phần 3 — chỉnh autoCompactWindow / DISABLE_AUTO_COMPACT trong settings.json (đứng riêng)
-├── install-optimize-claude.sh   # Phần 4 — disableWorkflows từ .env, ghi settings.json (đứng riêng)
+├── install-optimize-claude.sh   # Phần 4 — disableWorkflows + denyTools (permissions.deny) từ .env, ghi settings.json (đứng riêng)
 ├── ai-proxy/
 │   ├── ccswitch.sh            # CLI mac/linux — target ~/.claude/settings.json
 │   ├── ccswitch.ps1           # CLI windows (PowerShell) — parity với .sh
