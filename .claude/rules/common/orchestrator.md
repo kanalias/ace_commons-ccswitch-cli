@@ -2,7 +2,12 @@
 name: orchestrator
 description: Main agent = pure orchestrator; plan-first (lock interface + spec) rồi fan-out ≤15 Sonnet song song; REVISE → SendMessage agent cũ. Fable-main: cấm mọi code kể cả size-S trừ khi user cho phép explicit
 status: live
-updated: 2026-08-04
+updated: 2026-09-25
+paths:
+  - ".claude/agents/**"
+  - ".claude/skills/**"
+  - ".claude/state/**"
+  - "scripts/delegate/**"
 metadata:
   type: reference
 ---
