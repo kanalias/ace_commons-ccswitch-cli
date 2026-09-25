@@ -265,7 +265,7 @@ Delegate wrapper là **bash-only** — Windows cần WSL hoặc Git Bash (không
 | **quality hooks** | `HARNESS_GROUP_QUALITY` | `.claude/hooks/post-edit-syntax-check.sh` (wire `PostToolUse`) + `session-start-banner.sh` (wire `SessionStart`) |
 | **commands** | `HARNESS_GROUP_COMMANDS` | `.claude/skills/*/SKILL.md` (16 skill, gọi qua `/<name>`) |
 | **skills** | `HARNESS_GROUP_SKILLS` | `.claude/skills/{check-hardcode,dep-ladder-check,fix-ledger,orchestrate}/SKILL.md` (4 skill) |
-| **rules** | `HARNESS_GROUP_RULES` | `.claude/rules/common/*.md` (8 invariant guardrail — always overwrite) + `.claude/rules/project/{git-workflow,skill-superpowers}.md` (giữ nguyên nếu đã tồn tại) |
+| **rules** | `HARNESS_GROUP_RULES` | `.claude/rules/common/*.md` (10 invariant guardrail — always overwrite) + `.claude/rules/project/{git-workflow,skill-superpowers,test-parallel,browser-mcp-profiles,processes-layout}.md` (giữ nguyên nếu đã tồn tại) |
 | **git pre-push hook** | `HARNESS_GROUP_GITHOOKS` | `.git/hooks/pre-push` (gitleaks secret scan) — bỏ qua nếu target không phải git repo |
 
 Wiring `.claude/settings.json` dùng `jq` merge **idempotent** — chạy lại không tạo hook trùng lặp. Off-switch không cần gỡ cài: set `env.HARNESS_DELEGATE=0` trong `.claude/settings.json` của project đích.
@@ -476,7 +476,7 @@ ccswitch-cli-claude/
 │       ├── scripts/delegate/               # wrapper script (_common, run-aider-deepseek, run-codex, run-gemini, doctor + lib/)
 │       ├── hooks/{pre-edit-orchestrator-gate,pre-bash-orchestrator-gate,pre-edit-secret-scan,post-edit-syntax-check,session-start-banner}.sh
 │       ├── skills/*/SKILL.md               # 23 skill (gồm 16 skill gọi qua `/<name>`, thay cho slash command cũ)
-│       ├── rules/{common,project}/*.md     # common (8 guardrail) + project (git-workflow, skill-superpowers)
+│       ├── rules/{common,project}/*.md     # common (10 guardrail) + project (git-workflow, skill-superpowers, test-parallel, browser-mcp-profiles, processes-layout)
 │       └── git-hooks/pre-push              # gitleaks scan trước push (cài vào .git/hooks/ project đích)
 │
 ├── install-auto-compact.sh       # Phần 3 — set/auto/off/on/status autoCompactWindow, đứng riêng

@@ -147,6 +147,7 @@ run_install() {
   [ -f "$TARGET/.claude/rules/common/orchestrator.md" ]
   [ -f "$TARGET/.claude/rules/project/git-workflow.md" ]
   [ -f "$TARGET/.claude/rules/project/skill-superpowers.md" ]
+  [ -f "$TARGET/.claude/rules/project/processes-layout.md" ]
   grep -q '"src/\*\*"' "$TARGET/.claude/rules/project/skill-superpowers.md"
   grep -q '"lib/\*\*"' "$TARGET/.claude/rules/project/skill-superpowers.md"
 
