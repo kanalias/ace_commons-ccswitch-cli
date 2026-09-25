@@ -12,6 +12,8 @@ Nguồn chân lý cho gate: `rule-loading-policy` trong `~/.claude/rules/` (glob
 
 Khác [[doctor-memory]] (chỉ memory content — broken link, orphan, naming, stale bên trong từng memory dir): command này audit **cái gì được nạp vào context**, doctor-memory audit **memory system tự nó có sạch không**. Hai phạm vi không chồng nhau: command này chỉ đọc `MEMORY.md` (index), không đọc/sửa từng file `user_*/feedback_*/project_*/reference_*.md` bên trong.
 
+`.claude/memory-mirror/` trong repo **KHÔNG nạp vào context** (bản mirror git-tracked chỉ để xem/review) — không liệt kê vào inventory static, không tính budget, không audit ở đây.
+
 ## Args
 
 - (mặc định) — full audit như mô tả trên: tất cả nguồn (global rules, CLAUDE.md, project rules, MEMORY.md), chỉ sửa sau khi user chọn `[a]ll/[s]elect/[n]one` ở Bước 5.

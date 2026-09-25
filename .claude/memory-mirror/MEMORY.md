@@ -1,6 +1,6 @@
 # Memory index — ccswitch-cli-claude (project, git-tracked)
 
-Nguồn: mirror 1 chiều từ auto-memory (`~/.claude/projects/<hash>/memory/`, loại `project`). Ghi mới → viết vào đây TRƯỚC, patch sang auto-memory SAU. Xoá → xoá ở auto-memory TRƯỚC, repo SAU. Xem [memory-mirror](../rules/common/memory-mirror.md).
+Nguồn: mirror 1 chiều từ auto-memory (`~/.claude/projects/<hash>/memory/`, loại `project`). **Chỉ để xem/review qua git — KHÔNG nạp vào context session** (Claude Code không đọc dir này; index thật là `MEMORY.md` trong auto-memory). Ghi mới → viết vào đây TRƯỚC, patch sang auto-memory SAU. Xoá → xoá ở auto-memory TRƯỚC, repo SAU. Xem [memory-mirror](../rules/common/memory-mirror.md).
 
 - [ai-memory-kit](project_ai_memory_kit.md) — v4.2 business-only (37821a0), bundle ↔ Drive khớp, addons/+nut-bam/+.obsidian purge, P2 vá hết (gate cache, lock + SIGINT release), cài qua cai-dat.sh
 - [Harness score](project-harness-score.md) — ~9.5/10 sau hygiene 2026-08-02; 0.5 còn lại là giới hạn platform, không fix từ repo

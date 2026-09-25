@@ -11,6 +11,8 @@ disable-model-invocation: true
 
 Cross-project: memory dir nằm ở `~/.claude/projects/<cwd-slug>/memory`, khoá theo path cwd chính xác (không tự merge ancestor). Mỗi dir có `MEMORY.md` (index, nạp TĨNH mọi session) + N file `user_*/feedback_*/project_*/reference_*.md` (nạp ĐỘNG, chỉ khi Claude Read/recall). Mục tiêu: MEMORY.md càng gọn càng tốt (chỉ 1 dòng/entry trỏ file), nội dung thật nằm trong file riêng.
 
+**Bỏ qua `.claude/memory-mirror/` trong repo** — đó là bản mirror git-tracked chỉ để xem/review, KHÔNG nạp vào context, không phải memory dir. Không audit, không đọc, không sửa dir đó ở đây (đồng bộ mirror theo [[memory-mirror]] rule, không phải việc của skill này).
+
 Memory dir KHÔNG phải git repo — xoá không khôi phục được. Mặc định: fix cấu trúc (broken link, rename, tách file) auto làm luôn; xoá nội dung (file thừa/trùng/stale) BẮT BUỘC liệt kê + hỏi confirm trước, không tự xoá. Với `--report-only`: KHÔNG sửa gì cả, kể cả auto-fix cấu trúc — chỉ audit + report.
 
 Khác [[audit-context-memory]] (audit **cái gì được nạp vào context mỗi session** — global rules, CLAUDE.md, project rules ALWAYS/LAZY, và MEMORY.md **index**): command này audit **bên trong memory system tự nó** — từng file `user_*/feedback_*/project_*/reference_*.md`, không chỉ index. Hai phạm vi không chồng nhau.

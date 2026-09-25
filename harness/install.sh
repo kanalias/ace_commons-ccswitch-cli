@@ -565,6 +565,21 @@ migrate_legacy_skills() {
 }
 migrate_legacy_skills
 
+# ── migration: .claude/memory/ → .claude/memory-mirror/ (renamed 2026-09-25) ──
+# Old name read as "loaded into context" like auto-memory; it is a view-only git
+# mirror. Move the whole dir once; never merge into an existing new dir.
+migrate_memory_mirror_dir() {
+  local old="$ROUTE_DIR/.claude/memory" new="$ROUTE_DIR/.claude/memory-mirror"
+  [ -d "$old" ] || return 0
+  if [ -e "$new" ]; then
+    echo "WARN: both .claude/memory/ and .claude/memory-mirror/ exist — kept both, merge by hand"
+    return 0
+  fi
+  mv "$old" "$new"
+  echo "  ↪  .claude/memory/ → .claude/memory-mirror/ (renamed)"
+}
+migrate_memory_mirror_dir
+
 if [ "$SEL_RULES" -eq 1 ]; then
   echo "── rules ──"
   # common/ = invariant guardrails, source-of-truth = templates → always overwrite (sync)
@@ -581,7 +596,7 @@ if [ "$SEL_RULES" -eq 1 ]; then
     install_file "rules/project/$b" ".claude/rules/project/$b" preserve
   done
   # project memory mirror index — per-repo content, never overwrite
-  install_file "memory/MEMORY.md" ".claude/memory/MEMORY.md" preserve
+  install_file "memory-mirror/MEMORY.md" ".claude/memory-mirror/MEMORY.md" preserve
 fi
 
 if [ "$SEL_GITHOOKS" -eq 1 ]; then
@@ -613,7 +628,7 @@ ensure_claude_md() {
 - [.claude/rules/project/git-workflow.md](.claude/rules/project/git-workflow.md) — branching, working branch rule, protected-branch deploy confirm, worktree, cleanup
 - [.claude/rules/common/feature-redflags.md](.claude/rules/common/feature-redflags.md) — safe minimal changes + RED FLAGS cognitive wedge
 - Thêm/sửa rule → đọc [.claude/rules/common/rule-loading-policy.md](.claude/rules/common/rule-loading-policy.md) trước (rule mới mặc định LAZY \`paths:\`)
-- Ghi memory type project → mirror vào [.claude/memory/](.claude/memory/) theo [.claude/rules/common/memory-mirror.md](.claude/rules/common/memory-mirror.md)
+- Ghi memory type project → mirror vào [.claude/memory-mirror/](.claude/memory-mirror/) (chỉ để xem/review qua git, KHÔNG nạp vào context) theo [.claude/rules/common/memory-mirror.md](.claude/rules/common/memory-mirror.md)
 - ⭐⭐⭐ **Harness Architecture (P0)** — xem section dưới
 
 ## ⭐⭐⭐ Harness Architecture (P0 — đọc kỹ)

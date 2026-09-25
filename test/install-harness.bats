@@ -151,9 +151,9 @@ run_install() {
   grep -q '"lib/\*\*"' "$TARGET/.claude/rules/project/skill-superpowers.md"
 
   # memory mirror index — scaffolded with rules group, slug substituted (preserve mode)
-  [ -f "$TARGET/.claude/memory/MEMORY.md" ]
-  grep -q 'testproj' "$TARGET/.claude/memory/MEMORY.md"
-  ! grep -q '@@PROJECT_SLUG@@' "$TARGET/.claude/memory/MEMORY.md" || false
+  [ -f "$TARGET/.claude/memory-mirror/MEMORY.md" ]
+  grep -q 'testproj' "$TARGET/.claude/memory-mirror/MEMORY.md"
+  ! grep -q '@@PROJECT_SLUG@@' "$TARGET/.claude/memory-mirror/MEMORY.md" || false
 
   # no leftover placeholder tokens or 9router-specific hardcoding
   # (sync-template.md is a doc *about* the @@TOKEN@@ mechanism, so it intentionally
@@ -182,13 +182,13 @@ run_install() {
   ! grep -q '@@' "$TARGET/.claude/skills/task-loop-feature/SKILL.md" || false
 }
 
-@test "pre-existing .claude/memory/MEMORY.md custom content is kept unchanged, even with HARNESS_OVERWRITE=all" {
-  mkdir -p "$TARGET/.claude/memory"
-  printf '# My custom memory\n\n- [entry](entry.md) — do not clobber\n' > "$TARGET/.claude/memory/MEMORY.md"
-  before="$(cat "$TARGET/.claude/memory/MEMORY.md")"
+@test "pre-existing .claude/memory-mirror/MEMORY.md custom content is kept unchanged, even with HARNESS_OVERWRITE=all" {
+  mkdir -p "$TARGET/.claude/memory-mirror"
+  printf '# My custom memory\n\n- [entry](entry.md) — do not clobber\n' > "$TARGET/.claude/memory-mirror/MEMORY.md"
+  before="$(cat "$TARGET/.claude/memory-mirror/MEMORY.md")"
   run_install
   [ "$status" -eq 0 ]
-  after="$(cat "$TARGET/.claude/memory/MEMORY.md")"
+  after="$(cat "$TARGET/.claude/memory-mirror/MEMORY.md")"
   [ "$before" = "$after" ]
 }
 
@@ -482,4 +482,27 @@ run_install_deploy() {
   [ -x "$TARGET/.git/hooks/pre-push" ]
   grep -q 'gitleaks' "$TARGET/.git/hooks/pre-push"
   cmp "$ROOT/harness/templates/git-hooks/pre-push" "$TARGET/.git/hooks/pre-push"
+}
+
+@test "migration: legacy .claude/memory/ is renamed to .claude/memory-mirror/ with content intact" {
+  mkdir -p "$TARGET/.claude/memory"
+  printf '# old index\n\n- [x](project_x.md) — keep\n' > "$TARGET/.claude/memory/MEMORY.md"
+  printf 'body\n' > "$TARGET/.claude/memory/project_x.md"
+  run_install
+  [ "$status" -eq 0 ]
+  [ ! -e "$TARGET/.claude/memory" ]
+  [ -f "$TARGET/.claude/memory-mirror/project_x.md" ]
+  grep -q 'old index' "$TARGET/.claude/memory-mirror/MEMORY.md"
+  [[ "$output" == *".claude/memory/ → .claude/memory-mirror/"* ]]
+}
+
+@test "migration: .claude/memory/ is kept when .claude/memory-mirror/ already exists" {
+  mkdir -p "$TARGET/.claude/memory" "$TARGET/.claude/memory-mirror"
+  printf 'old\n' > "$TARGET/.claude/memory/project_x.md"
+  printf 'new\n' > "$TARGET/.claude/memory-mirror/MEMORY.md"
+  run_install
+  [ "$status" -eq 0 ]
+  [ -f "$TARGET/.claude/memory/project_x.md" ]
+  [ "$(cat "$TARGET/.claude/memory-mirror/MEMORY.md")" = "new" ]
+  [[ "$output" == *"WARN: both .claude/memory/ and .claude/memory-mirror/ exist"* ]]
 }

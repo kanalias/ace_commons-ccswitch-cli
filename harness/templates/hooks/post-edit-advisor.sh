@@ -52,7 +52,7 @@ case "$file_path" in
       mem_type=$(head -15 "$file_path" | grep -E '^(  )?type:' | head -1 | sed -E 's/^(  )?type:[[:space:]]*//')
       case "$mem_type" in
         *project*)
-          echo "📝 post-write-memory-mirror: '$file_path' is project-type memory. Mirror it to repo: .claude/memory/<name>.md (audit for secrets first, per [[memory-mirror]] rule)." >&2
+          echo "📝 post-write-memory-mirror: '$file_path' is project-type memory. Mirror it to repo: .claude/memory-mirror/<name>.md (audit for secrets first, per [[memory-mirror]] rule)." >&2
           ;;
       esac
     fi
