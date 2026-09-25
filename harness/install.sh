@@ -33,7 +33,7 @@
 #   HARNESS_GROUP_QUALITY        y/n — quality hooks, no prompt      (default: Y)
 #   HARNESS_GROUP_COMMANDS       y/n — audit-claude-md + audit-context-memory + audit-dependency + audit-vietnamese + clean-up-project + doctor-memory + git-cleanup-branch + git-commit + git-commit-describe + git-force-snapshot + git-push-safety + task-loop-feature + update-claude + update-codex + update-gemini + update-deepseek workflow skills (slash-invocable /<name>), no prompt (default: Y)
 #   HARNESS_GROUP_SKILLS         y/n — check-hardcode + dep-ladder-check + fix-ledger + orchestrate skills, no prompt (default: Y)
-#   HARNESS_GROUP_RULES          y/n — rules: common/ (9 invariant guardrails, always overwrite) + project/ (git-workflow, skill-superpowers — kept if exist), no prompt (default: Y)
+#   HARNESS_GROUP_RULES          y/n — rules: common/ (10 invariant guardrails, always overwrite) + project/ (git-workflow, skill-superpowers, test-parallel, browser-mcp-profiles, processes-layout — kept if exist), no prompt (default: Y)
 #   HARNESS_GROUP_GITHOOKS       y/n — git pre-push hook (gitleaks secret scan) into .git/hooks/, no prompt (default: Y; skipped if target not a git repo)
 #   HARNESS_GROUP_DEPLOY         y/n — production-deploy/-cleanup/-reboot skills (slash-invocable /production-*), no prompt (default: N — opt-in, most repos don't deploy to a prod host)
 #   HARNESS_DEPLOY_SSH_HOST      ssh alias of the prod host                (default: <deploy-ssh-host>)
