@@ -14,6 +14,10 @@
 #   HARNESS_DRY_RUN              1 — report target without writing anything
 #   HARNESS_ASSUME_YES           1 — accept confirmation prompts
 #   install.sh uninstall|--uninstall — remove only manifest-owned content
+#   install.sh update-all        — re-install into every project listed in the registry,
+#                                  reusing each project's saved install params (manifest .installEnv)
+#   HARNESS_REGISTRY             registry file, 1 abs project path/line (default: <repo>/.repo-inused);
+#                                install appends ROUTE_DIR, uninstall removes it
 #
 #   HARNESS_INSTALL_METHOD       1|2 — 1=enter path, 2=cwd          (default: 1; ignored if HARNESS_ROUTE_DIR set)
 #   HARNESS_ROUTE_DIR            project directory                  (default: .; set = skip method menu)
@@ -44,8 +48,38 @@ set -euo pipefail
 HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 TEMPLATES_DIR="$HARNESS_DIR/templates"
 ACTION="install"
-case "${1:-}" in uninstall|--uninstall) ACTION="uninstall" ;; "") ;; *) echo "Usage: $0 [uninstall|--uninstall]" >&2; exit 2 ;; esac
+case "${1:-}" in uninstall|--uninstall) ACTION="uninstall" ;; update-all) ACTION="update-all" ;; "") ;; *) echo "Usage: $0 [uninstall|--uninstall|update-all]" >&2; exit 2 ;; esac
 MANIFEST_REL=".claude/harness-manifest.json"
+REGISTRY="${HARNESS_REGISTRY:-$(cd "$HARNESS_DIR/.." && pwd -P)/.repo-inused}"
+
+registry_remove() { # registry_remove <abs-dir>
+  [ -f "$REGISTRY" ] || return 0
+  local tmp; tmp="$(mktemp "${REGISTRY}.XXXXXX")"
+  grep -vxF -- "$1" "$REGISTRY" > "$tmp" || true
+  mv "$tmp" "$REGISTRY"
+}
+
+if [ "$ACTION" = "update-all" ]; then
+  command -v jq >/dev/null 2>&1 || { echo "❌ 'jq' required." >&2; exit 1; }
+  [ -s "$REGISTRY" ] || { echo "ℹ️  Registry trống: $REGISTRY"; exit 0; }
+  ok=0; fail=0; skip=0
+  while IFS= read -r dir || [ -n "$dir" ]; do
+    [ -n "$dir" ] || continue
+    m="$dir/$MANIFEST_REL"
+    if [ ! -f "$m" ]; then echo "⚠️  skip $dir — không còn manifest (xoá dòng khỏi registry nếu đã bỏ)"; skip=$((skip+1)); continue; fi
+    # ponytail: manifests from before installEnv existed can't be replayed faithfully
+    # (would reset core dirs/slug/test cmd to defaults) — reinstall those once by hand.
+    if ! jq -e '.installEnv | type == "object"' "$m" >/dev/null 2>&1; then
+      echo "⚠️  skip $dir — manifest cũ chưa có installEnv, chạy install.sh thủ công 1 lần"; skip=$((skip+1)); continue
+    fi
+    echo "▶ update $dir"
+    envs=(); while IFS= read -r kv; do envs+=("$kv"); done < <(jq -r '.installEnv | to_entries[] | "\(.key)=\(.value)"' "$m")
+    if env "${envs[@]}" HARNESS_ROUTE_DIR="$dir" HARNESS_CONFIRM_PATH=y HARNESS_INSTALL_ALL=y \
+        bash "$HARNESS_DIR/install.sh" </dev/null >/dev/null; then ok=$((ok+1)); else echo "❌ fail $dir"; fail=$((fail+1)); fi
+  done < "$REGISTRY"
+  echo "✅ update-all: $ok ok, $skip skip, $fail fail"
+  [ "$fail" -eq 0 ]; exit $?
+fi
 HARNESS_VERSION="1"
 
 sha256_file() {
@@ -191,7 +225,7 @@ uninstall_harness() {
   echo "✅ Đã gỡ nội dung harness còn nguyên ownership; giữ lại file đã sửa và preserve paths."
 }
 
-if [ "$ACTION" = "uninstall" ]; then uninstall_harness; exit $?; fi
+if [ "$ACTION" = "uninstall" ]; then uninstall_harness && registry_remove "$ROUTE_DIR"; exit $?; fi
 
 if git -C "$ROUTE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   IS_GIT=1
@@ -875,12 +909,29 @@ write_manifest() {
   jq -n --arg hv "$HARNESS_VERSION" \
     --argjson files "$files_json" --argjson preserve "$preserve_json" \
     --argjson hooks "$hooks_json" --argjson deny "$deny_json" --argjson env "$env_json" \
-    --arg status "$OWNED_STATUSLINE" \
-    '{schemaVersion:1,harnessVersion:$hv,syncFiles:$files,preservePaths:$preserve,settings:{hooks:$hooks,deny:$deny,env:$env,statusLineCommand:(if $status=="" then null else $status end)}}' > "$tmp"
+    --arg status "$OWNED_STATUSLINE" --argjson install "$(install_env_json)" \
+    '{schemaVersion:1,harnessVersion:$hv,syncFiles:$files,preservePaths:$preserve,installEnv:$install,settings:{hooks:$hooks,deny:$deny,env:$env,statusLineCommand:(if $status=="" then null else $status end)}}' > "$tmp"
   mv "$tmp" "$manifest"
   echo "  ✓ $MANIFEST_REL"
 }
+# Params replayed by `install.sh update-all` so a re-sync keeps this project's values.
+install_env_json() {
+  yn() { [ "$1" -eq 1 ] && printf y || printf n; }
+  jq -n --arg core "$CORE_DIRS_CSV" --arg risk "$RISK_DIRS_CSV" --arg slug "$PROJECT_SLUG_RAW" \
+    --arg branch "${HARNESS_BRANCH:-}" --arg test "$TEST_CMD_RAW" \
+    --arg sub "$(yn $SEL_SUBAGENTS)" --arg guard "$(yn $SEL_GUARD)" --arg qual "$(yn $SEL_QUALITY)" \
+    --arg cmds "$(yn $SEL_COMMANDS)" --arg skills "$(yn $SEL_SKILLS)" --arg rules "$(yn $SEL_RULES)" \
+    --arg gh "$(yn $SEL_GITHOOKS)" --arg dep "$(yn $SEL_DEPLOY)" \
+    --arg dh "$DEPLOY_SSH_HOST" --arg ds "$DEPLOY_SERVICE" --arg dp "$DEPLOY_PATH" \
+    --arg db "${HARNESS_DEPLOY_BRANCH:-}" --arg dr "$DEPLOY_REMOTE" --arg dc "$DEPLOY_HEALTHCHECK" \
+    '{HARNESS_CORE_DIRS:$core,HARNESS_RISK_DIRS:$risk,HARNESS_PROJECT_SLUG:$slug,HARNESS_BRANCH:$branch,HARNESS_TEST_CMD:$test,
+      HARNESS_GROUP_SUBAGENTS:$sub,HARNESS_GROUP_GUARD:$guard,HARNESS_GROUP_QUALITY:$qual,HARNESS_GROUP_COMMANDS:$cmds,
+      HARNESS_GROUP_SKILLS:$skills,HARNESS_GROUP_RULES:$rules,HARNESS_GROUP_GITHOOKS:$gh,HARNESS_GROUP_DEPLOY:$dep,
+      HARNESS_DEPLOY_SSH_HOST:$dh,HARNESS_DEPLOY_SERVICE:$ds,HARNESS_DEPLOY_PATH:$dp,HARNESS_DEPLOY_BRANCH:$db,
+      HARNESS_DEPLOY_REMOTE:$dr,HARNESS_DEPLOY_HEALTHCHECK:$dc}'
+}
 write_manifest
+grep -qxF -- "$ROUTE_DIR" "$REGISTRY" 2>/dev/null || printf '%s\n' "$ROUTE_DIR" >> "$REGISTRY"
 
 # ── 7. report ────────────────────────────────────────────────────────────
 echo

@@ -31,3 +31,5 @@
 # Python
 __pycache__/
 *.pyc
+# per-machine registry of projects with harness installed (install.sh update-all)
+/.repo-inused

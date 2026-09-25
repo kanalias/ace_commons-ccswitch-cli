@@ -506,3 +506,21 @@ run_install_deploy() {
   [ "$(cat "$TARGET/.claude/memory-mirror/MEMORY.md")" = "new" ]
   [[ "$output" == *"WARN: both .claude/memory/ and .claude/memory-mirror/ exist"* ]]
 }
+
+@test "registry: install records path once; update-all replays saved params; uninstall drops it" {
+  run_install; [ "$status" -eq 0 ]
+  run_install; [ "$status" -eq 0 ]
+  real="$(cd "$TARGET" && pwd -P)"
+  [ "$(grep -cxF "$real" "$HARNESS_REGISTRY")" -eq 1 ]
+  jq -e '.installEnv.HARNESS_CORE_DIRS == "src,lib" and .installEnv.HARNESS_TEST_CMD == "npm test"' "$TARGET/.claude/harness-manifest.json"
+  rm "$TARGET/CLAUDE.md"
+  echo "$BATS_TEST_TMPDIR/gone" >> "$HARNESS_REGISTRY"
+  run bash "$ROOT/harness/install.sh" update-all </dev/null
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"1 ok, 1 skip, 0 fail"* ]]
+  grep -q 'npm test' "$TARGET/CLAUDE.md" || grep -rq 'npm test' "$TARGET/.claude"
+  [ -f "$TARGET/CLAUDE.md" ]
+  HARNESS_ROUTE_DIR="$TARGET" HARNESS_CONFIRM_UNINSTALL=y run bash "$ROOT/harness/install.sh" uninstall </dev/null
+  [ "$status" -eq 0 ]
+  ! grep -qxF "$real" "$HARNESS_REGISTRY"
+}
