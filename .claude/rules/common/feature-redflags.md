@@ -33,7 +33,8 @@ metadata:
 | "Skip hook --no-verify cho nhanh" | Hook fail = có lý do. Investigate root cause, không bypass. |
 | "Code trước plan đỡ phí thời gian" | Task M trở lên: code trước plan = rework, đợi plan approve. (Size-S làm trực tiếp, không cần plan.) |
 | "Subagent tự lo, prompt ngắn được" | Subagent không có session context. Prompt self-contained: spec + paths + verify (xem [[orchestrator]]). |
-| "1 subagent làm hết cho gọn" | Task tách được mà không fan-out = chậm + vi phạm P0. Chẻ nhỏ nhất, dispatch song song (≤15). In bảng phân rã trước (xem [[orchestrator]] Parallel-first). |
+| "1 subagent làm hết cho gọn" | Task tách được mà không fan-out = chậm + vi phạm P0. Chẻ nhỏ nhất, dispatch song song (≤20). In bảng phân rã trước (xem [[orchestrator]] Parallel-first). |
 | "Dispatch từng cái rồi chờ" | Subtask độc lập → gửi chung 1 message nhiều tool-call = chạy concurrent. Tuần tự chỉ khi có dependency thật. |
+| "Chạy tuần tự cho chắc / dễ đọc log" | Bước độc lập chạy tuần tự = chờ lâu vô ích. Test → runner song song (`-j`/`-n auto`); lệnh độc lập → 1 message nhiều tool-call; N target → fan-out subagent (xem [[orchestrator]] rule 7). |
 
 **Cách dùng:** trước mỗi action lớn (edit, dispatch subagent, commit, merge) rà nhanh bảng. Match 1 dòng → áp "Reality". Cognitive wedge, không phải checklist tick.

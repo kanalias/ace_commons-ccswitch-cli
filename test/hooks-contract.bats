@@ -48,6 +48,22 @@ setup() {
   [ "$status" -eq 2 ]
 }
 
+@test "bash gate blocks serial multi-file bats only in the real bats segment" {
+  for blocked in 'bats test/*.bats' 'bats test/a.bats test/b.bats' 'cd repo && bats test/*.bats' 'make -j4 && bats test/*.bats' 'FOO=1 bats test/a.bats test/b.bats' 'env bats test/*.bats' 'time bats test/*.bats'; do
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(jq -nc --arg c "$blocked" '{tool_input:{command:$c}}')" "$HOOKS/pre-bash-gate.sh"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"serial-test-gate"* ]]
+  done
+  for allowed in 'bats -j 10 test/*.bats' 'bats -j10 test/*.bats' 'bats --jobs=4 test/*.bats' 'bats -T -j 10 test/*.bats' 'bats -f "x" test/a.bats' 'BATS_SERIAL_OK=1 bats test/*.bats' 'ls bats-core/' 'echo bats test/*.bats' 'grep -rn "bats test/x.bats" README.md' 'bats --version'; do
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(jq -nc --arg c "$allowed" '{tool_input:{command:$c}}')" "$HOOKS/pre-bash-gate.sh"
+    [ "$status" -eq 0 ]
+  done
+  # heredoc text mentioning .bats files must not count toward the real single-file run below it
+  local multi=$'python3 - <<PY\nx = "a.bats b.bats"\nPY\nbats -f r test/one.bats'
+  run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(jq -nc --arg c "$multi" '{tool_input:{command:$c}}')" "$HOOKS/pre-bash-gate.sh"
+  [ "$status" -eq 0 ]
+}
+
 @test "statusline tolerates malformed input missing graph and failing global chain" {
   mkdir -p "$HOME/.claude"
   printf '#!/bin/bash\nexit 1\n' > "$HOME/.claude/statusline-context.sh"

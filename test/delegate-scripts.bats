@@ -241,7 +241,6 @@ EOF
 @test "_common.sh report_run_status: STATUS=done when all expected files touched after start" {
   mkdir -p "$STAGE/wt"
   start=$(date +%s)
-  sleep 1
   touch "$STAGE/wt/a.txt"
   run bash -c "cd '$STAGE' && source scripts/delegate/_common.sh && report_run_status '$STAGE/wt' $start a.txt"
   [ "$status" -eq 0 ]
@@ -250,8 +249,7 @@ EOF
 
 @test "_common.sh report_run_status: STATUS=degraded when expected file not touched" {
   mkdir -p "$STAGE/wt"
-  touch "$STAGE/wt/old.txt"
-  sleep 1
+  touch -t 202001010000 "$STAGE/wt/old.txt"   # mtime in the past → not touched after start
   start=$(date +%s)
   run bash -c "cd '$STAGE' && source scripts/delegate/_common.sh && report_run_status '$STAGE/wt' $start old.txt"
   [ "$status" -eq 0 ]
@@ -260,10 +258,8 @@ EOF
 
 @test "_common.sh report_run_status: STATUS=partial when some but not all expected files touched" {
   mkdir -p "$STAGE/wt"
-  touch "$STAGE/wt/old.txt"
-  sleep 1
+  touch -t 202001010000 "$STAGE/wt/old.txt"
   start=$(date +%s)
-  sleep 1
   touch "$STAGE/wt/new.txt"
   run bash -c "cd '$STAGE' && source scripts/delegate/_common.sh && report_run_status '$STAGE/wt' $start old.txt new.txt"
   [ "$status" -eq 0 ]

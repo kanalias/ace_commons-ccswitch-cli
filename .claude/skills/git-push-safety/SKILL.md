@@ -10,15 +10,17 @@ user-invocable: true
 
 Khi được gọi với `--scan-only` (hoặc user chỉ muốn check leak, không push):
 chạy CHỈ bước 2 (gitleaks) + bước 3 (sensitive-content scan, gồm
-`/check-hardcode`) bên dưới. Bỏ qua bước 1 (tests), 3.5 (README drift) và
+`/check-hardcode`) bên dưới — 2 bước này song song. Bỏ qua bước 1 (tests), 3.5 (README drift) và
 bước 4 (push). Đây là chế độ read-only — không stage, không commit, không
 push gì. Dùng trước `/git-force-snapshot`, sau `/clean-up-project`, hoặc bất
 cứ khi nào user chỉ muốn xác nhận không có leak. Kết thúc: báo PASS/FAIL
 từng bước đã chạy (2 và 3) kèm finding đã redact.
 
-Chạy đúng pipeline này, theo thứ tự, dừng ở lần fail đầu tiên. Không skip
-bước hoặc tiếp tục qua một lần fail. Report kết quả từng bước cho user khi
-hoàn thành.
+Bước 1 (tests), 2 (gitleaks), 3 (sensitive scan) **độc lập nhau → chạy song
+song**: gửi chung 1 message 3 Bash tool-call (hoặc `run_in_background` từng
+bước rồi gom). Bất kỳ bước nào fail → DỪNG, không push, báo ĐỦ mọi bước fail
+(không chỉ bước đầu). Bước 3.5 chờ diff từ bước 3; bước 4 chờ cả 1–3.5 pass.
+Không skip bước. Report kết quả từng bước cho user khi hoàn thành.
 
 ## 1. Tests
 
@@ -26,8 +28,8 @@ hoàn thành.
 thứ tự này, dừng ở match đầu tiên):
 
 - có `test/*.bats` → chạy song song max: `bats -j "$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)" test/*.bats`.
-  Nếu bats báo thiếu GNU parallel (`-j` cần `parallel`/`rush`) → fallback `bats test/*.bats`
-  và cảnh báo user cài `parallel` (macOS `brew install parallel`) để tăng tốc. Xem `[[test-parallel]]`.
+  Nếu bats báo thiếu GNU parallel (`-j` cần `parallel`/`rush`) → fallback `BATS_SERIAL_OK=1 bats test/*.bats`
+  (hook chặn bats nhiều file không `-j`) và cảnh báo user cài `parallel` (macOS `brew install parallel`). Xem `[[test-parallel]]`.
 - `package.json` có field `scripts.test` → `npm test`
 - có `pyproject.toml`, `pytest.ini`, hoặc thư mục `tests/` → `pytest`
 - có `go.mod` → `go test ./...`
@@ -35,8 +37,8 @@ thứ tự này, dừng ở match đầu tiên):
 - không cái nào ở trên → KHÔNG đoán. Check README / CI config để tìm
   lệnh test, hoặc hỏi user. Không im lặng skip bước này.
 
-Chạy lệnh đã phát hiện. Nếu bất kỳ test nào fail (exit code khác 0), DỪNG. Báo
-tên test fail và không tiếp tục sang bước 2. Không tự fix hay
+Chạy lệnh đã phát hiện (song song với bước 2, 3). Nếu bất kỳ test nào fail
+(exit code khác 0), DỪNG — không push. Báo tên test fail. Không tự fix hay
 retry — báo lỗi rõ ràng và hỏi user cách xử lý tiếp.
 
 ## 2. gitleaks scan

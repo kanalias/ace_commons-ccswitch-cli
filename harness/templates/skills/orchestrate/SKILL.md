@@ -50,7 +50,7 @@ Chẻ tới đơn vị nhỏ nhất còn **độc lập thật** — đạt cả
 ## 4. Dispatch theo wave
 
 - In banner ngắn trước mỗi lượt gọi Agent: persona + subtask id + timeout dự kiến.
-- Mọi row cùng `wave` và không còn `deps` chưa xong → gửi **chung 1 message, nhiều tool-call** (Agent tool chạy concurrent). Trần 15 đồng thời — vượt → chia wave kế.
+- Mọi row cùng `wave` và không còn `deps` chưa xong → gửi **chung 1 message, nhiều tool-call** (Agent tool chạy concurrent). Trần 20 đồng thời (hard limit platform, xem `[[orchestrator]]`) — vượt → chia wave kế.
 - Prompt mỗi subtask self-contained: repo path tuyệt đối + branch, spec đã lock (không để subagent tự đoán thiết kế), file paths, acceptance/verify command, "NO commit — produce diff only", marker `task-graph #<id>`. Thiếu marker/spec → `pre-task-dispatch-gate.sh` block.
 - Cập nhật row `status: dispatched` ngay khi gửi.
 
@@ -59,7 +59,7 @@ Chẻ tới đơn vị nhỏ nhất còn **độc lập thật** — đạt cả
 - Mỗi subtask return → cập nhật row: `pass` (đạt) hoặc `revise` (cần sửa).
 - `revise` → `SendMessage` tới ĐÚNG agent cũ (giữ context đã có), không spawn agent mới trừ khi đổi persona hẳn.
 - Generator ≠ verifier: mảnh lớn/nhạy cảm (security, cross-module, >~300 dòng diff) → review pass riêng (Opus reasoning-only hoặc persona khác implementer), không để agent tự chấm diff của chính nó.
-- Sau mỗi verdict cập nhật row, IN LẠI bảng graph ra chat với icon map v1.1 (progress table) để user thấy tiến độ không cần hỏi: bảng ≤15 row in nguyên, lớn hơn in tóm tắt đếm `✅n 🔄n ♻️n ⬜n`.
+- Sau mỗi verdict cập nhật row, IN LẠI bảng graph ra chat với icon map v1.1 (progress table) để user thấy tiến độ không cần hỏi: bảng ≤8 row in nguyên, lớn hơn chỉ render wave hiện tại + queued kế (khớp Render block v1.2) và tóm tắt đếm `✅n 🔄n ♻️n ⬜n`.
 
 ## 6. Integration verify
 
@@ -130,7 +130,7 @@ Không có plan file (task M đơn-agent hoặc READ-only) → bỏ qua mục n�
    Không có cả graph lẫn ledger → báo user không có orchestration nào dở
    dang, dừng ở đây.
 4. **Re-dispatch CHỈ phần pending/failed.** Theo routing rules ở
-   `[[orchestrator]]` (persona, fallback chain, planning gate, fan-out ≤15
+   `[[orchestrator]]` (persona, fallback chain, planning gate, fan-out ≤20
    concurrent). Subtask đã done → KHÔNG chạy lại. Áp lại đúng persona +
    fallback chain đã định, không tự ý đổi persona trừ khi lần trước đã fail
    hết chain (khi đó theo loop guard: re-decompose, không quay lại model đã

@@ -62,7 +62,8 @@ registry_remove() { # registry_remove <abs-dir>
 if [ "$ACTION" = "update-all" ]; then
   command -v jq >/dev/null 2>&1 || { echo "❌ 'jq' required." >&2; exit 1; }
   [ -s "$REGISTRY" ] || { echo "ℹ️  Registry trống: $REGISTRY"; exit 0; }
-  ok=0; fail=0; skip=0
+  ok=0; fail=0; skip=0; n=0
+  st="$(mktemp -d)"
   while IFS= read -r dir || [ -n "$dir" ]; do
     [ -n "$dir" ] || continue
     m="$dir/$MANIFEST_REL"
@@ -74,9 +75,15 @@ if [ "$ACTION" = "update-all" ]; then
     fi
     echo "▶ update $dir"
     envs=(); while IFS= read -r kv; do envs+=("$kv"); done < <(jq -r '.installEnv | to_entries[] | "\(.key)=\(.value)"' "$m")
-    if env "${envs[@]}" HARNESS_ROUTE_DIR="$dir" HARNESS_CONFIRM_PATH=y HARNESS_INSTALL_ALL=y \
-        bash "$HARNESS_DIR/install.sh" </dev/null >/dev/null; then ok=$((ok+1)); else echo "❌ fail $dir"; fail=$((fail+1)); fi
+    n=$((n+1))
+    # projects are independent targets → run every install concurrently, gather at wait
+    ( if env "${envs[@]}" HARNESS_ROUTE_DIR="$dir" HARNESS_CONFIRM_PATH=y HARNESS_INSTALL_ALL=y \
+          bash "$HARNESS_DIR/install.sh" </dev/null >/dev/null; then : > "$st/$n.ok"; else echo "❌ fail $dir"; : > "$st/$n.fail"; fi ) &
   done < "$REGISTRY"
+  wait
+  # find, not ls: empty glob + pipefail + set -e would abort before the summary line
+  ok=$(find "$st" -name '*.ok' | wc -l | tr -d ' '); fail=$(find "$st" -name '*.fail' | wc -l | tr -d ' ')
+  rm -rf "$st"
   echo "✅ update-all: $ok ok, $skip skip, $fail fail"
   [ "$fail" -eq 0 ]; exit $?
 fi
@@ -376,7 +383,10 @@ should_overwrite() {
 
 substitute_file() {
   local src="$1" dest="$2" tmp line
-  tmp="$(mktemp)" || { echo "ERROR: mktemp failed" >&2; return 1; }
+  # ponytail: same-dir tmp + mv = atomic on one fs, saves mktemp+dirname fork per
+  # file (64 files ≈ 1s). Kill mid-write leaves <dest>.tmp.<pid> — harmless, re-run.
+  tmp="$dest.tmp.$$"
+  : > "$tmp" || { echo "ERROR: cannot write $tmp" >&2; return 1; }
   while IFS= read -r line || [ -n "$line" ]; do
     line="${line//@@CORE_DIRS_CASE@@/$CORE_DIRS_CASE}"
     line="${line//@@CORE_DIRS_ALT@@/$CORE_DIRS_ALT}"
@@ -410,7 +420,7 @@ install_file() { # install_file <src-rel-under-templates/> <dest-rel-under-route
   #              independent of HARNESS_OVERWRITE=all
   local src_rel="$1" dest_rel="$2" mode="${3:-}"
   local src="$TEMPLATES_DIR/$src_rel" dest="$ROUTE_DIR/$dest_rel"
-  mkdir -p "$(dirname "$dest")"
+  mkdir -p "${dest%/*}"
   if [ "$mode" = "preserve" ] && [ -e "$dest" ]; then
     PRESERVE_PATHS+=("$dest_rel")
     echo "  • $dest_rel (kept existing)"
@@ -891,9 +901,9 @@ write_manifest() {
 
   files_json='[]'
   if [ "${#SYNC_WRITTEN[@]}" -gt 0 ]; then
-    files_json="$(for rel in "${SYNC_WRITTEN[@]}"; do
-      [ -f "$ROUTE_DIR/$rel" ] && jq -n --arg p "$rel" --arg h "$(sha256_file "$ROUTE_DIR/$rel")" '{path:$p,sha256:$h}'
-    done | jq -s 'unique_by(.path)')"
+    # one shasum + one jq for every file (was 2 forks per file): "<hash>  <path>" lines
+    files_json="$(cd "$ROUTE_DIR" && { command -v shasum >/dev/null 2>&1 && shasum -a 256 -- "${SYNC_WRITTEN[@]}" || sha256sum -- "${SYNC_WRITTEN[@]}"; } 2>/dev/null \
+      | jq -Rn '[inputs | capture("^(?<h>[0-9a-f]{64})  (?<p>.+)$") | {path:.p, sha256:.h}] | unique_by(.path)')"
   fi
   preserve_json='[]'
   if [ "${#PRESERVE_PATHS[@]}" -gt 0 ]; then

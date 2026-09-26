@@ -23,6 +23,11 @@ KHÔNG BAO GIỜ được kéo sập các service hàng xóm. Command này snaps
 
 ## Các bước
 
+**Song song (bắt buộc, xem [[orchestrator]] rule 7):** bước 0 + 1 + 3 đều read-only → chạy chung
+1 message nhiều tool-call TRƯỚC confirm, để bước 2 in luôn disk % + snapshot cho user quyết. Bước 5 ‖ 6
+(verify target ‖ verify hàng xóm) chạy chung 1 message. Tuần tự bắt buộc: 2 (chờ user) → 4 → (5 ‖ 6) → 7.
+
+
 0. **Project guard — verify repo identity trước mọi hành động SSH/cloud/git production.**
    - Project slug kỳ vọng: `ccswitch-cli-claude`; remote identity kỳ vọng: `github.com/kanalias/ace_commons-ccswitch-cli`
      (đã sanitize `host/owner/repo`, lowercase; deploy host `<deploy-ssh-host>`, service `<service-name>`).

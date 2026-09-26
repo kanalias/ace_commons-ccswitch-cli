@@ -59,6 +59,12 @@ bash harness/install.sh </dev/null
 `HARNESS_PROJECT_SLUG`/`HARNESS_TEST_CMD`/`HARNESS_CORE_DIRS` giữ default trừ khi project có giá trị
 khác biệt rõ ràng cần giữ (check `.claude/settings.json` cũ trước khi ghi đè).
 
+## Song song (bắt buộc)
+
+N project độc lập → KHÔNG chạy lần lượt. Bước 3b: mỗi project 1 lệnh install `run_in_background`
+(hoặc N Bash tool-call cùng 1 message), gom kết quả rồi mới sang bước 4. Bước 3a `update-all` đã tự
+chạy song song từng project. Bước 4: gom verify N project vào 1 vòng lặp shell, không N lượt tool-call.
+
 ## Bước 4 — Verify sau update
 
 Mỗi project:

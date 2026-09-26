@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-description: Main agent = pure orchestrator; plan-first (lock interface + spec) rồi fan-out ≤15 Sonnet song song; REVISE → SendMessage agent cũ. Fable-main: cấm mọi code kể cả size-S trừ khi user cho phép explicit
+description: Main agent = pure orchestrator; plan-first (lock interface + spec) rồi fan-out ≤20 Sonnet song song; REVISE → SendMessage agent cũ. Fable-main: cấm mọi code kể cả size-S trừ khi user cho phép explicit
 status: live
 updated: 2026-09-25
 paths:
@@ -40,10 +40,11 @@ Fable/Opus:  review diff từng worktree → merge / reject → integration veri
 
 1. **Decompose nhỏ nhất còn độc lập.** Mỗi mảnh: spec riêng + paths riêng + verify riêng + **zero file chung** + không phụ thuộc interface chưa lock. Đạt cả 5 → chẻ tiếp; thiếu 1 → dừng.
 2. **Fan-out tối đa.** Subtask không phụ thuộc nhau → dispatch **cùng một lượt, 1 message nhiều tool-call**. KHÔNG dispatch tuần tự rồi chờ.
-3. **Trần đồng thời = 15 subagent.** >15 độc lập → chia **wave**.
+3. **Trần đồng thời = 20 subagent** (= hard limit platform `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, mặc định 20, vượt → Agent tool lỗi `Concurrent subagent limit reached`, KHÔNG retry). Đếm cả agent phụ đang sống (guide, git-ops...). >20 độc lập → chia **wave**.
 4. **Nghi ngờ độc lập: WRITE ≠ READ.** WRITE nghi đụng interface/file chung → coi là **PHỤ THUỘC** (gộp hoặc serialize). READ-only nghi ngờ → coi là **độc lập** (fan-out). Không bịa dependency cho READ; không bịa độc lập cho WRITE.
 5. **Song song vẫn theo routing + worktree isolation.** Mỗi delegate worktree riêng; persona theo bảng Routing dưới.
 6. **Không fan-out subtask chạm cùng file.** ≥2 subtask cùng sửa 1 file → gộp hoặc serialize.
+7. **Song song ≠ chỉ subagent — áp MỌI task** (test, push gate, deploy, audit, update N project). Bước độc lập → chạy đồng thời, chọn công cụ theo loại: (a) lệnh Bash độc lập → 1 message nhiều Bash tool-call hoặc `run_in_background` rồi gom; (b) test suite → flag song song của runner (`-j`/`-n auto`/worker, xem [[test-parallel]]), KHÔNG subagent; (c) N target độc lập cần suy luận (N project, N module) → fan-out subagent; (d) pipeline gate nhiều check (test ‖ gitleaks ‖ scan) → chạy đồng thời, gom, fail bất kỳ = dừng. Tuần tự CHỈ khi bước sau cần output bước trước hoặc là confirm gate của user.
 
 **Planning gate + blackboard (BẮT BUỘC trước dispatch):** task M trở lên → in bảng phân rã TRƯỚC khi gọi Agent nào:
 
@@ -58,7 +59,7 @@ Fable/Opus:  review diff từng worktree → merge / reject → integration veri
 
 **Enforcement:** behavioral (self-binding) — bảng phân rã in ra là bằng chứng kiểm được. Bỏ qua fan-out khi task tách được = vi phạm P0.
 
-**Tránh:** ❌ 1 subagent ôm nguyên task lớn khi tách được. ❌ dispatch tuần tự khi A/B độc lập. ❌ bịa dependency để làm ít việc phân rã. ❌ vượt 15 concurrent. ❌ fan-out WRITE khi interface chưa lock. ❌ chẻ quá ranh giới độc lập chỉ để tăng số subagent.
+**Tránh:** ❌ 1 subagent ôm nguyên task lớn khi tách được. ❌ dispatch tuần tự khi A/B độc lập. ❌ bịa dependency để làm ít việc phân rã. ❌ vượt 20 concurrent. ❌ fan-out WRITE khi interface chưa lock. ❌ chẻ quá ranh giới độc lập chỉ để tăng số subagent. ❌ chạy tuần tự lệnh/check độc lập (test rồi mới gitleaks, verify từng service một, update từng project một).
 
 ## Task-graph artifact (BẮT BUỘC task M trở lên)
 
@@ -149,7 +150,7 @@ Ranh giới "execution vào core → BẮT BUỘC delegate" có hook chặn cứ
 | Hook | Matcher | Chặn gì |
 |---|---|---|
 | `pre-edit-orchestrator-gate.sh` | `Edit\|Write\|MultiEdit\|NotebookEdit` | Main-agent Edit/Write vào core (dir bake install-time từ `HARNESS_CORE_DIRS`). Subagent → allow. + risk-path denylist cho persona `delegate-gemini`/`delegate-deepseek` (chặn dù trong subagent). |
-| `pre-bash-gate.sh` | `Bash` | Main-agent Bash-write core (`sed -i`, `>`, `tee`, `patch`, `git apply`, `python -c`...) + gọi thẳng `aider`/`gemini`/`codex` (bypass wrapper). |
+| `pre-bash-gate.sh` | `Bash` | Main-agent Bash-write core (`sed -i`, `>`, `tee`, `patch`, `git apply`, `python -c`...) + gọi thẳng `aider`/`gemini`/`codex` (bypass wrapper). Mọi agent: `bats` ≥2 file không `-j` (tuần tự, xem [[test-parallel]]). |
 
 - Discriminator main vs subagent: field `agent_id` (chỉ có ở subagent).
 - Escape hatch size-S 1-line thật: `ORCHESTRATOR_GATE_BYPASS=1` → allow + audit log. KHÔNG áp cho direct-CLI và risk-path (security boundary).
@@ -237,7 +238,7 @@ Context window (auto-compact 300K + guard): xem [[token-budget]] — orchestrato
 | Hook | Event | Vai trò |
 |---|---|---|
 | `pre-task-dispatch-gate.sh` | PreToolUse (Task) | Chặn dispatch khi prompt under-specified (thiếu spec/path/verify) + graph marker gates |
-| `pre-bash-gate.sh` | PreToolUse (Bash) | Chặn `git merge` khi verdict gần nhất REVISE; chặn commit khi integrating chưa pass |
+| `pre-bash-gate.sh` | PreToolUse (Bash) | Chặn `git merge` khi verdict gần nhất REVISE; chặn commit khi integrating chưa pass; chặn `bats` nhiều file không `-j` |
 | `post-bash-stuck-detector.sh` | PostToolUse (Bash) | Cảnh báo lặp cùng lệnh ≥4 lần (thrashing) |
 | `subagent-stop-record.sh` | SubagentStop | Ghi verdict (PASS/REVISE) vào ledger + append metrics JSONL; nhiều dòng cùng `agent_id` = resume iterations |
 | `session-start.sh` | SessionStart | Đọc ledger, hiển thị task dở dang — resume qua `/orchestrate --resume` |

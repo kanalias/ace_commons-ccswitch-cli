@@ -4,6 +4,7 @@
 #
 # Order matters:
 #   1) git-push gate    — runs for EVERYONE (main + subagent), no agent_id check.
+#   1.5) serial-test gate — EVERYONE. bats ≥2 file without -j → block (test-parallel.md).
 #   2) merge-verdict gate — runs for EVERYONE (main + subagent), no agent_id check.
 #   2.5) integration-verify gate — main-agent only. Blocks `git commit` while
 #      .claude/state/task-graph/<slug>.md (slug từ cwd, xem graph_slug() dưới)
@@ -61,6 +62,28 @@ if ! echo "$cmd" | grep -Eq 'GIT_PUSH_GATE_OK=1'; then
     echo "Nếu đã qua gate và user đã confirm, push với prefix: GIT_PUSH_GATE_OK=1 git push ..." >&2
     exit 2
   fi
+fi
+
+# ── 1.5) serial-test gate (everyone) ────────────────────────────────────────
+# bats ≥2 file / glob mà không -j = tuần tự, phí core (rules/project/test-parallel.md).
+# Chỉ xét ĐOẠN lệnh bats thật (command-word `bats` tới ;/&/|) — không đếm chuỗi
+# ".bats" trong heredoc/grep pattern, không nhận -j của lệnh khác (make -j4 && bats).
+# Thiếu GNU parallel hoặc false-positive (text lệnh chứa "&& bats x.bats" trong
+# heredoc) → prefix BATS_SERIAL_OK=1 (có chủ đích, log audit).
+if ! echo "$cmd" | grep -Eq 'BATS_SERIAL_OK=1'; then
+  while IFS= read -r seg; do
+    [ -n "$seg" ] || continue
+    echo "$seg" | grep -Eq '(^|[[:space:]])(-j|--jobs)([[:space:]]|=|[0-9]|$)' && continue
+    if echo "$seg" | grep -q '\*\.bats' || [ "$(echo "$seg" | grep -oE '[^[:space:]]+\.bats([[:space:]]|$)' | wc -l | tr -d ' ')" -ge 2 ]; then
+      echo "$(ts) BLOCK serial-bats → ${cmd:0:120}" >> "$LOG" 2>/dev/null || true
+      cat >&2 << 'EOF'
+🚦 serial-test-gate: bats nhiều file KHÔNG có -j = tuần tự, phí core.
+   Chạy: bats -j "$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)" test/*.bats
+   Thiếu GNU parallel (brew install parallel) hoặc false-positive → BATS_SERIAL_OK=1 <lệnh>
+EOF
+      exit 2
+    fi
+  done < <(echo "$cmd" | grep -oE '(^|[;&|(])[[:space:]]*((env|time|nice|nohup)[[:space:]]+)?([A-Z_][A-Z_0-9]*=[^[:space:]]*[[:space:]]+)*bats[[:space:]][^;&|]*')
 fi
 
 # ── 2) merge-verdict gate (everyone) ────────────────────────────────────────

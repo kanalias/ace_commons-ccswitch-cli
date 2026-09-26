@@ -31,6 +31,16 @@ run_install() {
   run bash "$ROOT/harness/install.sh" </dev/null
 }
 
+@test "manifest syncFiles sha256 match installed files (batch hashing)" {
+  run_install
+  [ "$status" -eq 0 ]
+  m="$TARGET/.claude/harness-manifest.json"
+  [ "$(jq '.syncFiles | length' "$m")" -gt 10 ]
+  run bash -c "cd '$TARGET' && jq -r '.syncFiles[] | \"\\(.sha256)  \\(.path)\"' '$m' | shasum -a 256 -c --quiet"
+  [ "$status" -eq 0 ]
+  [ -z "$(find "$TARGET" -name '*.tmp.*' -print)" ]
+}
+
 @test "dry run leaves missing target and temporary directory untouched" {
   export HARNESS_DRY_RUN=1
   export TMPDIR="$BATS_TEST_TMPDIR/dry-tmp"
@@ -522,6 +532,16 @@ run_install_deploy() {
   run bash "$ROOT/harness/install.sh" update-all </dev/null
   [ "$status" -eq 0 ]
   [[ "$output" == *"1 ok, 1 skip, 0 fail"* ]]
+  # fail path: registered project with installEnv but unwritable dir → counted as fail, exit 1
+  bad="$BATS_TEST_TMPDIR/bad"; mkdir -p "$bad/.claude"
+  jq -n '{installEnv:{HARNESS_PROJECT_SLUG:"bad"}}' > "$bad/.claude/harness-manifest.json"
+  chmod 555 "$bad"
+  echo "$bad" >> "$HARNESS_REGISTRY"
+  run bash "$ROOT/harness/install.sh" update-all </dev/null
+  chmod 755 "$bad"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"1 ok, 1 skip, 1 fail"* ]]
+  grep -vxF "$bad" "$HARNESS_REGISTRY" > "$HARNESS_REGISTRY.tmp" && mv "$HARNESS_REGISTRY.tmp" "$HARNESS_REGISTRY"
   grep -q 'npm test' "$TARGET/CLAUDE.md" || grep -rq 'npm test' "$TARGET/.claude"
   [ -f "$TARGET/CLAUDE.md" ]
   HARNESS_ROUTE_DIR="$TARGET" HARNESS_CONFIRM_UNINSTALL=y run bash "$ROOT/harness/install.sh" uninstall </dev/null

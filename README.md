@@ -344,8 +344,8 @@ Slash command `/git-push-safety` (cài trong nhóm `COMMANDS`) gom pipeline gate
 ### 2.4 Chạy test thủ công (dev repo này)
 
 ```bash
-brew install bats-core   # 1 lần, nếu chưa có
-bats test/*.bats
+brew install bats-core parallel   # 1 lần, nếu chưa có (parallel = backend cho -j)
+bats -j "$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)" test/*.bats   # song song = ncpu; thiếu parallel → BATS_SERIAL_OK=1 bats test/*.bats
 ```
 
 Test dùng `$HOME` giả (`$BATS_TEST_TMPDIR`) — không đụng `~/.claude` thật của máy chạy test.
@@ -488,5 +488,5 @@ ccswitch-cli-claude/
 │
 ├── scripts/delegate/             # bản wrapper THẬT dùng trong repo này (đồng bộ với harness/templates/scripts/delegate/)
 ├── .claude/                      # harness bản THẬT của repo này (agents, hooks, skills, rules)
-└── test/*.bats                   # bats suite (23 file, 360 test) — chạy qua /git-push-safety hoặc thủ công
+└── test/*.bats                   # bats suite (23 file, 362 test) — chạy qua /git-push-safety hoặc thủ công
 ```
