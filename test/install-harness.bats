@@ -109,6 +109,9 @@ run_install() {
   [ -x "$TARGET/.claude/hooks/session-start.sh" ]
   [ -x "$TARGET/.claude/hooks/post-bash-stuck-detector.sh" ]
   [ -x "$TARGET/.claude/hooks/subagent-stop-record.sh" ]
+  [ -x "$TARGET/.claude/hooks/pre-compact-guard.sh" ]
+  jq -e '[.hooks.PreCompact[]? | select(.matcher=="auto") | .hooks[]?.command] | any(endswith("pre-compact-guard.sh"))' "$TARGET/.claude/settings.json"
+  [ "$(jq '.autoCompactWindow' "$TARGET/.claude/settings.json")" = "300000" ]
 
   # session-limit hook fully removed (not merged) in the consolidation — must NOT be installed
   [ ! -e "$TARGET/.claude/hooks/check-session-limit.sh" ]

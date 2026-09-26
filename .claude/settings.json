@@ -85,6 +85,17 @@
           }
         ]
       }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact-guard.sh"
+          }
+        ]
+      }
     ]
   },
   "env": {
@@ -113,5 +124,6 @@
       "Bash(git push --force:*)",
       "Bash(git push -f:*)"
     ]
-  }
+  },
+  "autoCompactWindow": 300000
 }

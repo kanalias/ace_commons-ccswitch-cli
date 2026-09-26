@@ -17,7 +17,7 @@ setup() {
 }
 
 @test "JSON consuming hooks fail open silently on malformed JSON" {
-  for name in pre-bash-gate pre-edit-orchestrator-gate pre-task-dispatch-gate post-edit-advisor post-bash-stuck-detector subagent-stop-record; do
+  for name in pre-bash-gate pre-edit-orchestrator-gate pre-task-dispatch-gate post-edit-advisor post-bash-stuck-detector subagent-stop-record pre-compact-guard; do
     run bash -c 'printf "%s" "{malformed" | bash "$1"' _ "$HOOKS/$name.sh"
     [ "$status" -eq 0 ]
     [ -z "$output" ]

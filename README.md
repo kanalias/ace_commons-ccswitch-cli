@@ -488,5 +488,5 @@ ccswitch-cli-claude/
 │
 ├── scripts/delegate/             # bản wrapper THẬT dùng trong repo này (đồng bộ với harness/templates/scripts/delegate/)
 ├── .claude/                      # harness bản THẬT của repo này (agents, hooks, skills, rules)
-└── test/*.bats                   # bats suite (22 file, 352 test) — chạy qua /git-push-safety hoặc thủ công
+└── test/*.bats                   # bats suite (23 file, 360 test) — chạy qua /git-push-safety hoặc thủ công
 ```

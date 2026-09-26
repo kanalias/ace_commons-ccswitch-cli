@@ -228,7 +228,7 @@ Anti-patterns: ❌ main agent gõ `aider --model ...` trong Bash. ❌ delegate e
 - KHÔNG merge delegate worktree nếu diff chạm ngoài scope.
 - Fallback theo đúng chain khai báo ở trên, KHÔNG nhảy cóc.
 
-Context window (~200K auto-compact): xem [[token-budget]] — orchestrator luôn bật, không liên quan on/off.
+Context window (auto-compact 300K + guard): xem [[token-budget]] — orchestrator luôn bật, không liên quan on/off.
 
 > **Project-specific:** delegate wrapper path (`scripts/delegate/`), persona (`.claude/agents/delegate-*`) khai báo trong repo. Chi tiết wrapper: `.claude/rules/common/delegate-llm.md` (lazy, `paths: scripts/delegate/**`).
 
@@ -241,6 +241,7 @@ Context window (~200K auto-compact): xem [[token-budget]] — orchestrator luôn
 | `post-bash-stuck-detector.sh` | PostToolUse (Bash) | Cảnh báo lặp cùng lệnh ≥4 lần (thrashing) |
 | `subagent-stop-record.sh` | SubagentStop | Ghi verdict (PASS/REVISE) vào ledger + append metrics JSONL; nhiều dòng cùng `agent_id` = resume iterations |
 | `session-start.sh` | SessionStart | Đọc ledger, hiển thị task dở dang — resume qua `/orchestrate --resume` |
+| `pre-compact-guard.sh` | PreCompact (auto) | Chặn auto-compact khi task-graph session `status ≠ done` — handoff session mới thay vì compact lossy; manual `/compact` luôn qua |
 
 **Vai ledger (`orchestrator-ledger.md`):** audit-trail PHỤ, append-only, TTL 48h tự prune — KHÔNG phải state machine, vẫn 1 file dùng chung mọi session (an toàn vì append-only, không read-modify-write nên không race). `task-graph/<slug>.md` (per-worktree, xem mục "Task-graph artifact") là nguồn TRẠNG THÁI chính; ledger chỉ đối chiếu completion khi resume. Graph đã xoá mà ledger còn dòng cũ → bình thường.
 

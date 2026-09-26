@@ -474,6 +474,8 @@ if [ "$SEL_QUALITY" -eq 1 ]; then
   install_file "hooks/post-bash-stuck-detector.sh" ".claude/hooks/post-bash-stuck-detector.sh"
   # merged: stop-verdict-record + subagent-stop-ledger
   install_file "hooks/subagent-stop-record.sh"    ".claude/hooks/subagent-stop-record.sh"
+  # PreCompact(auto) guard — chặn auto-compact khi task-graph session đang dở
+  install_file "hooks/pre-compact-guard.sh"       ".claude/hooks/pre-compact-guard.sh"
   # resume is part of the skill `orchestrate` (SEL_SKILLS group below), not a command
   # statusline — shows task-graph progress, chains ~/.claude/statusline-context.sh if present
   install_file "statusline-orchestration.sh"      ".claude/statusline-orchestration.sh"
@@ -834,6 +836,7 @@ if [ "$SEL_GUARD" -eq 1 ] || [ "$SEL_QUALITY" -eq 1 ]; then
     # orchestration recorders — stuck-command detection + merged subagent verdict/ledger
     wire_hook PostToolUse 'Bash' '$CLAUDE_PROJECT_DIR/.claude/hooks/post-bash-stuck-detector.sh'
     wire_hook SubagentStop '' '$CLAUDE_PROJECT_DIR/.claude/hooks/subagent-stop-record.sh'
+    wire_hook PreCompact 'auto' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact-guard.sh'
   fi
   # discoverable off-switch — set once if absent, never clobber a user's existing "0"
   delegate_missing="$(jq 'if .env.HARNESS_DELEGATE == null then 1 else 0 end' "$SETTINGS")"
@@ -848,6 +851,12 @@ if [ "$SEL_GUARD" -eq 1 ] || [ "$SEL_QUALITY" -eq 1 ]; then
   tmp="$(mktemp)"
   jq --arg risk "$RISK_DIRS_CSV" '.env //= {} | if (.env.HARNESS_RISK_DIRS == null) then .env.HARNESS_RISK_DIRS = $risk else . end' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
   if [ "$risk_missing" -eq 1 ] || { [ "${#OWNED_ENV_KEYS[@]}" -gt 0 ] && array_contains HARNESS_RISK_DIRS "${OWNED_ENV_KEYS[@]}"; }; then OWNED_ENV_KEYS+=(HARNESS_RISK_DIRS); fi
+
+  # autoCompactWindow — set once if absent (300K: model 1M mặc định ~967K không bao
+  # giờ compact; 300K đủ task L, quá đó chất lượng tụt). User đã đặt → giữ nguyên.
+  # Không ghi manifest ownership: giá trị user-tunable qua install-auto-compact.sh.
+  tmp="$(mktemp)"
+  jq 'if (.autoCompactWindow == null) then .autoCompactWindow = 300000 else . end' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
 
   # Conservative project-local protection; record only entries first added by us.
   DENY_ENTRIES=(
