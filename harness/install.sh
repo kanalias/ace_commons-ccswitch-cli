@@ -32,7 +32,7 @@
 #   HARNESS_GROUP_GUARD          y/n — guard hooks, no prompt        (default: Y)
 #   HARNESS_GROUP_QUALITY        y/n — quality hooks, no prompt      (default: Y)
 #   HARNESS_GROUP_COMMANDS       y/n — audit-claude-md + audit-context-memory + audit-dependency + audit-vietnamese + clean-up-project + doctor-memory + git-cleanup-branch + git-commit + git-commit-describe + git-force-snapshot + git-push-safety + task-loop-feature + update-claude + update-codex + update-gemini + update-deepseek workflow skills (slash-invocable /<name>), no prompt (default: Y)
-#   HARNESS_GROUP_SKILLS         y/n — check-hardcode + dep-ladder-check + fix-ledger + orchestrate skills, no prompt (default: Y)
+#   HARNESS_GROUP_SKILLS         y/n — ace-library + check-hardcode + dep-ladder-check + fix-ledger + orchestrate skills, no prompt (default: Y)
 #   HARNESS_GROUP_RULES          y/n — rules: common/ (10 invariant guardrails, always overwrite) + project/ (git-workflow, skill-superpowers, test-parallel, browser-mcp-profiles, processes-layout — kept if exist), no prompt (default: Y)
 #   HARNESS_GROUP_GITHOOKS       y/n — git pre-push hook (gitleaks secret scan) into .git/hooks/, no prompt (default: Y; skipped if target not a git repo)
 #   HARNESS_GROUP_DEPLOY         y/n — production-deploy/-cleanup/-reboot skills (slash-invocable /production-*), no prompt (default: N — opt-in, most repos don't deploy to a prod host)
@@ -496,7 +496,7 @@ fi
 # Group membership is derived from the skill's own name (no separate list to
 # keep in sync):
 #   production-*                                           → SEL_DEPLOY
-#   check-hardcode / dep-ladder-check / fix-ledger / orchestrate → SEL_SKILLS (skill-only, never had a command;
+#   ace-library / check-hardcode / dep-ladder-check / fix-ledger / orchestrate → SEL_SKILLS (skill-only, never had a command;
 #                                                                    orchestrate also covers resume-orchestration)
 #   everything else (former slash-commands)                → SEL_COMMANDS
 if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -eq 1 ] || [ "$SEL_DEPLOY" -eq 1 ]; then
@@ -506,7 +506,7 @@ if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -e
     group_flag=0
     case "$skill_name" in
       production-*) group_flag="$SEL_DEPLOY" ;;
-      check-hardcode|dep-ladder-check|fix-ledger|orchestrate) group_flag="$SEL_SKILLS" ;;
+      ace-library|check-hardcode|dep-ladder-check|fix-ledger|orchestrate) group_flag="$SEL_SKILLS" ;;
       *) group_flag="$SEL_COMMANDS" ;;
     esac
     [ "$group_flag" -eq 1 ] || continue

@@ -129,6 +129,7 @@ run_install() {
   # skills group (default Y, not overridden above) — must land
   [ ! -e "$TARGET/.claude/skills/lazy-load-health" ]
   [ -f "$TARGET/.claude/skills/dep-ladder-check/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/ace-library/SKILL.md" ]
   [ ! -e "$TARGET/.claude/skills/auto-commit" ]
   [ -f "$TARGET/.claude/skills/check-hardcode/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/fix-ledger/SKILL.md" ]
