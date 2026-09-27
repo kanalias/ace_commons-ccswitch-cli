@@ -2,7 +2,7 @@
 name: processes-layout
 description: Layout code chạy nền — processes/jobs (cron; chung 1 package + 1 image nhưng MỖI job = 1 entry + 1 compose service chạy riêng) vs processes/services (worker chạy liên tục, package độc lập, pm2/supervisor); naming job <verb>-<source>-to-<target>-<table>, log prefix [job=<name>]. LAZY, load khi chạm processes/, apps/, compose, ecosystem.
 status: live
-updated: 2026-09-25
+updated: 2026-09-27
 paths:
   - "**/processes/**"
   - "**/apps/**"
@@ -14,7 +14,16 @@ metadata:
 
 # Layout `processes/` — code chạy nền (cross-project)
 
-Áp cho repo có code chạy nền (cron job, worker, poller). Root có thể là `processes/` hoặc `<platform>/processes/` — quy ước dưới tính từ root đó.
+Áp cho repo có code chạy nền (cron job, worker, poller). Quy ước dưới tính từ dir `processes/` đó.
+
+## Vị trí `processes/`
+
+- Thường đặt tại 1 trong: root (`processes/`), `src/processes/`, `src/app/processes/`, `src/server/processes/` (hoặc `<platform>/processes/`). `processes/` nằm **cùng cấp** `apps/`/`packages/` nếu repo có.
+- Repo đã có `processes/` → dùng đúng vị trí đó, KHÔNG tạo thêm `processes/` thứ 2.
+- Chưa có / cấu trúc không khớp các vị trí trên (vd không `src/`, monorepo khác kiểu, job nằm rải rác `scripts/`, `cron/`, `workers/`) → **khảo sát trước khi tạo**:
+  1. Liệt kê cấu trúc top-level + nơi đang chứa code nền (`grep -rlE "cron|setInterval|schedule|worker|queue"`, `ecosystem.config.*`, compose service không expose port).
+  2. Xác định root code chính (`src/`, `src/app/`, `src/server/`…) + workspace (`package.json` `workspaces`, `pnpm-workspace.yaml`).
+  3. Đề xuất user: vị trí `processes/` + danh sách file cần move + tác động (import path, Dockerfile, compose, CI). **Chờ user xác nhận** rồi mới tạo/move.
 
 | Dir | Chứa | KHÔNG chứa |
 |---|---|---|
