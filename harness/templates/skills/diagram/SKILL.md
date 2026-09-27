@@ -38,7 +38,11 @@ Fallback: `grep -rnE '^\s*(import|from|require|use|#include)' <target>`
 
 Gotcha dependency-cruiser: npx cache không thấy `typescript` → quét `.ts` ra 0 module; `NODE_PATH` ở trên là bắt buộc. Check: `... --info 2>&1 | grep -q '✔ typescript'`, thiếu → `npm install` trước.
 
-Không cần graphviz (đích là Mermaid). VS Code thiếu preview Mermaid → `code --install-extension bierner.markdown-mermaid`.
+Không cần graphviz (đích là Mermaid). Extension VS Code xem preview (thiếu → hỏi user trước khi cài):
+
+```bash
+code --list-extensions | grep -q bierner.markdown-mermaid || code --install-extension bierner.markdown-mermaid
+```
 
 ## Bước 3 — Sinh diagram
 
@@ -49,6 +53,8 @@ Không cần graphviz (đích là Mermaid). VS Code thiếu preview Mermaid → 
 1. Khoanh vùng file bằng structure graph + entry point (route/controller, CLI main, cron/scheduler, event/queue handler). Đọc `README`/`MODULE.md` trong `<target>` nếu có trước.
 2. Chỉ đọc file nằm trên luồng chính; grep chữ ký hàm thay vì đọc toàn file khi đủ.
 3. Viết `sequenceDiagram` (trigger → module → external: DB/API/queue/LLM…) + `flowchart TD` cho nhánh điều kiện/lỗi nếu có. Chỉ vẽ lời gọi có thật trong code — không bịa bước.
+4. Trước khi ghi: đối chiếu từng nguồn dữ liệu/actor với code (grep lời gọi client DB/HTTP/queue/SDK thật) — README/MODULE.md có thể lệch code (vd thứ doc gọi là "bảng riêng" thực ra là relation/field).
+5. Nhiều trigger (vd cron ngày + webhook) → mỗi trigger 1 `sequenceDiagram` riêng, không gộp.
 
 Ghi file:
 
@@ -68,18 +74,37 @@ sequenceDiagram
 ```
 ````
 
-Validate cú pháp khi nghi ngờ (node id có ký tự lạ, label có `()`/`:` chưa quote): `npx -y @mermaid-js/mermaid-cli -i <file> -o /tmp/check.svg`.
+## Bước 4 — Render (mở tab preview luôn)
 
-## Bước 4 — Render
+Có extension → mở thẳng tab preview, KHÔNG bắt user bấm Cmd/Ctrl+Shift+V. Cơ chế: `.vscode/settings.json` gán thư mục diagram mở bằng preview editor (merge key, không ghi đè file):
 
-```bash
-code docs/diagrams/<slug>.md   # rồi Cmd/Ctrl+Shift+V để preview
+```json
+"workbench.editorAssociations": { "**/docs/diagrams/*.md": "vscode.markdown.preview.editor" }
 ```
 
-Báo user: path file + 1 dòng tóm tắt luồng. Cần ảnh (SVG/PNG) → `npx -y @mermaid-js/mermaid-cli -i <file>.md -o <file>.svg` (tải Chromium lần đầu — chỉ khi user yêu cầu).
+```bash
+grep -q 'docs/diagrams' .vscode/settings.json 2>/dev/null || echo "THIẾU editorAssociations → merge key trên vào .vscode/settings.json"
+code --list-extensions | grep -q bierner.markdown-mermaid && code -r docs/diagrams/<slug>.md
+```
+
+- `-r` = mở tab trong window hiện tại. Cần sửa source → chuột phải tab → "Reopen Editor With… → Text Editor".
+- Không dùng VS Code → GitHub/GitLab render Mermaid sẵn khi xem file.
+
+Báo user: path file + 1 dòng tóm tắt luồng.
+
+### Preview trắng / lỗi render
+
+1. Validate cú pháp bằng mermaid-cli (tải Chromium lần đầu ~1 phút), chạy trong `/tmp` để ảnh không rơi vào repo:
+   ```bash
+   (cd /tmp && npx -y @mermaid-js/mermaid-cli -i "$OLDPWD/docs/diagrams/<slug>.md" -o /tmp/<slug>.md -e png)
+   ```
+   Có `❌`/parse error → sửa block đó.
+2. Render OK mà preview vẫn trắng → sequence dài lệch viewport: bấm nút fit (góc phải block) hoặc `Developer: Reload Window`. Vẫn trắng → mở `/tmp/<slug>-N.png` cho user xem.
+3. Giảm rủi ro: tránh `;`, `#`, `{}` chưa escape trong message; label có `()`/`:` → quote; label dài dùng `<br/>`.
 
 ## Không làm
 
 - Không commit diagram tự động — user quyết.
+- Không ghi ảnh SVG/PNG vào repo trừ khi user yêu cầu.
 - Không vẽ cả repo 1 lần (graph vô nghĩa) — luôn theo module/tính năng.
 - Không thêm dependency / config tool vào repo.
