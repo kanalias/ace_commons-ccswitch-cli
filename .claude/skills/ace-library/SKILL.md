@@ -41,7 +41,7 @@ Clone local thường ở `~/Data/Local/Working/projects_repos/github/<repo>`. M
 | `lib-voice-gateway` | `@acegalaxy/lib-voice-gateway` | Whisper STT có cost cap, rate limit, queue, audit |
 | `lib-node-utils` | `@acegalaxy/lib-node-utils` | file-lock, kill process-group, normalize string (0 deps) |
 | `lib-browser-crawler` | `@acegalaxy/lib-browser-crawler` | CloakBrowser profile path/pool, scraper engine |
-| `lib-facebook-auth` | `@acegalaxy/facebook-auth` ⚠ lệch quy ước (chưa `lib-`) | Facebook session reauth, preflight, profile-lock |
+| `lib-facebook-auth` | `@acegalaxy/lib-facebook-auth` | Facebook session reauth, preflight, profile-lock |
 
 Bảng chỉ để khoanh vùng. Khả năng thật phải xác minh từ source (bước 2).
 
@@ -66,7 +66,7 @@ Bảng chỉ để khoanh vùng. Khả năng thật phải xác minh từ source
 
 ## C. Đánh giá lib chưa dùng (mode mặc định)
 
-1. **Danh sách lib:** `gh repo list acegalaxy-co --limit 200 --json name,description,updatedAt,isArchived`
+1. **Danh sách lib:** `gh repo list acegalaxy-co --limit 1000 --json name,description,updatedAt,isArchived`
    lọc `lib-*`, bỏ archived, bỏ lib đã dùng (từ A). `gh` lỗi → dùng bảng danh mục, ghi **chưa xác minh**.
 2. **Khoanh ứng viên:** so mô tả lib với project — stack (Node/ESM/TS), module hiện có
    (grep logic tương tự: lock file, rate-limit, audit, gọi LLM, Notion, Telegram, cron, `.env` loader...).
@@ -81,7 +81,7 @@ Bảng chỉ để khoanh vùng. Khả năng thật phải xác minh từ source
 
 ## B. Discovery cho tính năng mới (khi có yêu cầu)
 
-0. **Làm mới danh mục:** `gh repo list acegalaxy-co --limit 200 --json name,description,updatedAt`
+0. **Làm mới danh mục:** `gh repo list acegalaxy-co --limit 1000 --json name,description,updatedAt`
    lọc `lib-*` → so với bảng trên; lib mới/bỏ/lệch → ghi vào **Đề xuất cải tiến**.
 1. **Project trước.** Grep code + `package.json`/lockfile tìm logic/`@acegalaxy/*` đã có.
    Đã có → dùng lại, dừng.
