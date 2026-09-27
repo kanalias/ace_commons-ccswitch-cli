@@ -130,6 +130,7 @@ run_install() {
   [ ! -e "$TARGET/.claude/skills/lazy-load-health" ]
   [ -f "$TARGET/.claude/skills/dep-ladder-check/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/ace-library/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/diagram/SKILL.md" ]
   [ ! -e "$TARGET/.claude/skills/auto-commit" ]
   [ -f "$TARGET/.claude/skills/check-hardcode/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/fix-ledger/SKILL.md" ]

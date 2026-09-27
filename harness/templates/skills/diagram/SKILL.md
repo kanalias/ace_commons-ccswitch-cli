@@ -1,0 +1,85 @@
+---
+name: diagram
+description: "Render diagram Mermaid cho 1 module/tính năng, mọi ngôn ngữ: cấu trúc (import graph qua tool native khi có, ~0 token) + luồng chi tiết (sequence/flowchart do LLM đọc đúng file liên quan). Có diagram sẵn và còn mới → mở luôn; chưa có/cũ → sinh rồi render. Dùng /diagram <path|tính năng> [structure|flow|all], hoặc khi user nói \"vẽ sơ đồ\", \"diagram\", \"workflow\", \"chi tiết luồng\", \"cấu trúc module\"."
+user-invocable: true
+---
+
+# diagram — render sơ đồ cấu trúc + luồng tính năng
+
+Output: `docs/diagrams/<slug>.md` (Mermaid; GitHub/GitLab + VS Code preview render sẵn). Project đã có thư mục diagram khác (`doc/`, `docs/architecture/`…) → dùng thư mục đó. `<slug>` = path module thay `/` bằng `-`, bỏ prefix chung vô nghĩa (`src-`, `app-`, `lib-`).
+
+## Tham số
+
+- `<target>`: path (`src/modules/billing`) hoặc tên tính năng ("billing retry") → tự `ls`/grep ra path, không chắc thì hỏi user.
+- mode: `structure` (chỉ import graph) | `flow` (luồng nghiệp vụ) | `all` (mặc định).
+
+## Bước 1 — Check có sẵn chưa
+
+```bash
+f=docs/diagrams/<slug>.md
+[ -f "$f" ] && [ -z "$(find <target> -type f -newer "$f" -not -path '*/node_modules/*' | head -1)" ] && echo FRESH
+```
+
+- `FRESH` + user không yêu cầu vẽ lại → nhảy Bước 4. KHÔNG đọc source.
+- Không có / source mới hơn → Bước 2.
+
+## Bước 2 — Chọn tool structure theo ngôn ngữ
+
+Không add dependency vào repo — chạy ephemeral (`npx -y`, `uvx`, `go run`). Tool không chạy được → fallback grep (cuối bảng), không cài global.
+
+| Ngôn ngữ | Lệnh (output Mermaid / DOT) |
+|---|---|
+| JS/TS | `NODE_PATH=$PWD/node_modules npx -y dependency-cruiser@latest <target> --no-config --output-type mermaid` (+ `--ts-config tsconfig.json` nếu TS) |
+| Python | `uvx pydeps <target> --show-dot --no-output --max-bacon 2` → DOT, convert tay sang `flowchart` |
+| Go | `go list -f '{{.ImportPath}}: {{join .Imports " "}}' ./<target>/...` → lọc import nội bộ (prefix module) |
+| Khác / fail | grep import (dưới bảng) → LLM dựng `flowchart LR`, chỉ edge nội bộ |
+
+Fallback: `grep -rnE '^\s*(import|from|require|use|#include)' <target>`
+
+Gotcha dependency-cruiser: npx cache không thấy `typescript` → quét `.ts` ra 0 module; `NODE_PATH` ở trên là bắt buộc. Check: `... --info 2>&1 | grep -q '✔ typescript'`, thiếu → `npm install` trước.
+
+Không cần graphviz (đích là Mermaid). VS Code thiếu preview Mermaid → `code --install-extension bierner.markdown-mermaid`.
+
+## Bước 3 — Sinh diagram
+
+**structure**: chạy lệnh Bước 2 > `/tmp/dc.mmd`. Chỉ giữ module nội bộ (bỏ stdlib/third-party). >40 node → gom theo folder (dependency-cruiser: `--collapse '^<src-root>/[^/]+/[^/]+'`; cách khác: gộp tay theo thư mục cấp 1 dưới `<target>`).
+
+**flow** (tốn token — giữ tối thiểu):
+
+1. Khoanh vùng file bằng structure graph + entry point (route/controller, CLI main, cron/scheduler, event/queue handler). Đọc `README`/`MODULE.md` trong `<target>` nếu có trước.
+2. Chỉ đọc file nằm trên luồng chính; grep chữ ký hàm thay vì đọc toàn file khi đủ.
+3. Viết `sequenceDiagram` (trigger → module → external: DB/API/queue/LLM…) + `flowchart TD` cho nhánh điều kiện/lỗi nếu có. Chỉ vẽ lời gọi có thật trong code — không bịa bước.
+
+Ghi file:
+
+````markdown
+# <target> — diagram
+> Sinh bởi /diagram <ngày>. Source: `<target>`
+
+## Cấu trúc (import graph)
+```mermaid
+<nội dung /tmp/dc.mmd>
+```
+
+## Luồng
+```mermaid
+sequenceDiagram
+...
+```
+````
+
+Validate cú pháp khi nghi ngờ (node id có ký tự lạ, label có `()`/`:` chưa quote): `npx -y @mermaid-js/mermaid-cli -i <file> -o /tmp/check.svg`.
+
+## Bước 4 — Render
+
+```bash
+code docs/diagrams/<slug>.md   # rồi Cmd/Ctrl+Shift+V để preview
+```
+
+Báo user: path file + 1 dòng tóm tắt luồng. Cần ảnh (SVG/PNG) → `npx -y @mermaid-js/mermaid-cli -i <file>.md -o <file>.svg` (tải Chromium lần đầu — chỉ khi user yêu cầu).
+
+## Không làm
+
+- Không commit diagram tự động — user quyết.
+- Không vẽ cả repo 1 lần (graph vô nghĩa) — luôn theo module/tính năng.
+- Không thêm dependency / config tool vào repo.
