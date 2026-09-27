@@ -38,10 +38,21 @@ Fallback: `grep -rnE '^\s*(import|from|require|use|#include)' <target>`
 
 Gotcha dependency-cruiser: npx cache không thấy `typescript` → quét `.ts` ra 0 module; `NODE_PATH` ở trên là bắt buộc. Check: `... --info 2>&1 | grep -q '✔ typescript'`, thiếu → `npm install` trước.
 
-Không cần graphviz (đích là Mermaid). Extension VS Code xem preview (thiếu → hỏi user trước khi cài):
+Không cần graphviz (đích là Mermaid). **Preview Mermaid trong VS Code — chưa có thì cài, có rồi thì check + update** (tự chạy, không hỏi):
+
+- VS Code **≥1.121**: Mermaid là built-in (`mermaid-markdown-features`); `bierner.markdown-mermaid` đã deprecated (1.32.1, "merged into VS Code") và **xung đột** built-in → khung trắng (vscode#317870). "Cài/update" = update VS Code; extension cũ còn → gỡ.
+- VS Code **<1.121**: dùng extension `bierner.markdown-mermaid` — thiếu thì cài, có rồi thì `--force` lên bản mới nhất.
 
 ```bash
-code --list-extensions | grep -q bierner.markdown-mermaid || code --install-extension bierner.markdown-mermaid
+v=$(code --version | head -1)
+latest=$(curl -fsS https://update.code.visualstudio.com/api/releases/stable 2>/dev/null | tr -d '[]"' | cut -d, -f1)
+if [ "$(printf '%s\n1.121.0\n' "$v" | sort -V | head -1)" = "1.121.0" ]; then
+  code --list-extensions | grep -qx bierner.markdown-mermaid && code --uninstall-extension bierner.markdown-mermaid && echo "RESTART: gỡ extension deprecated xung đột built-in → Cmd+Q mở lại VS Code"
+  [ -n "$latest" ] && [ "$v" != "$latest" ] && echo "UPDATE: VS Code $v → $latest (Code > Check for Updates; brew: brew upgrade --cask visual-studio-code)"
+else
+  code --install-extension bierner.markdown-mermaid --force   # cài mới hoặc update lên latest
+  echo "UPDATE khuyến nghị: VS Code $v < 1.121 — nâng VS Code để dùng Mermaid built-in"
+fi
 ```
 
 ## Bước 3 — Sinh diagram
@@ -60,6 +71,7 @@ Ghi file:
 
 ````markdown
 # <target> — diagram
+
 > Sinh bởi /diagram <ngày>. Source: `<target>`
 
 ## Cấu trúc (import graph)
@@ -76,7 +88,7 @@ sequenceDiagram
 
 ## Bước 4 — Render (mở tab preview luôn)
 
-Có extension → mở thẳng tab preview, KHÔNG bắt user bấm Cmd/Ctrl+Shift+V. Cơ chế: `.vscode/settings.json` gán thư mục diagram mở bằng preview editor (merge key, không ghi đè file):
+Có preview Mermaid (built-in hoặc extension, xem Bước 2) → mở thẳng tab preview, KHÔNG bắt user bấm Cmd/Ctrl+Shift+V. Cơ chế: `.vscode/settings.json` gán thư mục diagram mở bằng preview editor (merge key, không ghi đè file):
 
 ```json
 "workbench.editorAssociations": { "**/docs/diagrams/*.md": "vscode.markdown.preview.editor" }
@@ -84,7 +96,7 @@ Có extension → mở thẳng tab preview, KHÔNG bắt user bấm Cmd/Ctrl+Shi
 
 ```bash
 grep -q 'docs/diagrams' .vscode/settings.json 2>/dev/null || echo "THIẾU editorAssociations → merge key trên vào .vscode/settings.json"
-code --list-extensions | grep -q bierner.markdown-mermaid && code -r docs/diagrams/<slug>.md
+code -r docs/diagrams/<slug>.md
 ```
 
 - `-r` = mở tab trong window hiện tại. Cần sửa source → chuột phải tab → "Reopen Editor With… → Text Editor".
@@ -99,8 +111,9 @@ Báo user: path file + 1 dòng tóm tắt luồng.
    (cd /tmp && npx -y @mermaid-js/mermaid-cli -i "$OLDPWD/docs/diagrams/<slug>.md" -o /tmp/<slug>.md -e png)
    ```
    Có `❌`/parse error → sửa block đó.
-2. Render OK mà preview vẫn trắng → sequence dài lệch viewport: bấm nút fit (góc phải block) hoặc `Developer: Reload Window`. Vẫn trắng → mở `/tmp/<slug>-N.png` cho user xem.
-3. Giảm rủi ro: tránh `;`, `#`, `{}` chưa escape trong message; label có `()`/`:` → quote; label dài dùng `<br/>`.
+2. Render OK mà preview trắng → gần như luôn do `bierner.markdown-mermaid` còn cài trên VS Code ≥1.121 (xung đột built-in): gỡ extension + restart hẳn VS Code (Cmd+Q, không chỉ Reload Window).
+3. Vẫn trắng → sequence dài lệch viewport: bấm nút fit (góc phải block) hoặc `Developer: Reload Window`. Vẫn trắng → mở `/tmp/<slug>-N.png` cho user xem.
+4. Giảm rủi ro: tránh `;`, `#`, `{}` chưa escape trong message; label có `()`/`:` → quote; label dài dùng `<br/>`.
 
 ## Không làm
 
