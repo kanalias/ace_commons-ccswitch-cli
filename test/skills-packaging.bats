@@ -74,6 +74,123 @@ assert 'không commit, push hoặc publish' in lower
 PY
 }
 
+@test "production deploy accepts pushed gate evidence or pending gated commits without rerunning full suites" {
+  python3 - <<'PY'
+import os
+from pathlib import Path
+path = Path(os.environ['TEMPLATE_ROOT']) / 'skills' / 'production-deploy' / 'SKILL.md'
+text = path.read_text()
+for contract in (
+    'validation duy nhất trong phase deploy',
+    '/git-push-safety',
+    'KHÔNG invoke',
+    'không fallback sang full suite',
+    'remote HEAD',
+    'pending commit',
+    'không có evidence',
+    'GIT_PUSH_GATE_OK=1 git push',
+):
+    assert contract in text, f'Missing production deploy gate contract {contract!r}: {path}'
+for forbidden in ('npm test', 'pytest', 'go test ./...', 'cargo test'):
+    assert forbidden not in text, f'Production deploy must not run full-suite command {forbidden!r}: {path}'
+assert text.index('không có evidence') < text.index('GIT_PUSH_GATE_OK=1 git push')
+assert 'docker compose up -d --build @@DEPLOY_SERVICE@@' in text, 'Docker rebuild is an allowed deploy action'
+assert 'if [ -f bootstrap.sh ]; then bash bootstrap.sh; else' in text
+assert 'bootstrap.sh ||' not in text, 'Bootstrap failure must not trigger fallback deploy'
+assert 'bootstrap.sh` tồn tại nhưng fail' in text
+PY
+}
+
+@test "production deploy verifies the exact Compose rollback container before smoke and success" {
+  python3 - <<'PY'
+import os
+from pathlib import Path
+path = Path(os.environ['TEMPLATE_ROOT']) / 'skills' / 'production-deploy' / 'SKILL.md'
+text = path.read_text()
+rollback = text.split('7. **Fail → tự động rollback.**', 1)[1].split('8. **Báo cáo.**', 1)[0]
+for contract in (
+    "rollback_ref='<rollback-ref>'",
+    "service='@@DEPLOY_SERVICE@@'",
+    'docker compose up -d --no-build',
+    'docker compose ps --all --quiet',
+    "docker inspect --format '{{.Image}}'",
+    '$actual',
+    '$rollback_ref',
+    "ssh @@DEPLOY_SSH_HOST@@ '@@DEPLOY_HEALTHCHECK@@'",
+    'FAIL + đã rollback',
+):
+    assert contract in rollback, f'Missing production deploy rollback contract {contract!r}: {path}'
+order = (
+    'docker compose up -d --no-build',
+    'docker compose ps --all --quiet',
+    "docker inspect --format '{{.Image}}'",
+    '$actual',
+    "ssh @@DEPLOY_SSH_HOST@@ '@@DEPLOY_HEALTHCHECK@@'",
+    'FAIL + đã rollback',
+)
+positions = [rollback.index(item) for item in order]
+assert positions == sorted(positions), f'Rollback verification order is unsafe: {positions}'
+PY
+}
+
+@test "production deploy treats every rollback verification failure as incomplete and unhealthy" {
+  python3 - <<'PY'
+import os
+from pathlib import Path
+path = Path(os.environ['TEMPLATE_ROOT']) / 'skills' / 'production-deploy' / 'SKILL.md'
+text = path.read_text()
+rollback = text.split('7. **Fail → tự động rollback.**', 1)[1].split('8. **Báo cáo.**', 1)[0]
+for failure in (
+    'Không có container',
+    'nhiều container',
+    '`docker inspect` lỗi',
+    'image không khớp',
+    'Smoke fail/timeout',
+):
+    assert failure in rollback, f'Missing rollback failure contract {failure!r}: {path}'
+assert rollback.count('FAIL + rollback unhealthy/incomplete') >= 2
+assert 'target **unhealthy — STOP**' in rollback
+assert rollback.index('Smoke pass') < rollback.index('FAIL + đã rollback')
+assert 'không claim đã rollback' in rollback
+PY
+}
+
+@test "production deploy template and installed copy stay semantically synchronized" {
+  python3 - <<'PY'
+import os
+from pathlib import Path
+root = Path(os.environ['TEMPLATE_ROOT'])
+repo = Path(os.environ['REPO_ROOT'])
+template = (root / 'skills' / 'production-deploy' / 'SKILL.md').read_text()
+installed = (repo / '.claude' / 'skills' / 'production-deploy' / 'SKILL.md').read_text()
+replacements = {
+    '@@PROJECT_SLUG@@': 'ccswitch-cli-claude',
+    '@@PROJECT_REMOTE_ID@@': 'github.com/kanalias/ace_commons-ccswitch-cli',
+    '@@DEPLOY_SSH_HOST@@': '<deploy-ssh-host>',
+    '@@DEPLOY_SERVICE@@': '<service-name>',
+    '@@DEPLOY_PATH@@': '<remote-repo-path>',
+    '@@DEPLOY_BRANCH@@': 'main',
+    '@@DEPLOY_REMOTE@@': 'origin',
+    '@@DEPLOY_HEALTHCHECK@@': '<healthcheck-cmd>',
+}
+for token, value in replacements.items():
+    template = template.replace(token, value)
+assert installed == template
+PY
+}
+
+@test "production deploy stops when smoke configuration is missing" {
+  python3 - <<'PY'
+import os
+from pathlib import Path
+path = Path(os.environ['TEMPLATE_ROOT']) / 'skills' / 'production-deploy' / 'SKILL.md'
+text = path.read_text()
+assert 'smoke/healthcheck config thiếu' in text
+assert 'STOP trước push/deploy' in text
+assert 'không chạy full suite thay thế' in text
+PY
+}
+
 @test "destructive and publishing workflows require explicit invocation and confirmation" {
   python3 - <<'PY'
 import os, re
