@@ -42,6 +42,7 @@ Clone local thường ở `~/Data/Local/Working/projects_repos/github/<repo>`. M
 | `lib-node-utils` | `@acegalaxy/lib-node-utils` | file-lock, kill process-group, normalize string (0 deps) |
 | `lib-browser-crawler` | `@acegalaxy/lib-browser-crawler` | CloakBrowser profile path/pool, scraper engine |
 | `lib-facebook-auth` | `@acegalaxy/lib-facebook-auth` | Facebook session reauth, preflight, profile-lock |
+| `lib-notion-config` | `@acegalaxy/lib-notion-config` | config loader Notion/any fetcher → cache memory/disk → stale → defaults, `.env` override |
 
 Bảng chỉ để khoanh vùng. Khả năng thật phải xác minh từ source (bước 2).
 

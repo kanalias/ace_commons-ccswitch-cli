@@ -131,6 +131,7 @@ run_install() {
   [ -f "$TARGET/.claude/skills/dep-ladder-check/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/ace-library/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/diagram/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/research/SKILL.md" ]
   [ ! -e "$TARGET/.claude/skills/auto-commit" ]
   [ -f "$TARGET/.claude/skills/check-hardcode/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/fix-ledger/SKILL.md" ]
@@ -206,6 +207,29 @@ run_install() {
   [ "$status" -eq 0 ]
   after="$(cat "$TARGET/.claude/memory-mirror/MEMORY.md")"
   [ "$before" = "$after" ]
+}
+
+@test "skills group isolation installs research only with HARNESS_GROUP_SKILLS" {
+  HARNESS_ROUTE_DIR="$TARGET" \
+  HARNESS_CORE_DIRS="src,lib" \
+  HARNESS_PROJECT_SLUG="testproj" \
+  HARNESS_BRANCH="dev" \
+  HARNESS_TEST_CMD="npm test" \
+  HARNESS_GROUP_SUBAGENTS="N" \
+  HARNESS_GROUP_GUARD="N" \
+  HARNESS_GROUP_QUALITY="N" \
+  HARNESS_GROUP_COMMANDS="N" \
+  HARNESS_GROUP_SKILLS="Y" \
+  HARNESS_GROUP_RULES="N" \
+  HARNESS_GROUP_GITHOOKS="N" \
+  HARNESS_GROUP_DEPLOY="N" \
+  HARNESS_OVERWRITE="all" \
+  run bash "$ROOT/harness/install.sh" </dev/null
+  [ "$status" -eq 0 ]
+  [ -f "$TARGET/.claude/skills/research/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/orchestrate/SKILL.md" ]
+  [ ! -e "$TARGET/.claude/skills/git-commit" ]
+  [ ! -e "$TARGET/.claude/skills/production-deploy" ]
 }
 
 @test "HARNESS_GROUP_DEPLOY=y installs production-* skills" {

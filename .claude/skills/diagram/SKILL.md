@@ -1,6 +1,6 @@
 ---
 name: diagram
-description: "Render diagram Mermaid cho 1 module/tính năng, mọi ngôn ngữ: cấu trúc (import graph qua tool native khi có, ~0 token) + luồng chi tiết (sequence/flowchart do LLM đọc đúng file liên quan). Có diagram sẵn và còn mới → mở luôn; chưa có/cũ → sinh rồi render. Dùng /diagram <path|tính năng> [structure|flow|all], hoặc khi user nói \"vẽ sơ đồ\", \"diagram\", \"workflow\", \"chi tiết luồng\", \"cấu trúc module\"."
+description: "Render diagram Mermaid cho 1 module/tính năng, mọi ngôn ngữ: cấu trúc (import graph qua tool native khi có, ~0 token) + luồng chi tiết (sequence/flowchart do LLM đọc đúng file liên quan). Có diagram sẵn và còn mới → mở luôn; chưa có/cũ → sinh rồi render. Dùng /diagram <path|tính năng> [structure|flow|all], hoặc khi user nói \"vẽ sơ đồ\", \"diagram\", \"workflow\", \"flow\", \"flow chart\", \"flowchart\", \"architecture\", \"architecture diagram\", \"kiến trúc\", \"sơ đồ\", \"sơ đồ luồng\", \"sơ đồ kiến trúc\", \"chi tiết luồng\", \"cấu trúc module\"."
 user-invocable: true
 ---
 

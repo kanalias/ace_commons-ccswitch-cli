@@ -41,6 +41,39 @@ for skill in (Path(os.environ['TEMPLATE_ROOT']) / 'skills').glob('*/SKILL.md'):
 PY
 }
 
+@test "research skill locks report provenance and preflight guards" {
+  python3 - <<'PY'
+import os
+from pathlib import Path
+root = Path(os.environ['TEMPLATE_ROOT'])
+path = root / 'skills' / 'research' / 'SKILL.md'
+assert path.is_file(), path
+text = path.read_text()
+for contract in (
+    'docs/research/research-<slug>.md',
+    'WebSearch',
+    'WebFetch',
+    'owner/repo',
+    'License',
+    'Commit/tag',
+    'Provenance',
+    'chưa xác minh',
+    '$ARGUMENTS` rỗng',
+    'Preflight collision trước mọi research',
+    'Không overwrite, append, đổi suffix',
+    'project/repo hiện tại trước',
+    'fork candidate',
+    'fork thực tế',
+):
+    assert contract in text, f'Missing research contract {contract!r}: {path}'
+assert text.index('Preflight collision trước mọi research') < text.index('### 1. Research project/repo hiện tại trước')
+lower = text.lower()
+assert 'không sửa source/config/test' in lower
+assert 'không tạo fork' in lower
+assert 'không commit, push hoặc publish' in lower
+PY
+}
+
 @test "destructive and publishing workflows require explicit invocation and confirmation" {
   python3 - <<'PY'
 import os, re
