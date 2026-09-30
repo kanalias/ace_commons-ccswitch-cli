@@ -37,7 +37,7 @@ setup() {
   fable=$(jq -r '.env.ANTHROPIC_DEFAULT_FABLE_MODEL' "$HOME/.claude/settings.json")
   effort=$(jq -r '.env.CLAUDE_CODE_EFFORT_LEVEL' "$HOME/.claude/settings.json")
   [ "$opus" = "cx/gpt-5.6-luna" ]
-  [ "$sonnet" = "cx/gpt-5.6-sol" ]
+  [ "$sonnet" = "cx/gpt-6.1-sol" ]
   [ "$haiku" = "cx/gpt-5.6-terra" ]
   [ "$fable" = "cx/gpt-6-astra" ]
   [ "$effort" = "high" ]
