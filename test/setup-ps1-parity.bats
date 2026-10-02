@@ -17,7 +17,7 @@ stage_repo() {
   cp "$ROOT/ai-proxy/ccswitch.ps1" "$STAGE/ai-proxy/ccswitch.ps1"
   cp "$ROOT/ai-proxy/statusline-context.sh" "$STAGE/ai-proxy/statusline-context.sh"
   cp "$ROOT/ai-proxy/hooks/check-router.sh" "$STAGE/ai-proxy/hooks/check-router.sh"
-  cp "$ROOT/ai-proxy/profiles/claude.json" "$ROOT/ai-proxy/profiles/codex.json" "$ROOT/ai-proxy/profiles/deepseek.json" "$ROOT/ai-proxy/profiles/kimi.json" "$STAGE/ai-proxy/profiles/"
+  cp "$ROOT/ai-proxy/profiles/claude.json" "$ROOT/ai-proxy/profiles/codex.json" "$ROOT/ai-proxy/profiles/deepseek.json" "$ROOT/ai-proxy/profiles/kimi.json" "$ROOT/ai-proxy/profiles/gemini.json" "$STAGE/ai-proxy/profiles/"
 }
 
 write_fake_env_pro() {
