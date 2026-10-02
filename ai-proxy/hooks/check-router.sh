@@ -42,7 +42,7 @@ is_router_url() {
   local target_host prof f base host
   target_host=$(_host_of "$url")
   [ -n "$target_host" ] || return 1
-  for prof in claude codex deepseek kimi; do
+  for prof in claude codex deepseek kimi gemini; do
     f="$PROFILES/$prof.json"
     [ -f "$f" ] && [ -r "$f" ] || continue
     base=$(jq -r '.ANTHROPIC_BASE_URL // empty' "$f" 2>/dev/null || true)
@@ -61,7 +61,8 @@ if [ -z "$base" ] && [ -f "$SETTINGS" ]; then
   model=$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL // empty' "$SETTINGS" 2>/dev/null || true)
 fi
 
-# claude / codex / deepseek / kimi share the same base URL (9router) → phân biệt bằng model prefix (cc/ cx/ ds/ kimi/).
+# claude / codex / deepseek / kimi / gemini share the same base URL (9router) → phân biệt bằng
+# model prefix (cc/ cx/ ds/ kimi/ antigravity/).
 if [ -z "$base" ]; then
   name="subscription (OAuth)"
 elif is_router_url "$base"; then
@@ -69,6 +70,7 @@ elif is_router_url "$base"; then
     cx/*) name="codex (gpt via 9router)" ;;
     ds/*) name="deepseek (via 9router)" ;;
     kimi*) name="kimi (via 9router)" ;;
+    antigravity/*) name="gemini (via 9router)" ;;
     *)    name="claude (via 9router)" ;;
   esac
 else
@@ -80,9 +82,9 @@ fi
   echo "━━━ ccswitch ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "▶ Endpoint đang chạy: ${name}${base:+  ($base${model:+, $model})}"
   echo "  Fallback (khi router chết): <router hiện tại> → subscription (OAuth)"
-  echo "    • claude/codex/deepseek/kimi chung 1 router + 1 key (9router)"
+  echo "    • claude/codex/deepseek/kimi/gemini chung 1 router + 1 key (9router)"
   echo "    • subscription = safe-harbor: gỡ env → Claude Code dùng OAuth login (luôn về được)"
-  echo "  Lệnh: ccswitch [check | claude | codex | deepseek | kimi | subscription | fallback | clear]"
+  echo "  Lệnh: ccswitch [check | claude | codex | deepseek | kimi | gemini | subscription | fallback | clear]"
   echo "        đổi endpoint xong → RESTART Claude Code (env nạp lúc khởi động)"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 } >&2

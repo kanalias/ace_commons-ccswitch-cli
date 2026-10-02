@@ -10,10 +10,11 @@
     codex                    (same base)                      cx/* gpt      — Codex/GPT via 9router
     deepseek                 (same base)                      ds/* deepseek — DeepSeek via 9router
     kimi                     (same base)                      kimi/*       — Kimi via 9router
+    gemini                   (same base)                      antigravity/* — Gemini via 9router (Antigravity)
     subscription             (no env block)                   — Claude Code OAuth login (safe-harbor)
 
-  claude / codex / deepseek / kimi share the SAME base URL (9router); they differ only in the model
-  prefix (cc/ vs cx/ vs ds/ vs kimi/) and SHARE ONE 9router key.
+  claude / codex / deepseek / kimi / gemini share the SAME base URL (9router); they differ only in
+  the model prefix (cc/ vs cx/ vs ds/ vs kimi/ vs antigravity/) and SHARE ONE 9router key.
 
   `subscription` is NOT a profile file: it removes the env block so Claude Code falls back to its
   own OAuth subscription login. No key, never probed — the guaranteed terminal.
@@ -25,6 +26,7 @@
   ccswitch codex          # Codex/GPT via 9router (cx/* models)
   ccswitch deepseek       # DeepSeek via 9router (ds/* models)
   ccswitch kimi           # Kimi via 9router (kimi/* models)
+  ccswitch gemini         # Gemini via 9router (antigravity/* models)
   ccswitch subscription   # remove env block -> Claude Code OAuth subscription
   ccswitch spawn <target> # launch a separate instance pinned to <target> via process env
                           #   (settings.json untouched). N terminals + N targets = N vendors in parallel.
@@ -49,7 +51,7 @@ $ClaudeDir = Join-Path $env:USERPROFILE ".claude"
 $Settings  = Join-Path $ClaudeDir "settings.json"
 $Profiles  = Join-Path $ClaudeDir "profiles"
 $Marker    = Join-Path $ClaudeDir ".ccswitch-target"     # records last target explicitly applied
-$Order     = @("claude", "codex", "deepseek", "kimi")   # profile files; subscription is env-clear
+$Order     = @("claude", "codex", "deepseek", "kimi", "gemini")   # profile files; subscription is env-clear
 
 function Die($msg) { Write-Host "❌ $msg" -ForegroundColor Red; exit 1 }
 
@@ -134,13 +136,13 @@ function Get-UrlHost($url) {
   return $u
 }
 
-# $url is the router iff its host matches the host of any existing profiles/{claude,codex,deepseek,kimi}.json
+# $url is the router iff its host matches the host of any existing profiles/{claude,codex,deepseek,kimi,gemini}.json
 # ANTHROPIC_BASE_URL, OR it matches the legacy repo placeholder host (fallback for stock/unconfigured installs).
 function Test-RouterUrl($url) {
   if (-not $url) { return $false }
   $targetHost = Get-UrlHost $url
   if ($targetHost) {
-    foreach ($name in @("claude", "codex", "deepseek", "kimi")) {
+    foreach ($name in @("claude", "codex", "deepseek", "kimi", "gemini")) {
       $prof = Join-Path $Profiles "$name.json"
       if (-not (Test-Path $prof)) { continue }
       try {
@@ -155,7 +157,7 @@ function Test-RouterUrl($url) {
   return $false
 }
 
-# claude / codex / deepseek / kimi share one base URL (9router) → tell them apart by model prefix.
+# claude / codex / deepseek / kimi / gemini share one base URL (9router) → tell them apart by model prefix.
 function Get-Tag($base, $model) {
   if (-not $base) { return "subscription" }
   if (Test-RouterUrl $base) {
@@ -164,6 +166,7 @@ function Get-Tag($base, $model) {
       "ds/*"  { return "deepseek" }
       "cc/*"  { return "claude" }
       "kimi*" { return "kimi" }
+      "antigravity/*" { return "gemini" }
       default { return "claude" }
     }
   }
@@ -277,12 +280,12 @@ function Set-ProfileHost($rawHost, $rawName) {
 
 # update [src] — sync ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN from router profile `src` (default claude)
 # into the other router profiles. Only these two fields are copied — the model-prefix fields
-# stay untouched, since that's what makes claude/codex/deepseek/kimi distinct despite sharing one
-# 9router host+token. Asks [y/N].
+# stay untouched, since that's what makes claude/codex/deepseek/kimi/gemini distinct despite
+# sharing one 9router host+token. Asks [y/N].
 function Update-Profiles($rawSrc) {
   $src = Get-Canon $rawSrc
   if ($src -eq "subscription") { Die "subscription has no host/key to copy from." }
-  if ($src -notin @("claude", "codex", "deepseek", "kimi")) { Die "update only syncs router profiles (claude|codex|deepseek|kimi)." }
+  if ($src -notin @("claude", "codex", "deepseek", "kimi", "gemini")) { Die "update only syncs router profiles (claude|codex|deepseek|kimi|gemini)." }
   $srcProf = Join-Path $Profiles "$src.json"
   if (-not (Test-Path $srcProf)) { Die "profile not found: $srcProf" }
   try { $srcObj = Get-Content $srcProf -Raw | ConvertFrom-Json } catch { Die "profile $srcProf is not valid JSON" }
@@ -293,7 +296,7 @@ function Update-Profiles($rawSrc) {
   if (-not $tok)  { Die "profile $srcProf has no ANTHROPIC_AUTH_TOKEN to copy." }
 
   $updated = 0
-  foreach ($p in @("claude", "codex", "deepseek", "kimi")) {
+  foreach ($p in @("claude", "codex", "deepseek", "kimi", "gemini")) {
     if ($p -eq $src) { continue }
     $dst = Join-Path $Profiles "$p.json"
     if (-not (Test-Path $dst)) { Write-Host "  • profiles\$p.json not found — skipped"; continue }
@@ -318,7 +321,7 @@ function Update-Profiles($rawSrc) {
 function Spawn-Target($rawName, $childArgs) {
   $name = Get-Canon $rawName
   if ($name -eq "subscription") {
-    Die "spawn needs a real router target (claude|codex|deepseek|kimi). subscription is env-clear — run: ccswitch subscription, then plain 'claude'."
+    Die "spawn needs a real router target (claude|codex|deepseek|kimi|gemini). subscription is env-clear — run: ccswitch subscription, then plain 'claude'."
   }
   $prof = Join-Path $Profiles "$name.json"
   if (-not (Test-Path $prof)) { Die "profile not found: $prof (run setup first)" }
@@ -338,7 +341,7 @@ function Spawn-Target($rawName, $childArgs) {
 }
 
 switch ($Command) {
-  { $_ -in @("claude", "codex", "deepseek", "kimi") } {
+  { $_ -in @("claude", "codex", "deepseek", "kimi", "gemini") } {
     # all route through 9router (differ only by model prefix) and share one token.
     $c = Test-Profile $Command
     if ($c -ne "200") { Write-Host "⚠️  '$Command' health=$c (not 200) — switching anyway, may be down" -ForegroundColor Yellow }
@@ -367,6 +370,7 @@ switch ($Command) {
       "ds/*"  { "deepseek" }
       "cc/*"  { "claude" }
       "kimi*" { "kimi" }
+      "antigravity/*" { "gemini" }
       default { "claude" }
     }
     $c = Test-Profile $t
@@ -438,11 +442,12 @@ TARGETS (switch-in-place; RESTART Claude Code after — env loads at launch)
   codex               Codex/GPT via 9router       (cx/* models)
   deepseek            DeepSeek via 9router         (ds/* models)
   kimi                Kimi via 9router             (kimi/* models)
+  gemini              Gemini via 9router (Antigravity) (antigravity/* models)
   subscription        remove env block → Claude Code OAuth login  (safe-harbor, no key)
                       aliases: original | direct | clear
 
-  claude + codex + deepseek + kimi share ONE 9router base URL AND ONE token
-  (fill the same key into all four profiles). Router down → all down → subscription.
+  claude + codex + deepseek + kimi + gemini share ONE 9router base URL AND ONE token
+  (fill the same key into all five profiles). Router down → all down → subscription.
 
 COMMANDS
   status  (default)   show active target (by model prefix) + health + subscription
@@ -457,12 +462,12 @@ COMMANDS
   help | -h           this help
 
 KEYS
-  ccswitch set-key claude       # then: set-key codex, set-key deepseek, set-key kimi with the SAME token
-  ccswitch set-host https://9router.proxy.example.com/v1 claude   # then: same URL for codex, deepseek, kimi
-  ccswitch update claude        # or just re-sync: copies claude's host+key into codex + deepseek + kimi
+  ccswitch set-key claude       # then: set-key codex, set-key deepseek, set-key kimi, set-key gemini with the SAME token
+  ccswitch set-host https://9router.proxy.example.com/v1 claude   # then: same URL for codex, deepseek, kimi, gemini
+  ccswitch update claude        # or just re-sync: copies claude's host+key into codex + deepseek + kimi + gemini
   profiles live at ~/.claude/profiles/*.json  (local, never committed)
 "@ | Write-Host
     exit 0
   }
-  default { Die "usage: ccswitch [claude|codex|deepseek|kimi|subscription|spawn <target>|check|fallback|set-key [profile]|set-host <url> [profile]|update [src]|install <name>|clear|status|help]" }
+  default { Die "usage: ccswitch [claude|codex|deepseek|kimi|gemini|subscription|spawn <target>|check|fallback|set-key [profile]|set-host <url> [profile]|update [src]|install <name>|clear|status|help]" }
 }

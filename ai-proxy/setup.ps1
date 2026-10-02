@@ -35,10 +35,10 @@ Write-Host "  ✓ statusline-context.sh (context-usage early-warning bar)"
 
 # 2. profile templates — create missing profiles; refresh model defaults in existing
 # profiles while preserving real host/key. Re-run setup after repo model updates.
-# 4 profiles: claude/codex/deepseek/kimi via 9router share ONE token.
+# 5 profiles: claude/codex/deepseek/kimi/gemini via 9router share ONE token.
 # kimi_api_key_force_subscription=1 switches kimi to Kimi's own direct Anthropic-compatible endpoint instead.
-$ProfileTargets = @("claude", "codex", "deepseek", "kimi")
-$RouterTargets = @("claude", "codex", "deepseek", "kimi")
+$ProfileTargets = @("claude", "codex", "deepseek", "kimi", "gemini")
+$RouterTargets = @("claude", "codex", "deepseek", "kimi", "gemini")
 $ModelFields = @(
   "ANTHROPIC_DEFAULT_OPUS_MODEL",
   "ANTHROPIC_DEFAULT_SONNET_MODEL",
@@ -256,8 +256,8 @@ if (Select-String -Path $psProfile -SimpleMatch $fnLine -Quiet) {
 
 # 4b. parallel-launcher functions — one per target. Each spawns a SEPARATE Claude Code
 #     instance pinned to that vendor via process env. Run N in N terminals = N vendors in parallel.
-$short = @{ claude = "cc"; codex = "cx"; deepseek = "ds"; kimi = "km" }
-foreach ($t in @("claude", "codex", "deepseek", "kimi")) {
+$short = @{ claude = "cc"; codex = "cx"; deepseek = "ds"; kimi = "km"; gemini = "gm" }
+foreach ($t in @("claude", "codex", "deepseek", "kimi", "gemini")) {
   $fn = "claude-$($short[$t])"
   $line = "function $fn { & powershell -ExecutionPolicy Bypass -File `"`$env:USERPROFILE\.claude\ccswitch.ps1`" spawn $t @args }"
   if (Select-String -Path $psProfile -SimpleMatch $line -Quiet) {
@@ -270,9 +270,9 @@ foreach ($t in @("claude", "codex", "deepseek", "kimi")) {
 
 Write-Host ""
 Write-Host "✅ Installed. Next steps:" -ForegroundColor Green
-Write-Host "   1. (if you skipped the prompt) Fill a key:  ccswitch set-key <claude|codex|deepseek|kimi>  (same 9router key for all four)"
-Write-Host "   2. Reload profile:  . `$PROFILE   then run: ccswitch claude (or codex/deepseek/kimi)"
+Write-Host "   1. (if you skipped the prompt) Fill a key:  ccswitch set-key <claude|codex|deepseek|kimi|gemini>  (same 9router key for all five)"
+Write-Host "   2. Reload profile:  . `$PROFILE   then run: ccswitch claude (or codex/deepseek/kimi/gemini)"
 Write-Host "   3. Restart Claude Code (quit + reopen) to load the new env."
-Write-Host "   4. Parallel:  open 4 terminals -> claude-cc / claude-cx / claude-ds / claude-km (all share 9router quota; force-subscription Kimi uses its own Moonshot key)"
+Write-Host "   4. Parallel:  open 5 terminals -> claude-cc / claude-cx / claude-ds / claude-km / claude-gm (all share 9router quota; force-subscription Kimi uses its own Moonshot key)"
 Write-Host ""
 Write-Host "Note: the health hook uses 'bash' (Git Bash / WSL). If you have neither, the hook is skipped harmlessly." -ForegroundColor DarkGray

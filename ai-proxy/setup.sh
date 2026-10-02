@@ -36,11 +36,11 @@ echo "  ✓ statusline-context.sh (context-usage early-warning bar)"
 
 # 2. profile templates — create missing profiles; refresh model defaults in existing
 # profiles while preserving real host/key. Re-run setup after repo model updates.
-# 4 profiles: claude/codex/deepseek/kimi via 9router share ONE token.
+# 5 profiles: claude/codex/deepseek/kimi/gemini via 9router share ONE token.
 # kimi_api_key_force_subscription=1 switches kimi to Kimi's own direct Anthropic-compatible endpoint instead.
 # `subscription` is the env-clear fallback (no file, no key).
-PROFILE_TARGETS=(claude codex deepseek kimi)
-ROUTER_TARGETS=(claude codex deepseek kimi)
+PROFILE_TARGETS=(claude codex deepseek kimi gemini)
+ROUTER_TARGETS=(claude codex deepseek kimi gemini)
 for p in "${PROFILE_TARGETS[@]}"; do
   dst="$PROFILES/$p.json"
   tmpl="$SRC/profiles/$p.json"
@@ -61,7 +61,7 @@ for p in "${PROFILE_TARGETS[@]}"; do
   fi
 done
 
-# 2b. fill credentials into all 3 router profiles (claude/codex/deepseek share ONE 9router token).
+# 2b. fill credentials into all router profiles (claude/codex/deepseek/kimi/gemini share ONE 9router token).
 # Preferred source: `.env` at repo root (one level up from this script's dir, gitignored)
 # holding `proxy_host=` + `proxy_key=`. When both are present, ALWAYS overwrite host + key
 # in all three router profiles — no prompt, no placeholder check, interactive or not. `.env` is the
@@ -187,7 +187,7 @@ fi
 if [ "$USE_ENV_PRO" -eq 1 ]; then
   apply_env_pro
 elif [ -t 0 ]; then
-  echo "  ── enter router base URL + one shared key for claude+codex+deepseek ──"
+  echo "  ── enter router base URL + one shared key for claude+codex+deepseek+kimi+gemini ──"
   prompt_host
   prompt_shared_key
 else
@@ -260,7 +260,7 @@ fi
 #     instance pinned to that vendor via process env. Open N terminals + run N of these
 #     = N vendors in parallel (single-instance switch can only hold one at a time).
 # (bash 3.2 compat — macOS ships old bash; no associative arrays)
-for pair in claude:cc codex:cx deepseek:ds kimi:km; do
+for pair in claude:cc codex:cx deepseek:ds kimi:km gemini:gm; do
   t=${pair%%:*}; short=${pair##*:}
   spawn_line="alias claude-${short}='bash ~/.claude/ccswitch.sh spawn ${t}'"
   if grep -qF "$spawn_line" "$SHELL_RC" 2>/dev/null; then
@@ -303,12 +303,12 @@ unset claude_tok settings_has_env PRIOR_INSTALL
 
 echo
 echo "✅ Installed. Next steps:"
-echo "   1. (if you skipped the prompt) Fill a key:  ccswitch set-key <claude|codex|deepseek|kimi>  (same 9router key for all four)"
+echo "   1. (if you skipped the prompt) Fill a key:  ccswitch set-key <claude|codex|deepseek|kimi|gemini>  (same 9router key for all five)"
 if [ "$AUTO_SWITCHED" -eq 1 ]; then
   echo "   2. Activate:        already done above (claude profile applied to settings.json)"
 else
-  echo "   2. Activate:        source $SHELL_RC && ccswitch claude   (or: codex / deepseek / kimi)"
+  echo "   2. Activate:        source $SHELL_RC && ccswitch claude   (or: codex / deepseek / kimi / gemini)"
 fi
 echo "   3. Restart Claude Code (quit + reopen) to load the new env."
-echo "   4. Parallel:        open 4 terminals → claude-cc / claude-cx / claude-ds / claude-km"
-echo "                       (4 vendors at once — all four share 9router quota; force-subscription Kimi uses its own Moonshot key)"
+echo "   4. Parallel:        open 5 terminals → claude-cc / claude-cx / claude-ds / claude-km / claude-gm"
+echo "                       (5 vendors at once — all five share 9router quota; force-subscription Kimi uses its own Moonshot key)"

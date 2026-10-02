@@ -44,9 +44,10 @@ Phần 1 tự detect OS (macOS/Linux chạy bash trực tiếp; Windows qua Git 
 | `codex` | 9router + model `cx/*` | Codex/GPT qua 9router |
 | `deepseek` | 9router + model `ds/*` | DeepSeek qua 9router |
 | `kimi` | 9router + model `kimi/*` | Kimi qua 9router |
+| `gemini` | 9router + model `antigravity/*` | Gemini qua 9router (Antigravity) |
 | `subscription` | **gỡ block `env`** | Safe-harbor fallback — Claude Code dùng OAuth subscription login (không cần key) |
 
-> `claude` / `codex` / `deepseek` / `kimi` **chung 1 base URL** `https://9router.proxy.example.com/v1` **và chung 1 key** (điền cùng 1 token 9router vào cả 4 profile); khác nhau **chỉ ở model prefix** (`cc/` vs `cx/` vs `ds/` vs `kimi/`).
+> `claude` / `codex` / `deepseek` / `kimi` / `gemini` **chung 1 base URL** `https://9router.proxy.example.com/v1` **và chung 1 key** (điền cùng 1 token 9router vào cả 5 profile); khác nhau **chỉ ở model prefix** (`cc/` vs `cx/` vs `ds/` vs `kimi/` vs `antigravity/`).
 >
 > `subscription` KHÔNG phải profile file: nó xóa block `env` để Claude Code quay về OAuth login gốc.
 > Alias tương thích ngược: `original` / `direct` / `clear` → `subscription`.
@@ -74,7 +75,7 @@ Installer sẽ:
 4. Thêm alias/function `ccswitch` vào shell profile.
 5. **KHÔNG ghi đè** profile đã có key thật (chỉ copy template khi file thiếu).
 
-### 1.2 Điền key (1 key dùng chung cho cả 4 profile)
+### 1.2 Điền key (1 key dùng chung cho cả 5 profile)
 
 **Cách nhanh nhất — `.env`:** tạo file `.env` (gitignored) ở repo root:
 
@@ -87,16 +88,17 @@ kimi_api_key_force_subscription=1
 kimi_api_key=<your-kimi-key>
 ```
 
-(mẫu có sẵn ở `.env.example`). Khi `setup.sh`/`setup.ps1` chạy và thấy file này có đủ cả 2 biến, nó **ghi thẳng** `proxy_host` + `proxy_key` vào cả 4 file (`claude.json` / `codex.json` / `deepseek.json` / `kimi.json`) — không hỏi, interactive hay non-interactive đều như nhau. Nếu `kimi_api_key_force_subscription=1` + `kimi_api_key` có mặt, nó ghi riêng `~/.claude/profiles/kimi.json` với endpoint Anthropic-compatible thật của Kimi `https://api.moonshot.ai/anthropic` (bỏ qua 9router). `.env` là nguồn chuẩn duy nhất (source of truth): một profile đã có key thật vẫn bị ghi đè (có in thông báo ghi đè), chạy lại script bất kỳ lúc nào để resync theo `.env` mới nhất.
+(mẫu có sẵn ở `.env.example`). Khi `setup.sh`/`setup.ps1` chạy và thấy file này có đủ cả 2 biến, nó **ghi thẳng** `proxy_host` + `proxy_key` vào cả 5 file (`claude.json` / `codex.json` / `deepseek.json` / `kimi.json` / `gemini.json`) — không hỏi, interactive hay non-interactive đều như nhau. Nếu `kimi_api_key_force_subscription=1` + `kimi_api_key` có mặt, nó ghi riêng `~/.claude/profiles/kimi.json` với endpoint Anthropic-compatible thật của Kimi `https://api.moonshot.ai/anthropic` (bỏ qua 9router). `.env` là nguồn chuẩn duy nhất (source of truth): một profile đã có key thật vẫn bị ghi đè (có in thông báo ghi đè), chạy lại script bất kỳ lúc nào để resync theo `.env` mới nhất.
 
 Không có `.env`, hoặc thiếu 1 trong 2 biến → bỏ qua bước này, dùng flow nhập tay:
 
 ```bash
-# mac/linux — nhập ẩn rồi apply luôn. claude + codex + deepseek + kimi dùng CÙNG 1 key 9router.
+# mac/linux — nhập ẩn rồi apply luôn. claude + codex + deepseek + kimi + gemini dùng CÙNG 1 key 9router.
 ccswitch set-key claude       # key cho Claude qua 9router
 ccswitch set-key codex        # Codex/GPT qua 9router — điền cùng token với claude
 ccswitch set-key deepseek     # DeepSeek qua 9router — điền cùng token với claude
 ccswitch set-key kimi         # Kimi qua 9router — điền cùng token với claude
+ccswitch set-key gemini       # Gemini qua 9router (Antigravity) — điền cùng token với claude
 ```
 
 Hoặc sửa file trực tiếp:
@@ -108,13 +110,13 @@ $EDITOR ~/.claude/profiles/deepseek.json     # thay <your-9router-key>
 notepad $env:USERPROFILE\.claude\profiles\deepseek.json
 ```
 
-> 🔑 Xin key từ lead. `claude` + `codex` + `deepseek` + `kimi` **chung 1 token** (điền giống nhau vào cả 4 file). **Không commit key** — `~/.claude/profiles/*.json` và `.env` đều local, không đẩy git.
+> 🔑 Xin key từ lead. `claude` + `codex` + `deepseek` + `kimi` + `gemini` **chung 1 token** (điền giống nhau vào cả 5 file). **Không commit key** — `~/.claude/profiles/*.json` và `.env` đều local, không đẩy git.
 
 Đã đổi key/host của `claude` và muốn đồng bộ lại các profile khác cho khớp (không phải setup lần đầu)? Dùng `update`:
 
 ```bash
-ccswitch update claude    # copy ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN từ claude.json sang codex/deepseek/kimi.json
-                           # hỏi [y/N] trước khi ghi đè từng file — model prefix (cc/cx/ds/kimi) giữ nguyên
+ccswitch update claude    # copy ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN từ claude.json sang codex/deepseek/kimi/gemini.json
+                           # hỏi [y/N] trước khi ghi đè từng file — model prefix (cc/cx/ds/kimi/antigravity) giữ nguyên
 ```
 
 ### 1.3 Dùng
@@ -125,6 +127,7 @@ ccswitch claude         # → Claude qua 9router (default)
 ccswitch codex          # → Codex/GPT qua 9router
 ccswitch deepseek       # → DeepSeek qua 9router
 ccswitch kimi           # → Kimi qua 9router
+ccswitch gemini         # → Gemini qua 9router (Antigravity)
 ccswitch subscription   # → gỡ env block, dùng OAuth subscription login
 ccswitch spawn <target> # → mở 1 instance RIÊNG ghim target đó (settings.json không đổi)
 ccswitch check          # probe health các profile + verify subscription OAuth
@@ -173,25 +176,27 @@ Ví dụ output `ccswitch`:
   codex: 200 OK
   deepseek: 200 OK
   kimi: 200 OK
+  gemini: 200 OK
   subscription: ✓ logged in (you@example.com, max) [keychain] → safe-harbor OK
-profiles: claude codex deepseek kimi
+profiles: claude codex deepseek kimi gemini
 ```
 
 #### Chạy nhiều vendor SONG SONG
 
-`ccswitch <target>` chỉ đổi **1 instance** — 1 process Claude Code đọc 1 block `env` → 1 model. Muốn **nhiều vendor cùng active** thì cần **nhiều process riêng**. Dùng `spawn` (hoặc 4 alias `setup` tạo sẵn):
+`ccswitch <target>` chỉ đổi **1 instance** — 1 process Claude Code đọc 1 block `env` → 1 model. Muốn **nhiều vendor cùng active** thì cần **nhiều process riêng**. Dùng `spawn` (hoặc 5 alias `setup` tạo sẵn):
 
 ```
-# mỗi lệnh trong 1 terminal riêng → 4 vendor chạy đồng thời
+# mỗi lệnh trong 1 terminal riêng → 5 vendor chạy đồng thời
 claude-cc      # = ccswitch spawn claude    → Claude (cc/*)
 claude-cx      # = ccswitch spawn codex     → Codex/GPT (cx/*)
 claude-ds      # = ccswitch spawn deepseek  → DeepSeek (ds/*)
 claude-km      # = ccswitch spawn kimi      → Kimi (kimi/*)
+claude-gm      # = ccswitch spawn gemini    → Gemini (antigravity/*)
 ```
 
 `spawn` export model vào **process env** (tầng ① — thắng mọi settings file) rồi gọi `claude`, nên **KHÔNG đụng `settings.json`** — target đang switch-in-place của bạn giữ nguyên. Không cần restart: mỗi instance sinh ra đã pin sẵn vendor.
 
-> ⚠️ **Quota chung.** Cả 4 target cùng đi qua 1 account 9router (chung 1 key) → **share chung 1 quota**. Chạy song song = đốt quota nhanh hơn tương ứng số instance. Chung 1 token, KHÔNG tách quota (1 email = 1 quota); tách thật cần account 9router khác email.
+> ⚠️ **Quota chung.** Cả 5 target cùng đi qua 1 account 9router (chung 1 key) → **share chung 1 quota**. Chạy song song = đốt quota nhanh hơn tương ứng số instance. Chung 1 token, KHÔNG tách quota (1 email = 1 quota); tách thật cần account 9router khác email.
 >
 > `spawn subscription` bị từ chối — subscription là env-clear (gỡ block), không có gì để export. Muốn subscription thì `ccswitch subscription` rồi chạy `claude` thường.
 
@@ -205,6 +210,7 @@ Model qua 9router **phải** có prefix. Mỗi profile map sẵn 4 tier (Opus/So
 | `codex` | `cx/` | `cx/gpt-5.6-luna` (default) |
 | `deepseek` | `ds/` | `ds/deepseek-v4-pro-max` |
 | `kimi` | `kimi/` | `kimi/kimi-k3` |
+| `gemini` | `antigravity/` | `antigravity/gemini-pro-agent` |
 
 Thiếu prefix → lỗi `model_not_found`. Xem model id đầy đủ trong `~/.claude/profiles/<target>.json`, hoặc list live: `curl -s https://9router.proxy.example.com/v1/models -H "Authorization: Bearer <key>" | jq -r '.data[].id'`. (Ở `subscription` — không có env block — Claude Code tự dùng model mặc định của tài khoản, không cần prefix.)
 
@@ -220,7 +226,7 @@ curl -4 --resolve 9router.proxy.example.com:443:<proxy-ipv4> https://9router.pro
 Nếu IPv4 trả `200` → endpoint OK, bỏ qua cảnh báo. Muốn dứt điểm: pin IPv4 vào `/etc/hosts`.
 
 **`No active credentials for provider` / `model_not_found`**
-Sai model id — thêm prefix đúng target (`cc/` claude, `cx/` codex, `ds/` deepseek, `kimi/` kimi — xem mục 1.4).
+Sai model id — thêm prefix đúng target (`cc/` claude, `cx/` codex, `ds/` deepseek, `kimi/` kimi, `antigravity/` gemini — xem mục 1.4).
 
 **`API key required for remote API access`**
 Key trong profile là placeholder hoặc key local nhầm sang remote. Điền đúng key 9router.
@@ -469,7 +475,8 @@ ccswitch-cli-claude/
 │       ├── claude.json                # claude cc/*
 │       ├── codex.json                 # codex cx/*  (chung key với claude.json)
 │       ├── deepseek.json              # deepseek ds/*  (chung key với claude.json)
-│       └── kimi.json                  # kimi kimi/*  (chung key; chế độ direct-endpoint nếu force-subscription)
+│       ├── kimi.json                  # kimi kimi/*  (chung key; chế độ direct-endpoint nếu force-subscription)
+│       └── gemini.json                # gemini antigravity/*  (chung key với claude.json)
 │                                       # subscription không có file — nó là env-clear
 │
 ├── install-harness.sh   # Phần 2 — entry point (thin wrapper, exec harness/install.sh)
