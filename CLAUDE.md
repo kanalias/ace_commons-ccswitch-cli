@@ -48,4 +48,4 @@ BẮT BUỘC route qua 1 trong **5 surfaces** dưới đây. KHÔNG add ad-hoc s
 
 ## Project rules — quick links (ngoài block harness)
 
-- [.claude/rules/project/browser-mcp-profiles.md](.claude/rules/project/browser-mcp-profiles.md) — Cloak/Playwright qua MCP, profile `prj_xx_sv_yy` isolation tránh lock session, container resolve `BROWSER_PROFILES_DIR` → repo-root `./.browser-profiles/` (opt-in, Docker) → `~/.browser-profiles`, MCP per-project. LAZY.
+- [.claude/rules/project/browser-mcp-profiles.md](.claude/rules/project/browser-mcp-profiles.md) — Cloak/Playwright qua MCP, profile `prj_xx_sv_yy` isolation tránh lock session, container luôn là repo-root `./.browser-profiles/` (không override bằng env), MCP per-project. LAZY.

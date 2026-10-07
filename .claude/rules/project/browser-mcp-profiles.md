@@ -1,8 +1,8 @@
 ---
 name: browser-mcp-profiles
-description: Cloak (antidetect browser) + Playwright qua MCP — mỗi service 1 profile prj_xx_sv_yy tách biệt tránh lock session; container resolve env → <repo>/.browser-profiles; MCP đăng ký per-project. LAZY, load khi chạm .mcp.json / playwright / spec.
+description: Cloak (antidetect browser) + Playwright qua MCP — mỗi service 1 profile prj_xx_sv_yy tách biệt tránh lock session; container luôn là <repo>/.browser-profiles (không override bằng env); MCP đăng ký per-project. LAZY, load khi chạm .mcp.json / playwright / spec.
 status: live
-updated: 2026-09-23
+updated: 2026-10-08
 paths:
   - ".mcp.json"
   - ".claude/rules/project/browser-mcp-profiles.md"
@@ -14,10 +14,9 @@ metadata:
 
 # Browser MCP — Profile isolation (Cloak + Playwright)
 
-> **CONTAINER PATH (resolve TRƯỚC mọi thao tác profile) — chain 2 bước, dừng ở bước đầu tiên khớp:**
+> **CONTAINER PATH (resolve TRƯỚC mọi thao tác profile):** luôn là `<repo>/.browser-profiles/`, với `<repo>` là root checkout chính kể cả khi đang ở worktree.
 >
-> 1. env `BROWSER_PROFILES_DIR` có giá trị → dùng path tuyệt đối đó (thắng tất cả; dùng cho Docker/CI khi cần override).
-> 2. Không có override → dùng `<repo>/.browser-profiles/`, với `<repo>` là root checkout chính kể cả khi đang ở worktree.
+> KHÔNG có override bằng env. Biến môi trường trỏ container đi nơi khác (vd export toàn cục trong shell profile) bị **bỏ qua** — một biến toàn cục sẽ dồn profile của mọi project về chung 1 repo.
 >
 > Container = folder chứa các profile `prj_<xx>_sv_<yy>/`. Trước mọi `mkdir`, cả `<repo>/.gitignore` và `<repo>/.dockerignore` PHẢI có dòng `/.browser-profiles/`; thiếu guard và không được phép sửa → STOP hỏi user.
 
@@ -29,7 +28,7 @@ MỌI thao tác chạm Cloak/Playwright (navigate, click, screenshot, launch, lo
 
 Pre-flight bắt buộc — chạy đủ 5 bước theo thứ tự TRƯỚC khi gọi tool đầu tiên:
 
-1. **Resolve container** theo chain trên. Trong worktree vẫn resolve `<repo>` về root checkout chính, không phải root worktree.
+1. **Resolve container** = `<repo>/.browser-profiles/`. Trong worktree vẫn resolve `<repo>` về root checkout chính, không phải root worktree.
 2. **Guard trước khi tạo.** Xác nhận cả `<repo>/.gitignore` và `<repo>/.dockerignore` có `/.browser-profiles/` trước BẤT KỲ `mkdir` nào; thiếu → thêm trước hoặc STOP hỏi user.
 3. **Xác định `(xx, yy)`** = (project, service) của action này. Không suy ra được từ context → STOP hỏi user, KHÔNG tự đặt tên bừa.
 4. **Profile = `prj_<xx>_sv_<yy>`**, validate regex `^prj_[a-z0-9]+_sv_[a-z0-9]+$`. Đã có trong `_registry.md`/container → tái dùng. Chưa có → sau guard bước 2 mới tạo dir + thêm dòng registry TRƯỚC khi dùng.
@@ -76,7 +75,7 @@ Cả hai trỏ **CÙNG container + CÙNG naming** → quản lý 1 nơi.
 
 Đăng ký trong `.mcp.json` của repo cần browser, KHÔNG global. Lý do: scope security hẹp theo repo + tiết kiệm token (chỉ repo browser mới nạp tool defs, repo khác không gánh).
 
-> **Profile bake lúc launch, KHÔNG chọn per tool-call.** Playwright MCP cố định `user-data-dir` per server instance (flag `--user-data-dir`, hoặc env `PLAYWRIGHT_MCP_USER_DATA_DIR`). Nó **không đọc** `BROWSER_PROFILES_DIR` — env này chỉ là convention để build path. Antidetect browser (Cloak) cũng bind profile lúc mở. → **1 profile = 1 server entry**. "Tập trung" đạt qua 1 file config + N entry + 1 container, KHÔNG phải 1 server switch profile.
+> **Profile bake lúc launch, KHÔNG chọn per tool-call.** Playwright MCP cố định `user-data-dir` per server instance (flag `--user-data-dir`, hoặc env `PLAYWRIGHT_MCP_USER_DATA_DIR`). Antidetect browser (Cloak) cũng bind profile lúc mở. → **1 profile = 1 server entry**. "Tập trung" đạt qua 1 file config + N entry + 1 container, KHÔNG phải 1 server switch profile.
 
 Snippet mẫu — mỗi service 1 entry (server key = `pw|cloak _ <xx> _ <yy>`), `user-data-dir` bake lúc launch. `.mcp.json` là **strict JSON — KHÔNG comment**; copy nguyên rồi điền `<cloak-mcp-cmd>` + path tuyệt đối:
 
@@ -96,7 +95,7 @@ Snippet mẫu — mỗi service 1 entry (server key = `pw|cloak _ <xx> _ <yy>`),
 }
 ```
 
-- `.mcp.json` **không expand** `${HOME}`/`$BROWSER_PROFILES_DIR` — dùng **path tuyệt đối đã resolve** (`/path/to/repo/...`). Env `BROWSER_PROFILES_DIR` chỉ để người/script build path, không phải để MCP đọc.
+- `.mcp.json` **không expand** biến môi trường (`${HOME}`...) — dùng **path tuyệt đối đã resolve** (`/path/to/repo/.browser-profiles/...`).
 - **Ephemeral + auth replay (nhẹ hơn persistent):** Playwright `--isolated --storage-state=<container>/prj_xx_sv_yy/state.json` — không giữ profile trên disk, chỉ nạp cookie/localStorage. Dùng khi không cần fingerprint bền.
 - KHÔNG nhét >1 profile vào 1 entry (không switch per-call được).
 
@@ -113,7 +112,7 @@ Profile nặng + chứa auth → **mọi setup phải giữ được session qua
 
 ### Case A — Local thuần (không Docker)
 
-Setup mặc định: container `<repo>/.browser-profiles/` (chain bước 2), mỗi service 1 profile, mọi launch có `--user-data-dir`.
+Setup mặc định: container `<repo>/.browser-profiles/`, mỗi service 1 profile, mọi launch có `--user-data-dir`.
 
 Bền qua đổi branch/restart khi giữ nguyên checkout. Vì container nằm trong repo-root và bị ignore, `git clean -xfd` hoặc xoá checkout **sẽ xoá session**; luôn preview/exclude hoặc backup trước. Worktree dùng container root checkout chính, không tạo bản riêng.
 
@@ -127,13 +126,11 @@ Verify session đã nằm trên disk: `ls <repo>/.browser-profiles/prj_<xx>_sv_<
 # docker-compose.yml
 services:
   app:
-    environment:
-      BROWSER_PROFILES_DIR: /data/profiles      # chain bước 1 thắng → resolve trong container
     volumes:
-      - ./.browser-profiles:/data/profiles      # project path: session ghi thẳng ra repo-root host
+      - ./.browser-profiles:/app/.browser-profiles   # /app = repo root trong container; session ghi thẳng ra repo-root host
 ```
 
-- **Bind mount project path (`./.browser-profiles:/data/profiles`), KHÔNG named volume.** `docker compose down -v` xoá named volume → mất sạch session; bind mount không bị đụng. Với `docker run`, dùng path tuyệt đối `<repo>/.browser-profiles:/data/profiles`.
+- **Bind mount project path (`./.browser-profiles:/app/.browser-profiles`), KHÔNG named volume.** `docker compose down -v` xoá named volume → mất sạch session; bind mount không bị đụng. Với `docker run`, dùng path tuyệt đối `<repo>/.browser-profiles:/app/.browser-profiles`.
 - Profile **không bao giờ vào image** — `.dockerignore` loại nó khỏi build context; cookie bake vào layer = leak + image phình hàng trăm MB.
 - Rebuild image / `down` / restart → session còn nguyên vì nó sống ở host disk, không ở container layer.
 
@@ -173,16 +170,16 @@ Ba cách theo tình huống: **cùng OS** → `rsync -a` nguyên profile (đóng
 **Case B (local Docker) — deploy = rebuild image + up lại:**
 
 1. Xác nhận `.gitignore` và `.dockerignore` có `/.browser-profiles/`.
-2. Xác nhận compose dùng **bind mount** `./.browser-profiles:/data/profiles`, không phải named volume.
+2. Xác nhận compose dùng **bind mount** `./.browser-profiles:/app/.browser-profiles`, không phải named volume.
 3. `docker compose build && docker compose up -d` — image mới, session cũ vì nằm ở project path trên host.
 4. **KHÔNG dùng `docker compose down -v`.** Dùng `down` (không `-v`) hoặc `restart`.
-5. Verify trong container: `docker compose exec app ls /data/profiles/prj_<xx>_sv_<yy>/Cookies`.
+5. Verify trong container: `docker compose exec app ls /app/.browser-profiles/prj_<xx>_sv_<yy>/Cookies`.
 
 **Lần đầu setup Case B (chỉ 1 lần duy nhất):**
 
 1. Thêm `/.browser-profiles/` vào cả `.gitignore` và `.dockerignore`.
 2. `mkdir -p <repo>/.browser-profiles/prj_<xx>_sv_<yy>` trên host.
-3. `docker compose up -d` với bind mount + env như snippet trên.
+3. `docker compose up -d` với bind mount như snippet trên.
 4. Login **từ trong container** (headed qua VNC/CDP, hoặc script login headless) → profile Linux sinh ra, ghi xuyên bind mount ra host.
 5. Thêm dòng vào `_registry.md`; mọi deploy sau theo runbook Case B ở trên.
 
@@ -207,13 +204,13 @@ Ba cách theo tình huống: **cùng OS** → `rsync -a` nguyên profile (đóng
 
 ### Container repo-root — chuẩn mặc định
 
-`<repo>/.browser-profiles/` (chain bước 2) là container chuẩn cho local, Docker và deploy theo checkout. Trước khi tạo profile đầu tiên, PHẢI đủ 3 việc:
+`<repo>/.browser-profiles/` là container chuẩn cho local, Docker và deploy theo checkout. Trước khi tạo profile đầu tiên, PHẢI đủ 3 việc:
 
 1. `.gitignore` → `/.browser-profiles/` (cookie trong cây repo, 1 lần `git add -f` là lộ).
 2. `.dockerignore` → `/.browser-profiles/` (chặn phình build context + bake cookie vào layer).
 3. Báo user: **`git clean -xfd` xoá sạch container này** (gitignored = đúng target của `-x`) → mất toàn bộ session, không undo.
 
-Deploy sang máy khác không mang profile theo Git/image. Backup/migrate riêng hoặc provision persistent host path rồi set `BROWSER_PROFILES_DIR` tuyệt đối trên máy đích.
+Deploy sang máy khác không mang profile theo Git/image. Backup/migrate riêng rồi đặt lại vào `<repo>/.browser-profiles/` trên máy đích (hoặc bind mount persistent host path vào đúng vị trí đó).
 
 **Worktree:** repo fan-out `.claude/worktrees/<slug>/` vẫn resolve `<repo>` về root checkout chính, nên dùng chung container + registry. Hai task đụng cùng profile phải serialize vì single-writer lock.
 
@@ -232,7 +229,7 @@ Tạo / dùng profile → cập nhật dòng (nhất là `last-used`). Không c�
 ## Secret guard
 
 - Profile dir chứa cookie / session / auth token → **coi là secret**. KHÔNG `cat`/print nội dung profile ra chat. KHÔNG commit.
-- Container mặc định `<repo>/.browser-profiles/` → BẮT BUỘC `.gitignore` + `.dockerignore` trước khi tạo profile. Override qua `BROWSER_PROFILES_DIR` vẫn giữ guard này để profile không bao giờ bị track hoặc vào Docker context.
+- Container mặc định `<repo>/.browser-profiles/` → BẮT BUỘC `.gitignore` + `.dockerignore` trước khi tạo profile, để profile không bao giờ bị track hoặc vào Docker context.
 - Tie [[secrets-no-printout]], [[vault-no-mcp]].
 
 ## Cleanup / TTL

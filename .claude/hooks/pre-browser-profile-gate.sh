@@ -23,12 +23,15 @@ set -euo pipefail
 RE_SERVER='^(pw|cloak)_[a-z0-9]+_[a-z0-9]+$'
 RE_PROFILE='prj_[a-z0-9]+_sv_[a-z0-9]+'
 
+# Container luôn là <repo>/.browser-profiles — KHÔNG override bằng env
+# (env toàn cục sẽ dồn profile mọi project về chung 1 repo).
 profile_root() {
-  local root="${BROWSER_PROFILES_DIR:-}"
-  if [[ -z "$root" ]]; then
-    [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] || return 1
-    root="$CLAUDE_PROJECT_DIR/.browser-profiles"
-  fi
+  [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] || return 1
+  local base="${CLAUDE_PROJECT_DIR%/}" common
+  # Worktree → resolve về root checkout chính (container dùng chung, không tạo riêng mỗi worktree).
+  common=$(git -C "$base" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || common=""
+  [[ "$common" == */.git ]] && base="${common%/.git}"
+  local root="$base/.browser-profiles"
   [[ "$root" == /* ]] || return 1
   printf '%s' "${root%/}"
 }
@@ -106,7 +109,9 @@ verdict() {
 
 # ── self-test ───────────────────────────────────────────────────────────
 if [ "${1:-}" = "--self-test" ]; then
-  BROWSER_PROFILES_DIR=/profiles
+  CLAUDE_PROJECT_DIR=/repo
+  export CLAUDE_PROJECT_DIR
+  BROWSER_PROFILES_DIR=/elsewhere   # env toàn cục phải bị bỏ qua
   export BROWSER_PROFILES_DIR
   fail=0
   check() { # check <expect-prefix> <tool> <cmd> <user_data_dir>
@@ -119,17 +124,19 @@ if [ "${1:-}" = "--self-test" ]; then
   check ALLOW  "mcp__pw_myapp_auth__browser_navigate"
   check ALLOW  "mcp__cloak_shop_checkout__click"
   check BLOCK  "mcp__cloak_shop_checkout__cloak_launch"
-  check BLOCK  "mcp__cloak_shop_checkout__cloak_launch" "" "/profiles/prj_shop_sv_other"
-  check ALLOW  "mcp__cloak_shop_checkout__cloak_launch" "" "/profiles/prj_shop_sv_checkout"
+  check BLOCK  "mcp__cloak_shop_checkout__cloak_launch" "" "/repo/.browser-profiles/prj_shop_sv_other"
+  check ALLOW  "mcp__cloak_shop_checkout__cloak_launch" "" "/repo/.browser-profiles/prj_shop_sv_checkout"
   check BLOCK  "mcp__cloak_shop_checkout__cloak_launch" "" "relative/prj_shop_sv_checkout"
   check BLOCK  "mcp__cloak_shop_checkout__cloak_launch" "" "/tmp/prj_shop_sv_checkout"
-  check BLOCK  "mcp__cloak_shop_checkout__cloak_launch" "" "/profiles/prj_shop_sv_checkout/extra"
+  check BLOCK  "mcp__cloak_shop_checkout__cloak_launch" "" "/repo/.browser-profiles/prj_shop_sv_checkout/extra"
   check BLOCK  "mcp__playwright__browser_navigate"
   check BLOCK  "mcp__cloak__click"
   check BLOCK  "mcp__pw_myapp__navigate"           # thiếu _yy
   check ALLOW  "mcp__claude_ai_Notion__notion-search"  # non-browser MCP
-  check ALLOW  "Bash" "npx -y @playwright/mcp --user-data-dir=/profiles/prj_myapp_sv_auth"
+  check ALLOW  "Bash" "npx -y @playwright/mcp --user-data-dir=/repo/.browser-profiles/prj_myapp_sv_auth"
   check BLOCK  "Bash" "npx -y @playwright/mcp --user-data-dir=/tmp/prj_myapp_sv_auth"
+  check BLOCK  "Bash" "npx -y @playwright/mcp --user-data-dir=/elsewhere/prj_myapp_sv_auth"  # env override không còn hiệu lực
+  check BLOCK  "mcp__cloak_shop_checkout__cloak_launch" "" "/elsewhere/prj_shop_sv_checkout"
   check BLOCK  "Bash" "npx -y @playwright/mcp --user-data-dir=relative/prj_myapp_sv_auth"
   check BLOCK  "Bash" "npx -y @playwright/mcp --headless"
   check BLOCK  "Bash" "npx -y @playwright/mcp --user-data-dir=/tmp/scratch"  # tên không phải prj_
