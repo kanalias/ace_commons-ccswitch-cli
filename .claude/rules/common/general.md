@@ -13,6 +13,6 @@
 
 - Mọi alert/báo cáo Telegram của service/job/cron PHẢI đi qua `formatServiceAlert`/`sendServiceAlert` của `@acegalaxy/lib-ott-gateway/service-alert` (bash: CLI `service-alert`). Mẫu trong lib là nguồn duy nhất:
   `[<Env>][<Project>] [<icon> <status>] Service <service>` → `<title>` → `key: value` → `---` → detail
-  Ví dụ: `[Mac255][Crawler] [⏳ queued] Service nhadathue-tiktok`.
+  Ví dụ: `[MacMini2][Crawler] [⏳ queued] Service nhadathue-tiktok`.
 - `<Env>` = `HOST_LABEL`, `<Project>` = `ALERT_PROJECT` / `--project`, status ∈ `ok|fail|warn|info|queued|running`.
 - CẤM tự dựng chuỗi header, tự gọi `api.telegram.org`, hoặc fork format trong project. Cần đổi mẫu → sửa trong lib `lib-ott-gateway` + release tag, rồi bump version ở các project dùng.
