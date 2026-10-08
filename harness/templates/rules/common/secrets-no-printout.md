@@ -33,6 +33,15 @@ metadata:
 - Debug log, stack trace có thể chứa Authorization header hoặc query string mang token.
 - Kết quả API test (`curl -v`) — luôn `-H "Authorization: Bearer <redacted>"` khi echo lại lệnh, không in token thật trong output hiển thị cho user.
 
+## Task chạm data nhạy cảm — khảo sát + hỏi trước khi làm (P0)
+
+Data nhạy cảm: bảng lương/thu nhập, thông tin cá nhân nhân sự/khách hàng (CCCD, SĐT, địa chỉ, tài khoản ngân hàng), token, password, API key, private key, vault, file `.env*`/`secrets/`/`security_envs/`.
+
+1. **Khảo sát read-only trước** — xác định file/bảng/field nào bị chạm, chỉ xem tên field/schema/độ dài, KHÔNG in value.
+2. **Dừng, hỏi user xác nhận** trước MỌI action đọc value / sửa / ghi / copy / migrate / gửi ra ngoài data đó. Câu hỏi nêu rõ: data gì, làm gì, nơi đích, ai/hệ thống nào thấy được.
+3. **Bypass** chỉ khi prompt hiện tại của user nói rõ cấp toàn quyền, vd: "Bạn được toàn quyền xử lý", "được phép làm tất cả", "quyền cho bạn". Bypass áp cho task trong prompt đó, KHÔNG kéo sang task sau. Không suy diễn bypass từ "làm nhanh đi", "tự xử lý", hay approval cũ.
+4. Bypass KHÔNG gỡ các cấm ở trên: vẫn không in secret ra chat/log, vẫn [[vault-no-mcp]].
+
 ## Khi phát hiện secret ĐÃ lộ (trong chat, log, hoặc vừa commit)
 
 - Coi secret đó là **compromised ngay lập tức** — khuyến nghị rotate/revoke, không chỉ xoá dòng chat.
