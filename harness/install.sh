@@ -33,9 +33,9 @@
 #   HARNESS_GROUP_QUALITY        y/n — quality hooks, no prompt      (default: Y)
 #   HARNESS_GROUP_COMMANDS       y/n — audit-claude-md + audit-context-memory + audit-dependency + audit-vietnamese + clean-up-project + doctor-memory + git-cleanup-branch + git-commit + git-commit-describe + git-force-snapshot + git-push-safety + task-loop-feature + update-claude + update-codex + update-gemini + update-deepseek workflow skills (slash-invocable /<name>), no prompt (default: Y)
 #   HARNESS_GROUP_SKILLS         y/n — ace-library + check-hardcode + dep-ladder-check + diagram + fix-ledger + orchestrate + research skills, no prompt (default: Y)
-#   HARNESS_GROUP_RULES          y/n — rules: common/ (10 invariant guardrails, always overwrite) + project/ (git-workflow, skill-superpowers, test-parallel, browser-mcp-profiles, processes-layout — kept if exist), no prompt (default: Y)
+#   HARNESS_GROUP_RULES          y/n — rules: common/ (11 invariant guardrails, always overwrite) + project/ (git-workflow, skill-superpowers, test-parallel, browser-mcp-profiles, processes-layout — kept if exist), no prompt (default: Y)
 #   HARNESS_GROUP_GITHOOKS       y/n — git pre-push hook (gitleaks secret scan) into .git/hooks/, no prompt (default: Y; skipped if target not a git repo)
-#   HARNESS_GROUP_DEPLOY         y/n — production-deploy/-cleanup/-reboot skills (slash-invocable /production-*), no prompt (default: N — opt-in, most repos don't deploy to a prod host)
+#   HARNESS_GROUP_DEPLOY         y/n — production-deploy/-cleanup/-reboot + deploy-doc skills (slash-invocable /production-*, /deploy-doc), no prompt (default: N — opt-in, most repos don't deploy to a prod host)
 #   HARNESS_DEPLOY_SSH_HOST      ssh alias of the prod host                (default: <deploy-ssh-host>)
 #   HARNESS_DEPLOY_SERVICE       target container/compose service name    (default: <service-name>)
 #   HARNESS_DEPLOY_PATH          repo path on the host                    (default: <remote-repo-path>)
@@ -495,7 +495,7 @@ fi
 # as a same-name skill (.claude/skills/<name>/SKILL.md, invoked with /<name>).
 # Group membership is derived from the skill's own name (no separate list to
 # keep in sync):
-#   production-*                                           → SEL_DEPLOY
+#   production-* / deploy-doc                              → SEL_DEPLOY
 #   ace-library / check-hardcode / dep-ladder-check / diagram / fix-ledger / orchestrate / research → SEL_SKILLS (skill-only, never had a command;
 #                                                                               orchestrate also covers resume-orchestration)
 #   everything else (former slash-commands)                → SEL_COMMANDS
@@ -505,7 +505,7 @@ if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -e
     skill_name="$(basename "$skill_dir")"
     group_flag=0
     case "$skill_name" in
-      production-*) group_flag="$SEL_DEPLOY" ;;
+      production-*|deploy-doc) group_flag="$SEL_DEPLOY" ;;
       ace-library|check-hardcode|dep-ladder-check|diagram|fix-ledger|orchestrate|research) group_flag="$SEL_SKILLS" ;;
       *) group_flag="$SEL_COMMANDS" ;;
     esac
@@ -672,6 +672,7 @@ ensure_claude_md() {
 - ⭐⭐⭐ [.claude/rules/common/vault-no-mcp.md](.claude/rules/common/vault-no-mcp.md) — **P0**: Vault CRUD KHÔNG qua MCP, Notion API direct
 - ⭐⭐⭐ [.claude/rules/common/token-budget.md](.claude/rules/common/token-budget.md) — **P0**: context-window budget
 - [.claude/rules/project/git-workflow.md](.claude/rules/project/git-workflow.md) — branching, working branch rule, protected-branch deploy confirm, worktree, cleanup
+- ⭐⭐⭐ [.claude/rules/common/deploy-security.md](.claude/rules/common/deploy-security.md) — **P0** deploy/publish: allowlist file public, nginx chặn dotfile/config, probe live sau deploy
 - [.claude/rules/common/feature-redflags.md](.claude/rules/common/feature-redflags.md) — safe minimal changes + RED FLAGS cognitive wedge
 - Thêm/sửa rule → đọc [.claude/rules/common/rule-loading-policy.md](.claude/rules/common/rule-loading-policy.md) trước (rule mới mặc định LAZY \`paths:\`)
 - Ghi memory type project → mirror vào [.claude/memory-mirror/](.claude/memory-mirror/) (chỉ để xem/review qua git, KHÔNG nạp vào context) theo [.claude/rules/common/memory-mirror.md](.claude/rules/common/memory-mirror.md)

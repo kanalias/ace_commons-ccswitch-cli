@@ -142,6 +142,7 @@ run_install() {
   [ ! -e "$TARGET/.claude/skills/production-deploy" ]
   [ ! -e "$TARGET/.claude/skills/production-cleanup" ]
   [ ! -e "$TARGET/.claude/skills/production-reboot" ]
+  [ ! -e "$TARGET/.claude/skills/deploy-doc" ]
 
   # commands group (default Y) — every former slash-command now ships ONLY as a
   # same-name skill; .claude/commands must never be created
@@ -251,6 +252,7 @@ run_install() {
   [ -f "$TARGET/.claude/skills/production-deploy/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/production-cleanup/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/production-reboot/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/deploy-doc/SKILL.md" ]
 }
 
 run_install_deploy() {

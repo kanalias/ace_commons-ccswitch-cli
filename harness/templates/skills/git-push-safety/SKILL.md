@@ -95,6 +95,10 @@ Diff lớn hoặc nghi ngờ leak sâu hơn regex bắt được (secret ẩn tr
 pattern lạ) → dispatch subagent `secret-scanner` để quét kỹ hơn trước khi
 kết luận pass.
 
+## 3.6. Deploy-surface check (nếu diff chạm CI/Docker/nginx/package.json)
+
+Áp [[deploy-security]] mục 1, 2, 4: web root/static không trỏ repo checkout, `.dockerignore` loại `.env*`/`.git`/`.claude`/`CLAUDE.md`, npm lib có `files`, không file nhạy cảm tracked. Vi phạm → STOP trước push.
+
 ## 3.5. README drift check (nếu repo có README ở root)
 
 Chỉ chạy khi diff sắp push (bước 3) chạm tới thứ README mô tả:
