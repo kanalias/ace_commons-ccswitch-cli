@@ -71,7 +71,7 @@ done
 # 4. Code tự ghép path profile thay vì resolveServiceProfilePath (lib-browser-crawler)
 while IFS= read -r hit; do
   add "code tự ghép path profile: $hit — dùng resolveServiceProfilePath"
-done < <(git -C "$root" grep -nE "join\([^)]*['\"]\.browser-profiles['\"]|\.cloakbrowser/|homedir\(\)[^;]*[Pp]rofile" \
+done < <(git -C "$root" grep -nE "join\([^)]*['\"]\.browser-profiles['\"]|\.cloakbrowser/|homedir\(\)[^;]*['\"][^'\"]*[-_][Pp]rofile['\"]" \
   -- '*.ts' '*.js' '*.mjs' '*.cjs' '*.py' ':!*test*' ':!**/dist/**' ':!**/node_modules/**' ':!.claude/**' 2>/dev/null | cut -d: -f1,2 | head -10)
 
 # 5. Profile rơi ngoài repo (CloakBrowser default dir)
