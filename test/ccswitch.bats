@@ -25,7 +25,7 @@ setup() {
   # proxy IDs and auto-compacts at ~190k); 9router strips it before routing.
   [ "$model" = "cc/claude-opus-5-5[1m]" ]
   haiku=$(jq -r '.env.ANTHROPIC_DEFAULT_HAIKU_MODEL' "$HOME/.claude/settings.json")
-  [ "$haiku" = "cc/claude-haiku-4-5-20251001" ]   # haiku is a 200k model — no suffix
+  [ "$haiku" = "cc/claude-haiku-5-5" ]   # haiku is a 200k model — no suffix
 }
 
 @test "apply codex writes current GPT model tiers and high effort" {

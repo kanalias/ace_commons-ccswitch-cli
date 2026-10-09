@@ -115,6 +115,10 @@ không tự suy diễn từ CI xanh cũ.
    ```
    Exit 0 = healthy. Non-zero hoặc timeout = deploy failure, chuyển ngay bước 7; không chạy validation suite khác.
 
+5b. **Probe exposure (bắt buộc, theo [[deploy-security]] mục 3).** Service có HTTP public → chạy probe trên
+   mọi domain vừa deploy; thêm `ssh <deploy-ssh-host> 'ss -tlnp'` kiểm DB/redis/admin không bind `0.0.0.0`.
+   Có `LEAK` hoặc port nội bộ public → coi như smoke fail, chuyển bước 7 (rollback) + báo path lộ.
+
 6. **Verify multi-service (kiểm tra regression lan sang service khác).** Chạy lại `docker ps` trên host và diff với
    snapshot ở bước 3 — mọi service KHÁC phải vẫn `Up`/healthy với cùng container id
    (không bị recreate). Bất kỳ hàng xóm nào bị regress hoặc restart → cảnh báo lớn, đây chính xác là failure
