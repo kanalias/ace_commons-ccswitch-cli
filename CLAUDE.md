@@ -6,6 +6,7 @@
 - ⭐⭐⭐ [.claude/rules/common/vault-no-mcp.md](.claude/rules/common/vault-no-mcp.md) — **P0**: Vault CRUD KHÔNG qua MCP, Notion API direct
 - ⭐⭐⭐ [.claude/rules/common/token-budget.md](.claude/rules/common/token-budget.md) — **P0**: context-window budget
 - [.claude/rules/project/git-workflow.md](.claude/rules/project/git-workflow.md) — branching, working branch rule, protected-branch deploy confirm, worktree, cleanup
+- ⭐⭐⭐ [.claude/rules/common/deploy-security.md](.claude/rules/common/deploy-security.md) — **P0** deploy/publish: allowlist file public, nginx chặn dotfile/config, probe live sau deploy
 - [.claude/rules/common/feature-redflags.md](.claude/rules/common/feature-redflags.md) — safe minimal changes + RED FLAGS cognitive wedge
 - Thêm/sửa rule → đọc [.claude/rules/common/rule-loading-policy.md](.claude/rules/common/rule-loading-policy.md) trước (rule mới mặc định LAZY `paths:`)
 - Ghi memory type project → mirror vào [.claude/memory-mirror/](.claude/memory-mirror/) (chỉ để xem/review qua git, KHÔNG nạp vào context) theo [.claude/rules/common/memory-mirror.md](.claude/rules/common/memory-mirror.md)
@@ -18,7 +19,7 @@ BẮT BUỘC route qua 1 trong **5 surfaces** dưới đây. KHÔNG add ad-hoc s
 
 | Surface | Path | Khi nào dùng |
 |---|---|---|
-| **Skill (slash)** | `.claude/skills/<name>/SKILL.md` (gọi `/<name>`, vd `/deploy`, `/test`) | Workflow lặp lại user gõ `/<name>` |
+| **Skill (slash)** | `.claude/skills/<name>/SKILL.md` (gọi `/<name>`) | Workflow lặp lại user gõ `/<name>` |
 | **Hook** | `.claude/hooks/<name>.sh` + wire `.claude/settings.json` (vd `protect-backup.sh`, `session-start.sh`) | Auto-action khi event (Pre/Post/SessionStart/Stop/SubagentStop) |
 | **Subagent** | `.claude/agents/<name>.md` (vd `smoke-tester`) | Persona isolated context |
 | **MCP server** | `mcp-servers/<name>/` + `.mcp.json` ở root project | External tool / structured I/O |
