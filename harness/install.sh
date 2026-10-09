@@ -484,6 +484,8 @@ if [ "$SEL_QUALITY" -eq 1 ]; then
   install_file "hooks/post-edit-advisor.sh"       ".claude/hooks/post-edit-advisor.sh"
   # merged: session-start-banner + session-start-ledger
   install_file "hooks/session-start.sh"           ".claude/hooks/session-start.sh"
+  # browser profile audit — called by session-start.sh (advisory) or manually with --strict
+  install_file "hooks/browser-profile-audit.sh"   ".claude/hooks/browser-profile-audit.sh"
   # review/security subagents (independent second opinion — not delegate personas)
   install_file "agents/code-reviewer.md"  ".claude/agents/code-reviewer.md"
   install_file "agents/secret-scanner.md" ".claude/agents/secret-scanner.md"

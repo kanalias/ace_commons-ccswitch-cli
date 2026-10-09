@@ -110,6 +110,10 @@ fi
 
 echo "🚦 Orchestrator gate ACTIVE — routing: .claude/rules/common/orchestrator.md" >&2
 
+# browser profile audit (advisory, stderr) — path agent/.mcp.json, registry, .env, code tự ghép path
+[ -x "${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/browser-profile-audit.sh" ] && \
+  "${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/browser-profile-audit.sh" </dev/null || true
+
 if [ -n "${HARNESS_RISK_DIRS:-}" ]; then
   echo "🚦 RISK-PATH DENYLIST: ${HARNESS_RISK_DIRS} — delegate-gemini/delegate-deepseek bị chặn (exit 2) dù đang chạy trong subagent." >&2
   echo "   Chỉ delegate-codex/delegate-sonnet được sửa. Không có bypass (security boundary, không phải size-S convenience)." >&2

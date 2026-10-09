@@ -16,7 +16,7 @@ metadata:
 
 > **CONTAINER PATH (resolve TRƯỚC mọi thao tác profile):** luôn là `<repo>/.browser-profiles/`, với `<repo>` là root checkout chính kể cả khi đang ở worktree.
 >
-> KHÔNG có override bằng env. Biến môi trường trỏ container đi nơi khác (vd export toàn cục trong shell profile) bị **bỏ qua** — một biến toàn cục sẽ dồn profile của mọi project về chung 1 repo.
+> KHÔNG có override bằng env. Biến generic (vd `BROWSER_PROFILES_DIR` export toàn cục) bị **bỏ qua**; biến scope project `<PROJECT>_BROWSER_PROFILES_DIR` chỉ được trống hoặc bằng đúng `<repo>/.browser-profiles` — khác → lib throw `profiles_dir_locked`.
 >
 > Container = folder chứa các profile `prj_<xx>_sv_<yy>/`. Trước mọi `mkdir`, cả `<repo>/.gitignore` và `<repo>/.dockerignore` PHẢI có dòng `/.browser-profiles/`; thiếu guard và không được phép sửa → STOP hỏi user.
 
@@ -47,7 +47,11 @@ Pre-flight bắt buộc — chạy đủ 5 bước theo thứ tự TRƯỚC khi 
 
 Mâu thuẫn / không chắc `(xx,yy)` / container lạ → **STOP hỏi user**, KHÔNG tự đoán rồi tạo.
 
-**Enforce cứng (hook):** `pre-browser-profile-gate.sh` (PreToolUse, matcher MCP browser tools + Bash) chặn `exit 2` khi: MCP server name không khớp `<pw|cloak>_<xx>_<yy>` (server generic `playwright`/`cloak` → block), hoặc Bash launch `@playwright/mcp`/cloak thiếu `--user-data-dir=.../prj_<xx>_sv_<yy>`. Off-switch: `HARNESS_DELEGATE=0`. Hook chỉ chặn được cái đi qua MCP tool / Bash — còn lại vẫn tự giác theo GATE trên.
+**Enforce cứng (hook):** `pre-browser-profile-gate.sh` (PreToolUse, matcher MCP browser tools + Bash) chặn `exit 2` khi: MCP server name không khớp `<pw|cloak>_<xx>_<yy>` (server generic `playwright`/`cloak` → block), hoặc Bash launch `@playwright/mcp`/cloak thiếu `--user-data-dir=.../prj_<xx>_sv_<yy>`. Off-switch: `HARNESS_DELEGATE=0`. Hook chỉ chặn được cái đi qua MCP tool / Bash.
+
+**Audit phủ phần còn lại:** `.claude/hooks/browser-profile-audit.sh` (gọi từ `session-start.sh`, advisory; chạy tay `--strict` → exit 1 khi có lỗi) quét: `--user-data-dir`/`user_data_dir` trong `.claude/agents/*.md` + `.mcp.json` phải đúng `<container>/prj_<xx>_sv_<yy>` và khớp tên server `pw_<xx>_<yy>`; `.gitignore`/`.dockerignore` có `/.browser-profiles/`; dir ↔ `_registry.md` (thiếu/thừa); `.env*` set `*PROFILES_DIR` (chỉ in tên biến); code tự ghép `'.browser-profiles'`/`.cloakbrowser/` thay vì `resolveServiceProfilePath`; profile rơi ở `~/.cloakbrowser/*profile*`.
+
+**Runtime khoá cứng:** `@acegalaxy/lib-browser-crawler` ≥ v0.5.0 — `resolveProfilesBase` luôn `<root>/.browser-profiles`; `<PROJECT>_BROWSER_PROFILES_DIR` chỉ được trống hoặc bằng đúng path đó (Docker `/app/.browser-profiles`), khác → throw `profiles_dir_locked`. Code mới mở browser persistent PHẢI lấy path qua `resolveServiceProfilePath`, KHÔNG thêm env override riêng (`*_PROFILE_DIR`).
 
 ## Naming — `prj_<xx>_sv_<yy>`
 
