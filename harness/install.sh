@@ -344,6 +344,11 @@ build_core_dirs "$CORE_DIRS_CSV"
 
 PROJECT_SLUG="$(printf '%s' "$PROJECT_SLUG_RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
 [ -z "$PROJECT_SLUG" ] && PROJECT_SLUG="project"
+# browser profile slug: prj_<slug>_sv_<svc> regex forbids "-" (bds-hue → bdshue)
+PROFILE_SLUG="${PROJECT_SLUG//-/}"
+# profile container lives at the main checkout root even when installing into a worktree
+REPO_DIR="$(git -C "$ROUTE_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+case "$REPO_DIR" in */.git) REPO_DIR="${REPO_DIR%/.git}" ;; *) REPO_DIR="$ROUTE_DIR" ;; esac
 
 TEST_CMD_LOWER="$(printf '%s' "$TEST_CMD_RAW" | tr '[:upper:]' '[:lower:]')"
 if [ "$TEST_CMD_LOWER" = "none" ] || [ -z "$TEST_CMD_RAW" ]; then
@@ -393,6 +398,8 @@ substitute_file() {
     line="${line//@@CORE_DIRS_HUMAN@@/$CORE_DIRS_HUMAN}"
     line="${line//@@CORE_DIRS_YAML@@/$CORE_DIRS_YAML}"
     line="${line//@@PROJECT_SLUG@@/$PROJECT_SLUG}"
+    line="${line//@@PROFILE_SLUG@@/$PROFILE_SLUG}"
+    line="${line//@@REPO_DIR@@/$REPO_DIR}"
     line="${line//@@PROJECT_REMOTE_ID@@/$PROJECT_REMOTE_ID}"
     line="${line//@@BRANCH@@/$BRANCH}"
     line="${line//@@TEST_CMD@@/$TEST_CMD_PHRASE}"
@@ -515,6 +522,8 @@ if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -e
       install_file "$skill_rel" ".claude/$skill_rel"
     done < <(find "$skill_dir" -type f | sort)
   done < <(find "$TEMPLATES_DIR/skills" -mindepth 1 -maxdepth 1 -type d | sort)
+  # /ui-preview runs in this subagent (context: fork) — MCP tool defs never load in main
+  [ "$SEL_SKILLS" -eq 1 ] && install_file "agents/browser-uipreview.md" ".claude/agents/browser-uipreview.md"
 
   if [ "$SEL_DEPLOY" -eq 1 ]; then
     deploy_config_incomplete=0

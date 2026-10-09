@@ -73,7 +73,11 @@ Cả hai trỏ **CÙNG container + CÙNG naming** → quản lý 1 nơi.
 
 ## MCP registration — per-project (KHÔNG global)
 
-Đăng ký trong `.mcp.json` của repo cần browser, KHÔNG global. Lý do: scope security hẹp theo repo + tiết kiệm token (chỉ repo browser mới nạp tool defs, repo khác không gánh).
+**Mặc định: subagent, KHÔNG `.mcp.json`.** Mỗi profile 1 file `.claude/agents/browser-<yy>.md` khai `mcpServers` **inline** (tham chiếu theo tên `- cloak_x` không chạy khi server vắng trong `.mcp.json`); skill browser dùng `context: fork` + `agent: browser-<yy>`. Tool defs + snapshot chỉ nằm trong subagent, main session 0 token, không cần restart. Harness cài sẵn `browser-uipreview` (Playwright, `/ui-preview`). Chỉ khai `.mcp.json` khi skill phải hỏi user/login tay giữa chừng (subagent không hỏi được).
+
+**Mọi profile (Cloak, Playwright MCP, Playwright/Cloak trong code runtime) nằm trong `<repo>/.browser-profiles/prj_<xx>_sv_<yy>`** — kể cả `launchPersistentContext` trong service; resolve qua `resolveServiceProfilePath` của `@acegalaxy/lib-browser-crawler` khi project dùng lib. Profile ngoài container (`~/.cloakbrowser/*`, cache Playwright mặc định, `/tmp`) → backup `tar` rồi move vào + thêm dòng registry.
+
+Đăng ký `.mcp.json` (nếu cần) của repo cần browser, KHÔNG global. Lý do: scope security hẹp theo repo + tiết kiệm token (chỉ repo browser mới nạp tool defs, repo khác không gánh).
 
 > **Profile bake lúc launch, KHÔNG chọn per tool-call.** Playwright MCP cố định `user-data-dir` per server instance (flag `--user-data-dir`, hoặc env `PLAYWRIGHT_MCP_USER_DATA_DIR`). Antidetect browser (Cloak) cũng bind profile lúc mở. → **1 profile = 1 server entry**. "Tập trung" đạt qua 1 file config + N entry + 1 container, KHÔNG phải 1 server switch profile.
 
