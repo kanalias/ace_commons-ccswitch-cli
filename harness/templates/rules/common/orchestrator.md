@@ -153,7 +153,8 @@ Ranh giới "execution vào core → BẮT BUỘC delegate" có hook chặn cứ
 | `pre-bash-gate.sh` | `Bash` | Main-agent Bash-write core (`sed -i`, `>`, `tee`, `patch`, `git apply`, `python -c`...) + gọi thẳng `aider`/`gemini`/`codex` (bypass wrapper). Mọi agent: `bats` ≥2 file không `-j` (tuần tự, xem [[test-parallel]]). |
 
 - Discriminator main vs subagent: field `agent_id` (chỉ có ở subagent).
-- Escape hatch size-S 1-line thật: `ORCHESTRATOR_GATE_BYPASS=1` → allow + audit log. KHÔNG áp cho direct-CLI và risk-path (security boundary).
+- Escape hatch size-S 1-line thật: prefix ngay trong lệnh Bash `ORCHESTRATOR_GATE_BYPASS=1 <lệnh>` → allow + audit log. Edit/Write tool KHÔNG có bypass (không đặt env cho hook được). KHÔNG áp cho direct-CLI và risk-path (security boundary).
+- Gate Bash bắt cả: heredoc/`-c`/`-e` python/node/ruby/perl có thao tác ghi + path core; `cd <core>` rồi ghi path tương đối; session cwd đang trong core; core trong `.claude/worktrees/<slug>/`. Heuristic chống vô ý, không phải sandbox — lách gate = vi phạm rule, không phải mẹo.
 - Risk-path (auth/payment/wallet/...): khai báo `env.HARNESS_RISK_DIRS` trong `.claude/settings.json` — đọc runtime. Opus vẫn phải chọn đúng persona (Codex/Sonnet) cho domain nhạy cảm ngay từ đầu — hook chỉ là lưới cuối.
 - Fail-open khi thiếu jq / payload không JSON. Off-switch: `HARNESS_DELEGATE=0`.
 

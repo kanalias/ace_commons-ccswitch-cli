@@ -124,7 +124,7 @@ fi
 # Direct-CLI bypass — chặn aider/gemini/codex gọi như command word từ main.
 # KHÔNG có bypass (isolation boundary). Anchor vào vị trí command để tránh
 # match path/substring (vd "gemini/foo", "mycodex").
-if echo "$cmd" | grep -Eq '(^|[;&|(]|&&|\|\||[[:space:]](env|sudo|time|xargs|nice|nohup)[[:space:]])[[:space:]]*(aider|gemini|codex)([[:space:]]|$)'; then
+if echo "$cmd" | grep -Eq '(^|[;&|(]|&&|\|\||[[:space:]](env|sudo|time|xargs|nice|nohup)[[:space:]])[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*(aider|gemini|codex)([[:space:]]|$)'; then
   echo "$(ts) BLOCK main-agent direct-CLI → ${cmd:0:120}" >> "$LOG" 2>/dev/null || true
   cat >&2 << 'EOF'
 🚦 orchestrator-gate: MAIN agent KHÔNG gọi thẳng aider/gemini/codex qua Bash.
@@ -141,45 +141,159 @@ EOF
   exit 2
 fi
 
-# Escape hatch cho Bash-write core (size-S 1-line thật sự).
-if [ "${ORCHESTRATOR_GATE_BYPASS:-}" = "1" ]; then
+# Tách heredoc: thân heredoc của cat/tee = DATA (bỏ, tránh match oan nội dung);
+# của bash/sh/zsh = shell (gộp vào shell part); của python/node/ruby/perl = code.
+# $1 = shell|code. awk POSIX (BSD awk macOS OK), không dùng \x27 trong regex.
+split_heredoc() {
+  printf '%s\n' "$cmd" | awk -v mode="$1" -v q="'" '
+    BEGIN { re = "(^|[^<])<<-?[ \t]*[\"" q "]?[A-Za-z_][A-Za-z0-9_]*[\"" q "]?" }
+    inhd {
+      t = $0; if (strip) sub(/^\t+/, "", t)
+      if (t == tag) { inhd = 0; next }
+      if ((mode == "code" && kind == "code") || (mode == "shell" && kind == "sh")) print
+      next
+    }
+    {
+      if (mode == "shell") print
+      if (match($0, re)) {
+        h = substr($0, RSTART, RLENGTH); sub(/^[^<]/, "", h)
+        strip = (h ~ /^<<-/); gsub(/^<<-?[ \t]*/, "", h); gsub(/["\047]/, "", h)
+        tag = h; inhd = 1; kind = "data"
+        if ($0 ~ /(^|[^A-Za-z0-9_.\/-])(python[0-9.]*|node|ruby|perl|deno|bun)([ \t]|$)/) kind = "code"
+        else if ($0 !~ /ssh[ \t]/ && $0 ~ /(^|[^A-Za-z0-9_.\/-])(bash|sh|zsh)([ \t]|$)/) kind = "sh"
+      }
+    }'
+}
+
+shell_part=$(split_heredoc shell)
+code_part=$(split_heredoc code)
+
+# Escape hatch cho Bash-write core (size-S 1-line thật sự). Nhận CẢ prefix trong
+# chính lệnh (`ORCHESTRATOR_GATE_BYPASS=1 sed ...`, `export ...=1; ...`) — env của
+# process hook KHÔNG nhận assignment trong lệnh, trước đây bypass vô hiệu.
+if [ "${ORCHESTRATOR_GATE_BYPASS:-}" = "1" ] || \
+   printf '%s\n' "$shell_part" | grep -Eq '(^|[;&|(]|[[:space:]])(export[[:space:]]+)?ORCHESTRATOR_GATE_BYPASS=1([[:space:];&|]|$)'; then
   echo "$(ts) BYPASS main-agent bash-write → ${cmd:0:120}" >> "$LOG" 2>/dev/null || true
   exit 0
 fi
 
-# Bash-write vào core source. Mỗi pattern tự-đủ (đã bao hàm "target = core"):
-# core dir alternation = @@CORE_DIRS_ALT@@ (vd src|lib). Rỗng → skip (no core).
-ALT='@@CORE_DIRS_ALT@@'
-if [ -n "$ALT" ]; then
-  P=(
-    "(>>?|[0-9]+>)[[:space:]]*(\./)?($ALT)/"          # redirect vào core (kể cả 2> src/)
-    "\bsed\b.*(-i|--in-place).*($ALT)/"               # sed inplace target core
-    "\btee\b[[:space:]].*(\./)?($ALT)/"               # tee ghi file core
-    "\bpatch\b.*($ALT)/"                              # patch chạm core
-    "\bgit[[:space:]]+apply\b.*($ALT)/"               # git apply patch core
-    "\bdd\b.*of=[\"']?(\./)?($ALT)/"                  # dd of= core
-    "\b(perl|ruby)\b.*-i.*($ALT)/"                    # perl/ruby inplace core
-    "\bpython[0-9.]*\b.*-c\b.*($ALT)/"                # python -c ... core
-    "\b(cp|mv|install|rsync)\b.*[[:space:]](\./)?($ALT)/[^[:space:]]*[[:space:]]*$"  # dest = core (arg cuối)
-  )
-  for pat in "${P[@]}"; do
-    if echo "$cmd" | grep -Eq "$pat"; then
-      echo "$(ts) BLOCK main-agent bash-write → ${cmd:0:120}" >> "$LOG" 2>/dev/null || true
-      cat >&2 << EOF
-🚦 orchestrator-gate: MAIN agent (orchestrator — mọi model) KHÔNG ghi vào source core qua Bash.
+block_core_write() {
+  echo "$(ts) BLOCK main-agent bash-write ($1) → ${cmd:0:120}" >> "$LOG" 2>/dev/null || true
+  cat >&2 << EOF
+🚦 orchestrator-gate: MAIN agent (orchestrator — mọi model) KHÔNG ghi vào source core qua Bash ($1).
    Command: ${cmd:0:160}
 
-   Rule: .claude/rules/orchestrator.md — Opus = pure orchestrator. Edit core
-   (@@CORE_DIRS_HUMAN@@) PHẢI route qua delegate subagent (Task tool):
+   Rule: .claude/rules/common/orchestrator.md — main = pure orchestrator. Sửa core
+   (@@CORE_DIRS_HUMAN@@) PHẢI giao delegate subagent (Agent tool), prompt self-contained
+   (repo path + file paths + spec + verify + không commit):
      • L/XL algo / refactor / fix sau chẩn đoán → delegate-sonnet (fb: delegate-codex)
      • M mechanical / batch edit / boilerplate   → delegate-deepseek
 
-   Nếu ĐÚNG size-S (1-line + 0 read context), chạy lại với:
-     ORCHESTRATOR_GATE_BYPASS=1
+   Chỉ khi ĐÚNG size-S (1 dòng, đã biết chính xác chỗ sửa): đặt prefix ngay trong lệnh
+     ORCHESTRATOR_GATE_BYPASS=1 <lệnh>      (ghi audit log)
 EOF
-      exit 2
-    fi
+  exit 2
+}
+
+# Bash-write vào core source. core dir alternation = @@CORE_DIRS_ALT@@ (vd src|lib).
+# Rỗng → skip (no core).
+ALT='@@CORE_DIRS_ALT@@'
+if [ -n "$ALT" ]; then
+  # Bỏ chuỗi quote dạng pattern/text (chứa space, \, |, ;, newline) — vd grep 'sed -i\|src/',
+  # commit message nhiều dòng — không phải thao tác ghi. Giữ quote dạng path ("src/x.ts").
+  # State machine qua CẢ lệnh (quote nhiều dòng, quote lồng '…"…'), rồi chẻ theo ; | & newline.
+  segs=$(printf '%s\n' "$shell_part" | awk '
+    { buf = buf (NR > 1 ? "\n" : "") $0 }
+    END {
+      sq = sprintf("%c", 39); dq = "\""; out = ""; q = ""; tok = ""; n = length(buf)
+      for (i = 1; i <= n; i++) {
+        ch = substr(buf, i, 1)
+        if (q == "") {
+          if (ch == "\\") { out = out ch substr(buf, i + 1, 1); i++; continue }
+          if (ch == sq || ch == dq) { q = ch; tok = ch; continue }
+          out = out ch; continue
+        }
+        if (q == dq && ch == "\\") { tok = tok ch substr(buf, i + 1, 1); i++; continue }
+        tok = tok ch
+        if (ch == q) { out = out (tok ~ /[ \t\n\\|;&]/ ? "Q" : tok); q = "" }
+      }
+      printf "%s\n", out (q == "" ? "" : tok)
+    }' | tr ';|&' '\n\n\n')
+
+  # Vị trí command word: đầu segment, sau "(" / do / then / else / sudo / env.
+  CMDPOS='^[[:space:]]*(\([[:space:]]*)?((do|then|else|sudo|env|command|time|git)[[:space:]]+)*'
+
+  # (a) ghi trực tiếp vào path core. Dest dạng host:/path (rsync/scp remote) KHÔNG
+  #     phải core local → loại token chứa ':'.
+  P=(
+    "(>>?|[0-9]+>)[[:space:]]*[\"']?(\./)?($ALT)/"                   # redirect vào core (kể cả 2> src/)
+    "(>>?|[0-9]+>)[[:space:]]*[\"']?/[^[:space:]]*/($ALT)/"          # redirect abs path vào core
+    "${CMDPOS}sed[[:space:]]+(.*[[:space:]])?(-[A-Za-z]*i|--in-place).*($ALT)/"    # sed inplace target core
+    "${CMDPOS}(perl|ruby)[[:space:]]+(.*[[:space:]])?-[A-Za-z0-9]*i.*($ALT)/"      # perl/ruby inplace (-i, -pi, -0pi)
+    "(^|[[:space:]])tee[[:space:]]+([^[:space:]]+[[:space:]]+)*[\"']?[^[:space:]:]*($ALT)/"  # tee ghi file core
+    "${CMDPOS}patch[[:space:]].*($ALT)/"                             # patch chạm core
+    "${CMDPOS}apply[[:space:]].*($ALT)/"                             # git apply patch core
+    "${CMDPOS}dd[[:space:]].*of=[\"']?[^[:space:]]*($ALT)/"          # dd of= core
+    "${CMDPOS}(cp|mv|install|rsync)[[:space:]].*[[:space:]][\"']?[^[:space:]:]*($ALT)/[^[:space:]:]*[[:space:]]*$"  # dest = core (arg cuối)
+  )
+  for pat in "${P[@]}"; do
+    printf '%s\n' "$segs" | grep -Eq "$pat" && block_core_write "ghi path core"
   done
+
+  # (b) đang đứng trong core (cwd của session — Bash giữ cwd giữa các lệnh) hoặc
+  #     cd vào core trong lệnh này → ghi path tương đối = ghi core. Chỉ xét segment
+  #     TỪ lệnh cd đó trở đi (redirect trước cd không tính).
+  cwd_core=0
+  cwd_in=$(echo "$payload" | jq -r '.cwd // empty')
+  pd="${CLAUDE_PROJECT_DIR:-}"
+  if [ -n "$cwd_in" ] && [ -n "$pd" ]; then
+    case "$cwd_in" in
+      "$pd"/*)
+        rel="${cwd_in#"$pd"/}"
+        case "$rel" in .claude/worktrees/*/*) rel="${rel#.claude/worktrees/}"; rel="${rel#*/}" ;; esac
+        printf '%s' "$rel" | grep -Eq "^($ALT)(/|$)" && cwd_core=1 ;;
+    esac
+  fi
+  if [ "$cwd_core" = 1 ]; then
+    after_cd="$segs"
+  else
+    # cd vào core → bật; cd tuyệt đối ra ngoài core → tắt (cd tương đối giữ nguyên).
+    after_cd=$(printf '%s\n' "$segs" | awk -v alt="$ALT" '
+      match($0, /(^|[[:space:]])cd[[:space:]]+[^[:space:]]+/) {
+        a = substr($0, RSTART, RLENGTH); sub(/^[[:space:]]*cd[[:space:]]+/, "", a); gsub(/["\047]/, "", a)
+        if (a ~ ("(^|/)(" alt ")(/|$)")) on = 1
+        else if (a ~ /^[\/~]/) on = 0
+      }
+      on')
+  fi
+  in_core=0; [ -n "$after_cd" ] && in_core=1
+  if [ "$in_core" = 1 ]; then
+    R=(
+      "(>>?|[0-9]>)[[:space:]]*[^/&~\$[:space:]>]"                  # redirect tương đối (/tmp, /dev/null, >&2, $VAR OK)
+      "${CMDPOS}sed[[:space:]]+(.*[[:space:]])?(-[A-Za-z]*i|--in-place)([[:space:]]|$)"
+      "${CMDPOS}(perl|ruby)[[:space:]]+(.*[[:space:]])?-[A-Za-z0-9]*i([[:space:]]|$)"
+      "(^|[[:space:]])tee[[:space:]]+(-a[[:space:]]+)?[^/[:space:]-]"
+      "${CMDPOS}(cp|mv|install|patch)[[:space:]]"
+      "${CMDPOS}rsync[[:space:]].*[[:space:]][^[:space:]:]+[[:space:]]*$"   # rsync dest local (không host:)
+      "${CMDPOS}apply[[:space:]]"
+    )
+    for pat in "${R[@]}"; do
+      printf '%s\n' "$after_cd" | grep -Eq "$pat" && block_core_write "cd vào core rồi ghi"
+    done
+  fi
+
+  # (c) code interpreter (heredoc python/node… hoặc -c/-e inline) có thao tác ghi
+  #     + chạm core: path core là string literal ('src/x', "/abs/src/x") hoặc đang
+  #     đứng trong core. "src/" xuất hiện trong nội dung (yaml, markdown) không tính.
+  code="$code_part"
+  if printf '%s\n' "$shell_part" | grep -Eq "(^|[^A-Za-z0-9_./-])(python[0-9.]*|node|ruby|perl|deno|bun)[[:space:]]([^;|&]*[[:space:]])?-(c|e|p)([[:space:]]|$)"; then
+    code="$code"$'\n'"$shell_part"
+  fi
+  if [ -n "$code" ] && printf '%s\n' "$code" | grep -Eq "open\([^)]*,[[:space:]]*(mode=)?[\"'][^\"']*[wax+]|\.write(_text|_bytes)?\(|writeFile(Sync)?\(|appendFile(Sync)?\(|createWriteStream|(os|fs|fsp)\.(replace|rename|renameSync)\(|shutil\.(copy|move)|File\.write"; then
+    if [ "$in_core" = 1 ] || printf '%s\n' "$code" | grep -Eq "[\"'\`]([^\"'\`[:space:]]*/)?($ALT)/[^\"'\`[:space:]]*[\"'\`]"; then
+      block_core_write "script ghi file core"
+    fi
+  fi
 fi
 
 exit 0

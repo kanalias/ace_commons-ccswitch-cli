@@ -160,6 +160,12 @@ fi
 
 # 3) Allow-list trước — harness surface (.claude/), test/, harness/ luôn cho
 #    main agent sửa trực tiếp (không phải "source core" cần delegate).
+#    Bỏ prefix worktree trước khi match: ".claude/worktrees/<slug>/src/x" là core
+#    của worktree, KHÔNG phải harness surface (trước đây lọt qua */.claude/*).
+case "$file_path" in
+  */.claude/worktrees/*/*|.claude/worktrees/*/*)
+    file_path="${file_path#*.claude/worktrees/}"; file_path="${file_path#*/}" ;;
+esac
 case "$file_path" in
   */.claude/*|.claude/*|*/test/*|test/*|*/harness/*|harness/*)
     exit 0
@@ -182,8 +188,10 @@ case "$file_path" in
      • M mechanical / batch edit / boilerplate   → delegate-deepseek
      • read-only audit / cross-file / grep rộng  → delegate-gemini
 
-   Nếu ĐÚNG là size-S (1-line + 0 read context), chạy lại với:
-     ORCHESTRATOR_GATE_BYPASS=1
+   Prompt delegate self-contained: repo path + file paths + spec + verify + không commit.
+   Edit tool KHÔNG có bypass (không đặt được env cho hook). Chỉ khi ĐÚNG size-S
+   (1 dòng, đã biết chính xác chỗ sửa) → dùng Bash với prefix trong lệnh:
+     ORCHESTRATOR_GATE_BYPASS=1 sed -i '' 's/old/new/' <file>   (ghi audit log)
 EOF
     exit 2
     ;;
