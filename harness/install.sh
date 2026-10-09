@@ -656,7 +656,10 @@ fi
 
 if [ "$SEL_GITHOOKS" -eq 1 ]; then
   echo "── git hooks ──"
-  if [ "$IS_GIT" -eq 1 ]; then
+  if [ "$IS_GIT" -eq 1 ] && [ -f "$ROUTE_DIR/.git" ]; then
+    # worktree: .git is a file; hooks live in the shared common dir, installed from the main checkout
+    echo "  • skip pre-push ($ROUTE_DIR là worktree — hook dùng chung main checkout)"
+  elif [ "$IS_GIT" -eq 1 ]; then
     # git-native pre-push (gitleaks secret scan) — guards every `git push`, even outside Claude.
     # source-of-truth = template → sync overwrite. install_file only chmod +x on *.sh, so do it here.
     install_file "git-hooks/pre-push" ".git/hooks/pre-push" sync
