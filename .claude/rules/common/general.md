@@ -9,6 +9,14 @@
   - Đổi lâu dài ("từ giờ", "luôn", "mặc định", "from now on", "always") → áp ngay + **tự cập nhật** dòng "Mặc định" ở trên (sửa upstream `harness/templates/rules/common/general.md` nếu repo có harness, rồi sync sang `.claude/rules/common/general.md`), báo user 1 dòng đã đổi.
 - Không suy diễn đổi ngôn ngữ chỉ vì user gõ prompt bằng ngôn ngữ khác — cần yêu cầu rõ.
 
+## Cách làm việc
+
+- **Chạy liền mạch.** User nói "tiếp tục" / "làm hết" / "làm lần lượt" / "tự làm, đã có quyền" → làm hết các bước còn lại, không dừng hỏi giữa chừng. Vẫn dừng hỏi trước deploy, push, xoá, ghi data nhạy cảm.
+- **Báo "xong" kèm bằng chứng.** Nêu đã verify gì trên môi trường thật (trang live, log, Telegram, output test) — không chỉ "code đã sửa". Task nhiều bước → 1 tóm tắt ngắn cuối, không rải nhiều báo cáo dài.
+- **Tự ghi memory.** Gặp quyết định / cấu hình / quy ước mới user chốt → tự ghi memory ngay, không đợi user nói "ghi nhớ".
+- **Đổi tên → sweep 1 lần.** Đổi tên host / service / profile / env → grep + sửa hết repo, skill, docs, memory, Notion trong cùng lượt; báo danh sách chỗ đã đổi. Không sửa rải rác theo từng lần user nhắc.
+- **Không hardcode.** Path, model, profile, ID, URL không gắn cứng trong code — lấy từ env / Notion config / convention (vd `resolveServiceProfilePath`). Secret xem [[secrets-no-printout]].
+
 ## Thiếu quyền ghi file → viết sẵn lệnh cho user
 
 - Cần thêm/sửa giá trị trong file mà AI không có quyền hoặc bị chặn (`.env*`, `secrets/`, file trên server, file ngoài workspace) → KHÔNG chỉ mô tả "bạn thêm dòng X vào file Y". Viết sẵn lệnh/script hoàn chỉnh trong 1 code block để user copy chạy ngay (theo skill `copy-data-cmd`).
@@ -26,6 +34,7 @@
 - **Fail-open phải lên tiếng.** Code fallback mặc định khi thiếu config/env/Notion → ngoài `console.warn` còn gửi 1 alert `warn` qua `sendServiceAlert` (dedupe theo ngày). Fallback im lặng = lỗi ẩn nhiều ngày.
 - **Config DB Notion có mô tả.** Mỗi DB/page config ghi trong phần description: ý nghĩa từng cột, giá trị hợp lệ, nguồn dữ liệu, độ trễ cache, cái gì phải sửa code. Thêm/đổi cột → cập nhật description cùng lúc.
 - **Không đốt quota thật khi thử.** Chạy thử nhiều lần với API có quota (GitHub anonymous, LLM, Notion…) → cache response hoặc stub/mock; chỉ gọi thật ở lần verify cuối.
+- **Vượt scope project → hỏi 1 lần.** Sửa/commit/push/release ở repo khác ngoài project đang mở (vd lib dùng chung) → hỏi user đồng ý 1 lần (nêu repo + việc định làm); đã đồng ý → làm tiếp repo đó suốt session, không hỏi lại. Chỉ đọc tham khảo thì không cần hỏi.
 - **Preview trước khi gửi ra ngoài.** Hành động outward (gửi Telegram, ghi Notion hàng loạt, deploy) → dry-run in kết quả cho user xem trước, rồi mới chạy thật.
 
 ## Telegram service alert — format đồng nhất (BẮT BUỘC)

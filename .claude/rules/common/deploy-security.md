@@ -76,7 +76,8 @@ done; rm -f /tmp/probe.$$
 - Container KHÔNG mount nguyên `~/.ssh`, `~/.claude`, `~/.config/gh`, `~/.aws` — chỉ mount đúng file cần, `:ro`.
 - GitHub Actions: khai báo `permissions:` top-level (mặc định `contents: read`), job nào cần ghi mới mở rộng; token deps chỉ quyền read.
 - Secret vào runtime qua env/secret store của CI/host — KHÔNG `ENV`/`ARG` literal trong Dockerfile, KHÔNG literal trong compose, KHÔNG `echo $SECRET` trong CI log.
+- **Site public — scan nội dung** (khác scan leak file): text/ảnh/meta mới hoặc đổi phải qua kiểm tra pháp lý VN (quảng cáo, cờ bạc, tuyển dụng, dữ liệu cá nhân), lộ danh tính/địa chỉ/thông tin nội bộ, nội dung nhạy cảm. Có vấn đề → dừng deploy, báo user. Project có file rule content riêng (vd `careers-content.md`) → áp file đó.
 
 ## 5. Khi review/thêm deploy mới
 
-Checklist 1 dòng mỗi mục trong báo cáo deploy: allowlist ✓ · web-server block ✓ · port nội bộ không public ✓ · probe sạch ✓. Thiếu mục nào → nêu rõ, không claim "deploy an toàn".
+Checklist 1 dòng mỗi mục trong báo cáo deploy: allowlist ✓ · web-server block ✓ · port nội bộ không public ✓ · probe sạch ✓ · nội dung public đã scan ✓ (nếu có site public). Thiếu mục nào → nêu rõ, không claim "deploy an toàn".

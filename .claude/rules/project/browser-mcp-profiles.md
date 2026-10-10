@@ -61,6 +61,7 @@ Mâu thuẫn / không chắc `(xx,yy)` / container lạ → **STOP hỏi user**,
 - 1 profile = 1 `user-data-dir` riêng → cookie / session / fingerprint tách hẳn giữa service.
 - **Single-writer lock**: mỗi profile CHỈ 1 browser process tại 1 thời điểm. Chromium/Cloak lock `user-data-dir`; mở trùng → session corrupt / crash. Đóng session cũ TRƯỚC khi tái dùng profile.
 - **Parallel subagent / worktree**: mọi worktree resolve cùng container ở root checkout chính. Mỗi service vẫn dùng đúng profile; hai task cần cùng profile → serialize, KHÔNG mở đồng thời.
+- **Server vs local**: account/profile đang chạy trên server (prod host) KHÔNG được login/dùng song song ở local — login 2 nơi cùng lúc dễ dính checkpoint/khoá account. Mặc định profile chạy trên server; chỉ tạo bản local khi user nói rõ "chạy LOCAL", và dùng account khác.
 
 ## Cloak vs Playwright — dùng cái nào
 
