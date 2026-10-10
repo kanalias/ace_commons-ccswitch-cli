@@ -7,6 +7,7 @@
 - ⭐⭐⭐ [.claude/rules/common/token-budget.md](.claude/rules/common/token-budget.md) — **P0**: context-window budget
 - [.claude/rules/project/git-workflow.md](.claude/rules/project/git-workflow.md) — branching, working branch rule, protected-branch deploy confirm, worktree, cleanup
 - ⭐⭐⭐ [.claude/rules/common/deploy-security.md](.claude/rules/common/deploy-security.md) — **P0** deploy/publish: allowlist file public, nginx chặn dotfile/config, probe live sau deploy
+- ⭐⭐⭐ [.claude/rules/common/orchestrator.md](.claude/rules/common/orchestrator.md) — **P0**: sửa gì ảnh hưởng orchestrator → verify harness gate còn chặn (không bị bypass) TRƯỚC push, mục Harness self-check trước push
 - [.claude/rules/common/feature-redflags.md](.claude/rules/common/feature-redflags.md) — safe minimal changes + RED FLAGS cognitive wedge
 - Thêm/sửa rule → đọc [.claude/rules/common/rule-loading-policy.md](.claude/rules/common/rule-loading-policy.md) trước (rule mới mặc định LAZY `paths:`)
 - Ghi memory type project → mirror vào [.claude/memory-mirror/](.claude/memory-mirror/) (chỉ để xem/review qua git, KHÔNG nạp vào context) theo [.claude/rules/common/memory-mirror.md](.claude/rules/common/memory-mirror.md)

@@ -2,7 +2,7 @@
 name: orchestrator
 description: Main agent = pure orchestrator; plan-first (lock interface + spec) rồi fan-out ≤20 Sonnet song song; REVISE → SendMessage agent cũ. Fable-main: cấm mọi code kể cả size-S trừ khi user cho phép explicit
 status: live
-updated: 2026-09-25
+updated: 2026-10-10
 paths:
   - ".claude/agents/**"
   - ".claude/skills/**"
@@ -233,6 +233,18 @@ Anti-patterns: ❌ main agent gõ `aider --model ...` trong Bash. ❌ delegate e
 Context window (auto-compact 300K + guard): xem [[token-budget]] — orchestrator luôn bật, không liên quan on/off.
 
 > **Project-specific:** delegate wrapper path (`scripts/delegate/`), persona (`.claude/agents/delegate-*`) khai báo trong repo. Chi tiết wrapper: `.claude/rules/common/delegate-llm.md` (lazy, `paths: scripts/delegate/**`).
+
+## Harness self-check trước push (P0)
+
+Sửa BẤT CỨ thứ gì ảnh hưởng orchestrator (hook gate `pre-*-gate.sh`/`subagent-stop-*`/`session-start.sh`, wiring `.claude/settings.json`, `HARNESS_CORE_DIRS`/`HARNESS_RISK_DIRS`, persona `.claude/agents/`, skill `/orchestrate`, rule này, `install.sh` phần hooks/rules) → TRƯỚC push BẮT BUỘC verify harness còn đúng vai trò, không bị bypass:
+
+1. Main-agent Edit/Write vào core → exit 2 (`pre-edit-orchestrator-gate.sh`); cùng payload có `agent_id` (subagent) → exit 0.
+2. Main-agent Bash-write core (`sed -i`, `>`, python heredoc) + gọi thẳng `aider`/`gemini`/`codex` → exit 2 (`pre-bash-gate.sh`).
+3. Dispatch prompt thiếu marker → exit 2 (`pre-task-dispatch-gate.sh`).
+4. Hook vẫn wired trong `.claude/settings.json`; `HARNESS_DELEGATE` không bị set `0`.
+5. Test gate chạy pass (repo harness: `test/orchestrator-gate-holes.bats`, `test/sim-orchestrator-flows.bats`, `test/dispatch-gate.bats`, `test/hooks-contract.bats`).
+
+Probe = pipe payload JSON giả vào hook, check exit code. Bất kỳ case nào exit 0 khi phải 2 → KHÔNG push, coi là regression bypass. Report push PHẢI kèm kết quả check này.
 
 ## Hooks bổ trợ orchestration
 
