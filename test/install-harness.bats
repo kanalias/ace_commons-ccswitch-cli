@@ -183,7 +183,7 @@ run_install() {
   run jq empty "$TARGET/.claude/settings.json"
   [ "$status" -eq 0 ]
   pre_count=$(jq '.hooks.PreToolUse[0].hooks | length' "$TARGET/.claude/settings.json")
-  [ "$pre_count" -eq 2 ]
+  [ "$pre_count" -eq 3 ]  # orchestrator-gate + content-scan + service-alert-gate
   post_cmd=$(jq -r '.hooks.PostToolUse[0].hooks[0].command' "$TARGET/.claude/settings.json")
   [[ "$post_cmd" == *"post-edit-advisor.sh" ]]
   session_cmd=$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$TARGET/.claude/settings.json")

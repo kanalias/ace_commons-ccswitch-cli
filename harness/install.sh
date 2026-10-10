@@ -35,7 +35,8 @@
 #   HARNESS_GROUP_SKILLS         y/n — ace-library + check-hardcode + dep-ladder-check + diagram + fix-ledger + frontend-design + gen-image + orchestrate + research + ui-preview skills, no prompt (default: Y)
 #   HARNESS_GROUP_RULES          y/n — rules: common/ (11 invariant guardrails, always overwrite) + project/ (git-workflow, skill-superpowers, test-parallel, browser-mcp-profiles, processes-layout — kept if exist), no prompt (default: Y)
 #   HARNESS_GROUP_GITHOOKS       y/n — git pre-push hook (gitleaks secret scan) into .git/hooks/, no prompt (default: Y; skipped if target not a git repo)
-#   HARNESS_GROUP_DEPLOY         y/n — production-deploy/-cleanup/-reboot + deploy-doc skills (slash-invocable /production-*, /deploy-doc), no prompt (default: N — opt-in, most repos don't deploy to a prod host)
+#   HARNESS_GROUP_PII            y/n — OPT-IN pre-pii-guard hook (blocks VN phone/CCCD/personal email/address/GPS in edits, bash, mcp, push diff) + pii-scan.pl + self-test, no prompt (default: N)
+#   HARNESS_GROUP_DEPLOY        y/n — production-deploy/-cleanup/-reboot + deploy-doc skills (slash-invocable /production-*, /deploy-doc), no prompt (default: N — opt-in, most repos don't deploy to a prod host)
 #   HARNESS_DEPLOY_SSH_HOST      ssh alias of the prod host                (default: <deploy-ssh-host>)
 #   HARNESS_DEPLOY_SERVICE       target container/compose service name    (default: <service-name>)
 #   HARNESS_DEPLOY_PATH          repo path on the host                    (default: <remote-repo-path>)
@@ -363,7 +364,7 @@ group_on() {
   case "${!1:-y}" in n|N|no|NO|No|nO) return 1 ;; *) return 0 ;; esac
 }
 
-SEL_SUBAGENTS=0; SEL_GUARD=0; SEL_QUALITY=0; SEL_COMMANDS=0; SEL_SKILLS=0; SEL_RULES=0; SEL_GITHOOKS=0; SEL_DEPLOY=0
+SEL_SUBAGENTS=0; SEL_GUARD=0; SEL_QUALITY=0; SEL_COMMANDS=0; SEL_SKILLS=0; SEL_RULES=0; SEL_GITHOOKS=0; SEL_DEPLOY=0; SEL_PII=0
 group_on HARNESS_GROUP_SUBAGENTS    && SEL_SUBAGENTS=1
 group_on HARNESS_GROUP_GUARD        && SEL_GUARD=1
 group_on HARNESS_GROUP_QUALITY      && SEL_QUALITY=1
@@ -372,6 +373,8 @@ group_on HARNESS_GROUP_SKILLS       && SEL_SKILLS=1
 group_on HARNESS_GROUP_RULES        && SEL_RULES=1
 group_on HARNESS_GROUP_GITHOOKS     && SEL_GITHOOKS=1
 prompt_yn HARNESS_GROUP_DEPLOY "Cài production-deploy/-cleanup/-reboot skills (chỉ nếu repo này deploy lên 1 host multi-service)" "N" && SEL_DEPLOY=1
+# opt-in: default N, no interactive prompt (only explicit HARNESS_GROUP_PII=y enables)
+case "${HARNESS_GROUP_PII:-n}" in y|Y|yes|YES|Yes) SEL_PII=1 ;; esac
 
 # ── 4. copy + substitute ────────────────────────────────────────────────
 should_overwrite() {
@@ -476,6 +479,16 @@ if [ "$SEL_GUARD" -eq 1 ]; then
   install_file "hooks/pre-task-dispatch-gate.sh"      ".claude/hooks/pre-task-dispatch-gate.sh"
   # browser profile gate — force Cloak/Playwright qua profile prj_<xx>_sv_<yy>
   install_file "hooks/pre-browser-profile-gate.sh"    ".claude/hooks/pre-browser-profile-gate.sh"
+  # Telegram must go through lib-ott-gateway service-alert — block direct api.telegram.org
+  install_file "hooks/pre-edit-service-alert-gate.sh" ".claude/hooks/pre-edit-service-alert-gate.sh"
+fi
+
+if [ "$SEL_PII" -eq 1 ]; then
+  echo "── pii guard (opt-in) ──"
+  install_file "hooks/pre-pii-guard.sh"      ".claude/hooks/pre-pii-guard.sh"
+  install_file "hooks/pii-scan.pl"           ".claude/hooks/pii-scan.pl"
+  install_file "hooks/pre-pii-guard.test.sh" ".claude/hooks/pre-pii-guard.test.sh"
+  chmod +x "$ROUTE_DIR/.claude/hooks/pii-scan.pl" 2>/dev/null || true
 fi
 
 if [ "$SEL_QUALITY" -eq 1 ]; then
@@ -495,6 +508,8 @@ if [ "$SEL_QUALITY" -eq 1 ]; then
   install_file "hooks/subagent-stop-record.sh"    ".claude/hooks/subagent-stop-record.sh"
   # PreCompact(auto) guard — chặn auto-compact khi task-graph session đang dở
   install_file "hooks/pre-compact-guard.sh"       ".claude/hooks/pre-compact-guard.sh"
+  # advisory: remind /deploy-doc when a commit touches a deploy.md's scope without the doc
+  install_file "hooks/pre-commit-deploy-doc.sh"   ".claude/hooks/pre-commit-deploy-doc.sh"
   # resume is part of the skill `orchestrate` (SEL_SKILLS group below), not a command
   # statusline — shows task-graph progress, chains ~/.claude/statusline-context.sh if present
   install_file "statusline-orchestration.sh"      ".claude/statusline-orchestration.sh"
@@ -769,7 +784,7 @@ fi
 
 array_contains() { local needle="$1" item; shift; for item in "$@"; do [ "$item" = "$needle" ] && return 0; done; return 1; }
 
-if [ "$SEL_GUARD" -eq 1 ] || [ "$SEL_QUALITY" -eq 1 ]; then
+if [ "$SEL_GUARD" -eq 1 ] || [ "$SEL_QUALITY" -eq 1 ] || [ "$SEL_PII" -eq 1 ]; then
   mkdir -p "$ROUTE_DIR/.claude"
   SETTINGS="$ROUTE_DIR/.claude/settings.json"
   [ -f "$SETTINGS" ] || echo '{}' > "$SETTINGS"
@@ -854,6 +869,12 @@ if [ "$SEL_GUARD" -eq 1 ] || [ "$SEL_QUALITY" -eq 1 ]; then
     # browser profile gate — MCP browser tools + Bash launch
     wire_hook PreToolUse 'mcp__(pw_|cloak|playwright|browser).*' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-browser-profile-gate.sh'
     wire_hook PreToolUse 'Bash' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-browser-profile-gate.sh'
+    wire_hook PreToolUse 'Edit|Write|MultiEdit|NotebookEdit' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-edit-service-alert-gate.sh'
+  fi
+  if [ "$SEL_PII" -eq 1 ]; then
+    wire_hook PreToolUse 'Edit|Write|MultiEdit|NotebookEdit' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-pii-guard.sh'
+    wire_hook PreToolUse 'Bash' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-pii-guard.sh'
+    wire_hook PreToolUse 'mcp__.*' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-pii-guard.sh'
   fi
   if [ "$SEL_QUALITY" -eq 1 ]; then
     wire_hook PostToolUse 'Edit|Write|MultiEdit' '$CLAUDE_PROJECT_DIR/.claude/hooks/post-edit-advisor.sh' 'Edit|Write Write'
@@ -862,6 +883,7 @@ if [ "$SEL_GUARD" -eq 1 ] || [ "$SEL_QUALITY" -eq 1 ]; then
     wire_hook PostToolUse 'Bash' '$CLAUDE_PROJECT_DIR/.claude/hooks/post-bash-stuck-detector.sh'
     wire_hook SubagentStop '' '$CLAUDE_PROJECT_DIR/.claude/hooks/subagent-stop-record.sh'
     wire_hook PreCompact 'auto' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact-guard.sh'
+    wire_hook PreToolUse 'Bash' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-commit-deploy-doc.sh'
   fi
   # discoverable off-switch — set once if absent, never clobber a user's existing "0"
   delegate_missing="$(jq 'if .env.HARNESS_DELEGATE == null then 1 else 0 end' "$SETTINGS")"
@@ -955,12 +977,12 @@ install_env_json() {
     --arg branch "${HARNESS_BRANCH:-}" --arg test "$TEST_CMD_RAW" \
     --arg sub "$(yn $SEL_SUBAGENTS)" --arg guard "$(yn $SEL_GUARD)" --arg qual "$(yn $SEL_QUALITY)" \
     --arg cmds "$(yn $SEL_COMMANDS)" --arg skills "$(yn $SEL_SKILLS)" --arg rules "$(yn $SEL_RULES)" \
-    --arg gh "$(yn $SEL_GITHOOKS)" --arg dep "$(yn $SEL_DEPLOY)" \
+    --arg gh "$(yn $SEL_GITHOOKS)" --arg dep "$(yn $SEL_DEPLOY)" --arg pii "$(yn $SEL_PII)" \
     --arg dh "$DEPLOY_SSH_HOST" --arg ds "$DEPLOY_SERVICE" --arg dp "$DEPLOY_PATH" \
     --arg db "${HARNESS_DEPLOY_BRANCH:-}" --arg dr "$DEPLOY_REMOTE" --arg dc "$DEPLOY_HEALTHCHECK" \
     '{HARNESS_CORE_DIRS:$core,HARNESS_RISK_DIRS:$risk,HARNESS_PROJECT_SLUG:$slug,HARNESS_BRANCH:$branch,HARNESS_TEST_CMD:$test,
       HARNESS_GROUP_SUBAGENTS:$sub,HARNESS_GROUP_GUARD:$guard,HARNESS_GROUP_QUALITY:$qual,HARNESS_GROUP_COMMANDS:$cmds,
-      HARNESS_GROUP_SKILLS:$skills,HARNESS_GROUP_RULES:$rules,HARNESS_GROUP_GITHOOKS:$gh,HARNESS_GROUP_DEPLOY:$dep,
+      HARNESS_GROUP_SKILLS:$skills,HARNESS_GROUP_RULES:$rules,HARNESS_GROUP_GITHOOKS:$gh,HARNESS_GROUP_DEPLOY:$dep,HARNESS_GROUP_PII:$pii,
       HARNESS_DEPLOY_SSH_HOST:$dh,HARNESS_DEPLOY_SERVICE:$ds,HARNESS_DEPLOY_PATH:$dp,HARNESS_DEPLOY_BRANCH:$db,
       HARNESS_DEPLOY_REMOTE:$dr,HARNESS_DEPLOY_HEALTHCHECK:$dc}'
 }
