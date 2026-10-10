@@ -110,6 +110,19 @@ fi
 
 echo "🚦 Orchestrator gate ACTIVE — routing: .claude/rules/common/orchestrator.md" >&2
 
+# Luật routing vào CONTEXT model (stdout). orchestrator.md nạp lazy theo paths:,
+# banner stderr model không thấy → trước đây main chỉ biết luật khi bị gate chặn.
+cat << 'EOF'
+🚦 Orchestrator mode: main agent = orchestrator. Sửa source core (src/) → giao subagent ngay từ đầu, không tự Edit/sed/python:
+   delegate-sonnet (L/XL, fix sau chẩn đoán) · delegate-deepseek (M mechanical/batch) · Explore/delegate-gemini (đọc rộng).
+   Prompt self-contained: repo path + file paths + spec + verify + không commit. Đọc .claude/rules/common/orchestrator.md trước khi giao task M+.
+   Chỉ size-S 1 dòng đã biết chỗ sửa: Bash `ORCHESTRATOR_GATE_BYPASS=1 <lệnh>` (audit log). .claude/, test/, docs/ sửa trực tiếp được.
+EOF
+
+# browser profile audit (advisory, stderr) — path agent/.mcp.json, registry, .env, code tự ghép path
+[ -x "${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/browser-profile-audit.sh" ] && \
+  "${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/browser-profile-audit.sh" </dev/null || true
+
 if [ -n "${HARNESS_RISK_DIRS:-}" ]; then
   echo "🚦 RISK-PATH DENYLIST: ${HARNESS_RISK_DIRS} — delegate-gemini/delegate-deepseek bị chặn (exit 2) dù đang chạy trong subagent." >&2
   echo "   Chỉ delegate-codex/delegate-sonnet được sửa. Không có bypass (security boundary, không phải size-S convenience)." >&2
