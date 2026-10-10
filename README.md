@@ -269,11 +269,12 @@ Delegate wrapper là **bash-only** — Windows cần WSL hoặc Git Bash (không
 | Nhóm | Env override | File cài vào project đích |
 |---|---|---|
 | **subagents + wrappers** | `HARNESS_GROUP_SUBAGENTS` | `.claude/agents/delegate-{deepseek,gemini,codex,sonnet}.md` + `scripts/delegate/*.sh` (`_common`, `run-aider-deepseek`, `run-codex`, `run-gemini`, `doctor` + `lib/`) |
-| **guard hooks** | `HARNESS_GROUP_GUARD` | `.claude/hooks/{pre-edit-orchestrator-gate,pre-bash-orchestrator-gate,pre-edit-secret-scan}.sh` (wire `PreToolUse` cho `Edit`/`Write`/`MultiEdit`/`Bash`) |
-| **quality hooks** | `HARNESS_GROUP_QUALITY` | `.claude/hooks/post-edit-syntax-check.sh` (wire `PostToolUse`) + `session-start-banner.sh` (wire `SessionStart`) |
+| **guard hooks** | `HARNESS_GROUP_GUARD` | `.claude/hooks/{pre-edit-orchestrator-gate,pre-bash-orchestrator-gate,pre-edit-secret-scan,pre-edit-service-alert-gate}.sh` (wire `PreToolUse` cho `Edit`/`Write`/`MultiEdit`/`Bash`; service-alert-gate chặn gọi thẳng Telegram Bot API) |
+| **quality hooks** | `HARNESS_GROUP_QUALITY` | `.claude/hooks/post-edit-syntax-check.sh` (wire `PostToolUse`) + `session-start-banner.sh` (wire `SessionStart`) + `pre-commit-deploy-doc.sh` (nhắc `/deploy-doc` khi commit, advisory) |
 | **commands** | `HARNESS_GROUP_COMMANDS` | `.claude/skills/*/SKILL.md` (16 skill, gọi qua `/<name>`) |
 | **skills** | `HARNESS_GROUP_SKILLS` | `.claude/skills/{ace-library,check-hardcode,dep-ladder-check,diagram,fix-ledger,frontend-design,gen-image,orchestrate,research,ui-preview}/SKILL.md` (10 skill; gen-image kèm `gen.py`, frontend-design kèm `LICENSE.txt`; ui-preview chạy trong subagent `.claude/agents/browser-uipreview.md` — Playwright MCP inline, profile `<repo>/.browser-profiles/prj_<slug>_sv_uipreview`, không đụng `.mcp.json`) |
 | **rules** | `HARNESS_GROUP_RULES` | `.claude/rules/common/*.md` (10 invariant guardrail — always overwrite) + `.claude/rules/project/{git-workflow,skill-superpowers,test-parallel,browser-mcp-profiles,processes-layout}.md` (giữ nguyên nếu đã tồn tại) |
+| **PII guard (opt-in, mặc định N)** | `HARNESS_GROUP_PII` | `.claude/hooks/{pre-pii-guard.sh,pii-scan.pl,pre-pii-guard.test.sh}` — chặn SĐT/CCCD/email cá nhân/địa chỉ VN/GPS trong edit, bash, mcp, diff push |
 | **git pre-push hook** | `HARNESS_GROUP_GITHOOKS` | `.git/hooks/pre-push` (gitleaks secret scan) — bỏ qua nếu target không phải git repo |
 
 Wiring `.claude/settings.json` dùng `jq` merge **idempotent** — chạy lại không tạo hook trùng lặp. Off-switch không cần gỡ cài: set `env.HARNESS_DELEGATE=0` trong `.claude/settings.json` của project đích.
