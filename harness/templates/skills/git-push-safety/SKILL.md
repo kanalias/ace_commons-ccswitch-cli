@@ -1,6 +1,6 @@
 ---
 name: git-push-safety
-description: "Chạy test, gitleaks, sensitive-content scan; chỉ push nếu cả 3 pass. `--scan-only` chỉ scan, không test/push. Dùng khi \"check leak trước khi push\"."
+description: "Chạy test, gitleaks, sensitive-content scan; chỉ push nếu cả 3 pass. `--scan-only` chỉ scan, không test/push. Dùng khi \"audit git leak\", \"check leak trước khi push\", hoặc trước mọi lệnh push GitHub."
 disable-model-invocation: true
 user-invocable: true
 ---
@@ -82,7 +82,9 @@ Rồi chạy `git status` và `git diff --stat` (so với branch upstream/main, 
   config sample. Danh sách domain nội bộ cần cảnh giác lấy từ config
   project (vd `.claude/allowed-hosts.txt` là host ĐÃ duyệt; host nội bộ
   khác chưa duyệt → nghi ngờ), không hardcode tên org trong skill.
-- Thông tin cá nhân (email, tên) chưa public trong git history của repo
+  Có file `.claude/sensitive-patterns.txt` (gitignored, 1 regex/dòng: IP
+  production, domain thật, domain nội bộ org) → `git diff <base>...HEAD | grep -nEf`
+  file đó; hit → DỪNG. Không có file → chỉ dựa phán đoán thủ công, KHÔNG bịa pattern.- Thông tin cá nhân (email, tên) chưa public trong git history của repo
 - File nào trông như bị stage nhầm (vd `.env`, `*.bak`, file swap editor,
   credential dump)
 

@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: "Stage và commit local, không push. `--conventional` soạn Conventional Commit, `--auto` tự commit không hỏi. Dùng khi nói \"commit\" hoặc /git-commit."
+description: "Stage và commit local, không push. `--conventional` soạn Conventional Commit, `--auto` tự commit không hỏi. Dùng khi nói \"commit\", \"auto commit\", \"nhớ commit giúp\", \"đừng để tôi quên commit\" hoặc /git-commit."
 user-invocable: true
 disable-model-invocation: true
 ---
@@ -37,5 +37,7 @@ Không bao giờ force, amend, hoặc skip hook. Nếu commit fail (hook reject)
 - Precondition: 1 đơn vị việc hoàn chỉnh (todo done, test pass). Task dở / test fail → DỪNG, báo user, không commit.
 - Quét file lạ/nhạy cảm (`.env`, `*.bak`, credential dump, editor swap) → loại khỏi commit, nêu trong report.
 - Stage theo tên file đúng phạm vi vừa xong, không `-A`/`.`.
+- Dồn nhiều thay đổi không liên quan → tách commit theo từng đơn vị việc, không gộp 1 commit.
+- Chỉ `git commit` local: không push (push qua `/git-push-safety`), không amend, không `--no-verify`.
 - Kết hợp được với `--conventional`.
 - Report 1 dòng hash + subject + file bị loại (lý do).
