@@ -80,7 +80,7 @@
     },
     {
       "path": ".claude/rules/common/deploy-security.md",
-      "sha256": "e62237f2423c4ea78977e7b8f30904ecaeca262be74228c2d7ce05c5a00d591f"
+      "sha256": "1caaef74b39c53225f3b98ba5560915a76722dfff6c71a606541bdecc34a1bd3"
     },
     {
       "path": ".claude/rules/common/feature-redflags.md",
@@ -88,11 +88,11 @@
     },
     {
       "path": ".claude/rules/common/general.md",
-      "sha256": "d390d84894e9ebc4fc1925bc472ffa0e604399265bb51f4b3ffae8bf38a50a3e"
+      "sha256": "eeb487994576859ccfec58fd1c0ce790fea41c048921bb830bcce937e90a0f5b"
     },
     {
       "path": ".claude/rules/common/git-conventions.md",
-      "sha256": "8fc29d8138e383bf586505664a127ae3846f0b584f474fbe3ce4cfb6f1eaf786"
+      "sha256": "4d1c24f0bfe0f0e75464f6479a85c4937d54b2ff58f084dc4d35567fda2bbd37"
     },
     {
       "path": ".claude/rules/common/memory-mirror.md",
