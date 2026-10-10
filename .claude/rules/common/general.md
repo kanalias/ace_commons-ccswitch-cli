@@ -17,6 +17,20 @@
 - **Đổi tên → sweep 1 lần.** Đổi tên host / service / profile / env → grep + sửa hết repo, skill, docs, memory, Notion trong cùng lượt; báo danh sách chỗ đã đổi. Không sửa rải rác theo từng lần user nhắc.
 - **Không hardcode.** Path, model, profile, ID, URL không gắn cứng trong code — lấy từ env / Notion config / convention (vd `resolveServiceProfilePath`). Secret xem [[secrets-no-printout]].
 
+## Tên biến `.env` / config — PREFIX = supplier (BẮT BUỘC)
+
+Quy tắc chung, áp MỌI supplier (danh sách mở, không giới hạn: Anthropic/Claude, OpenAI, Google, Facebook/Meta, Cloudflare, Notion, Telegram, AWS, GitHub, TikTok, Zalo…).
+
+- Format: `<SUPPLIER>_<LOẠI>_<MỤC_ĐÍCH>`, viết HOA, `_` ngăn cách. Mọi biến trong `.env*` và config (JSON/YAML, Notion config) PHẢI có PREFIX supplier.
+  - Đúng: `NOTION_TOKEN_VAULT`, `NOTION_PAGE_CONFIG_ID`, `TELEGRAM_BOT_TOKEN_ALERT`, `TELEGRAM_CHANNEL_ALERT_ID`, `ANTHROPIC_API_KEY`, `CLOUDFLARE_API_TOKEN_DNS`, `GOOGLE_OAUTH_CLIENT_ID`, `FACEBOOK_PAGE_TOKEN_SHOP`.
+  - Sai: `TOKEN`, `BOT_TOKEN`, `CHAT_ID`, `PAGE_ID`, `API_KEY`, `VAULT_TOKEN` (không rõ supplier).
+- **Tự detect supplier** khi thêm biến — không hỏi user: suy từ SDK/package import, domain URL gọi tới (`api.cloudflare.com` → `CLOUDFLARE_`), docs vendor. Supplier có tên env chuẩn chính thức (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `CLOUDFLARE_API_TOKEN`, `GITHUB_TOKEN`) → dùng đúng tên đó để SDK tự đọc.
+- **Dò trước, tạo sau:** grep `.env.example` + code xem supplier đã có prefix chưa → có thì dùng lại đúng prefix đó (không tạo biến thể `CF_` khi repo đã dùng `CLOUDFLARE_`); chưa có → tạo prefix mới theo tên supplier đầy đủ, phổ biến nhất.
+- Config AI không gắn 1 supplier (chọn model, routing, gateway/proxy đa provider) → prefix `AI_` (vd `AI_MODEL_DEFAULT`, `AI_GATEWAY_URL`).
+- Nhiều instance cùng supplier → hậu tố mục đích, KHÔNG đánh số mơ hồ (`TELEGRAM_BOT_TOKEN_ALERT`, không `TELEGRAM_BOT_TOKEN_2`).
+- Biến nội bộ app (không thuộc supplier) → prefix tên project/app (vd `CRAWLER_CONCURRENCY`). Biến chuẩn ecosystem (`NODE_ENV`, `PORT`, `HOST_LABEL`) giữ nguyên.
+- Thêm biến mới → ghi luôn vào `.env.example` (tên + comment supplier/mục đích, KHÔNG value thật). Biến cũ sai convention → đề xuất rename (sweep theo mục "Đổi tên → sweep 1 lần"), không tự đổi khi chưa hỏi vì ảnh hưởng `.env` trên server.
+
 ## Thiếu quyền ghi file → viết sẵn lệnh cho user
 
 - Cần thêm/sửa giá trị trong file mà AI không có quyền hoặc bị chặn (`.env*`, `secrets/`, file trên server, file ngoài workspace) → KHÔNG chỉ mô tả "bạn thêm dòng X vào file Y". Viết sẵn lệnh/script hoàn chỉnh trong 1 code block để user copy chạy ngay (theo skill `copy-data-cmd`).
