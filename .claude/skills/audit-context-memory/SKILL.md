@@ -1,6 +1,6 @@
 ---
 name: audit-context-memory
-description: "Audit context load mỗi session (rules, CLAUDE.md, MEMORY.md): phát hiện trùng lặp/phình, đề xuất lazy `paths:`, fix sau khi user xác nhận. Dùng /audit-context-memory [--rules-only]."
+description: "Audit context load mỗi session (rules, CLAUDE.md, MEMORY.md): phát hiện trùng lặp/phình, đề xuất lazy `paths:`, fix sau khi user xác nhận. Dùng /audit-context-memory [--rules-only], hoặc khi nói \"rule nào đang always-load\", \"giảm context session\", \"kiểm tra + sửa lazy load\", \"rule nào nên lazy\"."
 user-invocable: true
 ---
 
@@ -17,7 +17,7 @@ Khác [[doctor-memory]] (chỉ memory content — broken link, orphan, naming, s
 ## Args
 
 - (mặc định) — full audit như mô tả trên: tất cả nguồn (global rules, CLAUDE.md, project rules, MEMORY.md), chỉ sửa sau khi user chọn `[a]ll/[s]elect/[n]one` ở Bước 5.
-- `--rules-only` — chỉ audit project rules (`.claude/rules/**`): chạy phần PROJECT RULES của Bước 1, chấm theo gate ở Bước 3 mục 1 (gate always-load) + mục 7 (LAZY giả), rồi **tự áp fix không hỏi** cho case confident — rule ALWAYS rớt gate mà glob suy được chắc chắn từ bảng glob ở Bước 3 mục 1, và rule FAKE-LAZY (thu hẹp glob rộng). Case KHÔNG CHẮC glob → KHÔNG chạm file, chỉ flag hỏi user vùng áp dụng. Vẫn tuân Write-boundary dưới: rule `common/**` → sửa template `harness/templates/rules/common/<same>.md`, KHÔNG sửa live; repo không có `harness/templates/` → chỉ flag, không tự sửa. Bỏ qua global rules, CLAUDE.md, MEMORY.md — không đọc, không audit trong mode này. Report theo format: bảng mỗi rule → trạng thái trước (ALWAYS/FAKE-LAZY/LAZY) → hành động (ĐÃ SỬA + glob đã ghi / GIỮ ALWAYS / FLAG chờ user) → lý do 1 dòng (gate nào rớt); tổng số candidate/đã sửa/flag; kết quả verify chạy lại lệnh Bước 1.
+- `--rules-only` — chỉ audit project rules (`.claude/rules/**`): chạy phần PROJECT RULES của Bước 1, chấm theo gate ở Bước 3 mục 1 (gate always-load) + mục 7 (LAZY giả), rồi **tự áp fix không hỏi** cho case confident — rule ALWAYS rớt gate mà glob suy được chắc chắn từ bảng glob ở Bước 3 mục 1, và rule FAKE-LAZY (thu hẹp glob rộng). Sau fix đồng bộ cột Load của `.claude/rules/00-index.md` (nếu có) và chạy lại Bước 1 verify: file đã sửa phải hiện `LAZY`. Không đổi body/`name`/`description` rule. Case KHÔNG CHẮC glob → KHÔNG chạm file, chỉ flag hỏi user vùng áp dụng. Vẫn tuân Write-boundary dưới: rule `common/**` → sửa template `harness/templates/rules/common/<same>.md`, KHÔNG sửa live; repo không có `harness/templates/` → chỉ flag, không tự sửa. Bỏ qua global rules, CLAUDE.md, MEMORY.md — không đọc, không audit trong mode này. Report theo format: bảng mỗi rule → trạng thái trước (ALWAYS/FAKE-LAZY/LAZY) → hành động (ĐÃ SỬA + glob đã ghi / GIỮ ALWAYS / FLAG chờ user) → lý do 1 dòng (gate nào rớt); tổng số candidate/đã sửa/flag; kết quả verify chạy lại lệnh Bước 1.
 
 ## Khái niệm (project rules)
 
