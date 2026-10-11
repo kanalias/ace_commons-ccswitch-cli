@@ -12,7 +12,7 @@
     },
     {
       "path": ".claude/agents/delegate-codex.md",
-      "sha256": "ae4a268b6a7411b837c3769ecbbfce7279d18ff8038b5e9ec15c11aefc16fcdd"
+      "sha256": "feba73b801644441cb0ece88ac56f7e4e1fd6591db16df17d46e505f627ead52"
     },
     {
       "path": ".claude/agents/delegate-deepseek.md",
@@ -51,6 +51,10 @@
       "sha256": "be351ef02d78b1f762819bbfb396e4668a1c4aa37db98b6dff8d03e6d5147950"
     },
     {
+      "path": ".claude/hooks/pre-commit-deploy-doc.sh",
+      "sha256": "dc1cf503d3ff351d58ee2e4516f26893d47b1c71fb7e852bbb724e4e9a2ebe47"
+    },
+    {
       "path": ".claude/hooks/pre-compact-guard.sh",
       "sha256": "4fc991daf09ca3112a0c25eb9bdb2d28f6adaa854488787fcdb212c66f067863"
     },
@@ -61,6 +65,10 @@
     {
       "path": ".claude/hooks/pre-edit-orchestrator-gate.sh",
       "sha256": "8ed47d9ec3ac4979e1879b94e1e12fc43298ab3f470604259361fb99b76a98d3"
+    },
+    {
+      "path": ".claude/hooks/pre-edit-service-alert-gate.sh",
+      "sha256": "8cd1a32537518d8c073091005b5325fb57e41a2ea5ea44c8a2002d0b186e8891"
     },
     {
       "path": ".claude/hooks/pre-task-dispatch-gate.sh",
@@ -80,7 +88,7 @@
     },
     {
       "path": ".claude/rules/common/deploy-security.md",
-      "sha256": "1caaef74b39c53225f3b98ba5560915a76722dfff6c71a606541bdecc34a1bd3"
+      "sha256": "06ef740f9dc2e785167a8711bf0e6ffa1fb987475027e929c1f024cb4708fe74"
     },
     {
       "path": ".claude/rules/common/feature-redflags.md",
@@ -88,7 +96,7 @@
     },
     {
       "path": ".claude/rules/common/general.md",
-      "sha256": "eeb487994576859ccfec58fd1c0ce790fea41c048921bb830bcce937e90a0f5b"
+      "sha256": "4cebc376141275fd285bd1488b3b3c64616e65c47377da95c56c96a8c50bb906"
     },
     {
       "path": ".claude/rules/common/git-conventions.md",
@@ -100,7 +108,7 @@
     },
     {
       "path": ".claude/rules/common/orchestrator.md",
-      "sha256": "a8e1e7af7a2f41ea803aa0c04fb3d5849582bc09916b160e79e2cf105d2fff56"
+      "sha256": "5c163868f8fd0fb42e94d4f7f96d2ebb6f7a9fd7f6b615429c1821433cd2f6f2"
     },
     {
       "path": ".claude/rules/common/rule-loading-policy.md",
@@ -128,7 +136,7 @@
     },
     {
       "path": ".claude/skills/audit-context-memory/SKILL.md",
-      "sha256": "cc31e97a570139967b8b596acc0a75a74e762ab798c445f007497ec3fb35d68e"
+      "sha256": "05fa98ff0edffdc59f6602ba970508d09c1580e0fdab2bcfe541a72dc0021145"
     },
     {
       "path": ".claude/skills/audit-dependency/SKILL.md",
@@ -192,7 +200,7 @@
     },
     {
       "path": ".claude/skills/git-commit/SKILL.md",
-      "sha256": "44ad26921858891c1d1a51c10f9823985b02aced7bb456e7e31e0b2f68495fd5"
+      "sha256": "f021840c48a12526f48d72cc759f5bd9fdea3c2a27c6703920f8264d23da8fef"
     },
     {
       "path": ".claude/skills/git-force-snapshot/SKILL.md",
@@ -200,7 +208,7 @@
     },
     {
       "path": ".claude/skills/git-push-safety/SKILL.md",
-      "sha256": "c8aa3c7210c7e8cbfc2d7fccb95f61035cd098ea56cdef057033c1e44d3445a4"
+      "sha256": "20cee3760039c7dffed9c74372bcdaddc5ca3173522bcde01def4dd0fb5165b6"
     },
     {
       "path": ".claude/skills/orchestrate/SKILL.md",
@@ -256,11 +264,11 @@
     },
     {
       "path": "scripts/delegate/_common.sh",
-      "sha256": "c0118cf6eb6bf8bfcbe2df0ccadc3a137c0687ec35b0f83183aa7bd1f43fbabb"
+      "sha256": "4ddcf14cd7f1fbb31c61cbe017e677528403f0fe7ed9182705cbb236d191b69e"
     },
     {
       "path": "scripts/delegate/doctor.sh",
-      "sha256": "40905d98b191439a5a4517437b0af56b7b0f06d4cfd896bc5def1512e4028ef3"
+      "sha256": "82b14e5eaed01b6b32b3d9b8e615a7c67f345fbb54363991e6acc627acf476da"
     },
     {
       "path": "scripts/delegate/lib/sitecustomize.py",
@@ -303,6 +311,7 @@
     "HARNESS_GROUP_RULES": "y",
     "HARNESS_GROUP_GITHOOKS": "y",
     "HARNESS_GROUP_DEPLOY": "y",
+    "HARNESS_GROUP_PII": "n",
     "HARNESS_DEPLOY_SSH_HOST": "<deploy-ssh-host>",
     "HARNESS_DEPLOY_SERVICE": "<service-name>",
     "HARNESS_DEPLOY_PATH": "<remote-repo-path>",
@@ -311,7 +320,18 @@
     "HARNESS_DEPLOY_HEALTHCHECK": "<healthcheck-cmd>"
   },
   "settings": {
-    "hooks": [],
+    "hooks": [
+      {
+        "event": "PreToolUse",
+        "matcher": "Bash",
+        "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-commit-deploy-doc.sh"
+      },
+      {
+        "event": "PreToolUse",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-edit-service-alert-gate.sh"
+      }
+    ],
     "deny": [
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
