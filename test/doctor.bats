@@ -37,9 +37,9 @@ setup() {
 
 @test "doctor.sh: all CLI present + git repo + env keys set → all pass, exit 0" {
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key-abc123
-deepseek_api_key=fake-ds-key-def456
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key-abc123
+DEEPSEEK_API_KEY=fake-ds-key-def456
 EOF
   run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
   [ "$status" -eq 0 ]
@@ -49,16 +49,16 @@ EOF
   [[ "$output" == *"✓ codex"* ]]
   [[ "$output" == *"✓ gemini"* ]]
   [[ "$output" == *"✓ cwd is inside a git work tree"* ]]
-  [[ "$output" == *"✓ 9router (proxy_host + proxy_key) resolved"* ]]
+  [[ "$output" == *"✓ 9router (AI_9ROUTER_BASE_URL + AI_9ROUTER_API_KEY) resolved"* ]]
   [[ "$output" == *"0 fail"* ]]
 }
 
 @test "doctor.sh: missing codex CLI → fails that line only, still runs rest, exit 1" {
   rm -f "$STUBBIN/codex"
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key-abc123
-deepseek_api_key=fake-ds-key-def456
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key-abc123
+DEEPSEEK_API_KEY=fake-ds-key-def456
 EOF
   run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
   [ "$status" -eq 1 ]
@@ -82,9 +82,9 @@ EOF
 @test "doctor.sh: no timeout/gtimeout binary → WARN (not fail), mentions consequence + fix" {
   # STUBBIN deliberately has no timeout/gtimeout stub.
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key-abc123
-deepseek_api_key=fake-ds-key-def456
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key-abc123
+DEEPSEEK_API_KEY=fake-ds-key-def456
 EOF
   run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
   [ "$status" -eq 0 ]
@@ -95,9 +95,9 @@ EOF
 @test "doctor.sh: timeout binary present → reports OK, not WARN" {
   ln -s "$(command -v timeout || command -v gtimeout || echo /usr/bin/true)" "$STUBBIN/timeout"
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key-abc123
-deepseek_api_key=fake-ds-key-def456
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key-abc123
+DEEPSEEK_API_KEY=fake-ds-key-def456
 EOF
   run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
   [ "$status" -eq 0 ]
@@ -106,9 +106,9 @@ EOF
 
 @test "doctor.sh: never leaks the actual secret value into stdout/stderr" {
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=SUPER-SECRET-VALUE-xyz789
-deepseek_api_key=ANOTHER-SECRET-987
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=SUPER-SECRET-VALUE-xyz789
+DEEPSEEK_API_KEY=ANOTHER-SECRET-987
 EOF
   run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
   ! echo "$output" | grep -q "SUPER-SECRET-VALUE-xyz789"
@@ -149,9 +149,9 @@ stage_settings_wiring() {
 
 @test "doctor.sh: hook wired + executable + syntax-ok + no drift → those checks pass" {
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key-abc123
-deepseek_api_key=fake-ds-key-def456
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key-abc123
+DEEPSEEK_API_KEY=fake-ds-key-def456
 EOF
   stage_hook "foo.sh" '#!/usr/bin/env bash
 echo "claude-code-stage marker"
@@ -180,9 +180,9 @@ exit 0'
 
 @test "doctor.sh: preserved project hooks are not reported as unwired" {
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key-abc123
-deepseek_api_key=fake-ds-key-def456
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key-abc123
+DEEPSEEK_API_KEY=fake-ds-key-def456
 EOF
   stage_hook "foo.sh" '#!/usr/bin/env bash
 exit 0'
@@ -197,9 +197,9 @@ exit 0'
 
 @test "doctor.sh: template drift (real content change) → FAIL naming the file" {
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key-abc123
-deepseek_api_key=fake-ds-key-def456
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key-abc123
+DEEPSEEK_API_KEY=fake-ds-key-def456
 EOF
   stage_hook "foo.sh" '#!/usr/bin/env bash
 echo "claude-code-stage marker"
@@ -216,9 +216,9 @@ exit 0'
 
 @test "doctor.sh: slug-vs-placeholder difference alone → NOT drift, passes" {
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key-abc123
-deepseek_api_key=fake-ds-key-def456
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key-abc123
+DEEPSEEK_API_KEY=fake-ds-key-def456
 EOF
   stage_hook "foo.sh" '#!/usr/bin/env bash
 cache_dir="claude-code-stage/cache"
@@ -236,9 +236,9 @@ exit 0'
 
 @test "doctor.sh: non-slug install-time token (@@CORE_DIRS_ALT@@) diff alone → NOT drift, passes" {
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key-abc123
-deepseek_api_key=fake-ds-key-def456
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key-abc123
+DEEPSEEK_API_KEY=fake-ds-key-def456
 EOF
   stage_hook "foo.sh" '#!/usr/bin/env bash
 core_dirs="src"
@@ -256,9 +256,9 @@ exit 0'
 
 @test "doctor.sh: live has extra trailing line vs template → drift, FAIL" {
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key-abc123
-deepseek_api_key=fake-ds-key-def456
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key-abc123
+DEEPSEEK_API_KEY=fake-ds-key-def456
 EOF
   stage_hook "foo.sh" '#!/usr/bin/env bash
 exit 0
@@ -273,9 +273,9 @@ exit 0'
 
 @test "doctor.sh: live missing a line the template has → drift, FAIL" {
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key-abc123
-deepseek_api_key=fake-ds-key-def456
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key-abc123
+DEEPSEEK_API_KEY=fake-ds-key-def456
 EOF
   stage_hook "foo.sh" '#!/usr/bin/env bash
 exit 0'
@@ -294,9 +294,9 @@ exit 0'
 exit 0'
   stage_settings_wiring "foo.sh"
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key-abc123
-deepseek_api_key=fake-ds-key-def456
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key-abc123
+DEEPSEEK_API_KEY=fake-ds-key-def456
 EOF
   run bash -c "cd '$STAGE' && PATH='$STUBBIN' bash scripts/delegate/doctor.sh"
   [[ "$output" == *"skipped (jq missing)"* ]]
@@ -314,7 +314,7 @@ manifest_fixture() {
   local digest
   digest="$(shasum -a 256 "$STAGE/.claude/commands/example.md" | cut -d ' ' -f1)"
   jq -n --arg hash "$digest" '{schemaVersion:1,harnessVersion:"test",syncFiles:[{path:".claude/commands/example.md",sha256:$hash}],preservePaths:[".claude/rules/project/custom.md"],settings:{hooks:[],deny:["Read(.env)"],env:{HARNESS_DELEGATE:"1"},statusLineCommand:null}}' > "$STAGE/.claude/harness-manifest.json"
-  export proxy_host=https://example.test proxy_key=test-key deepseek_api_key=test-key
+  export AI_9ROUTER_BASE_URL=https://example.test AI_9ROUTER_API_KEY=test-key DEEPSEEK_API_KEY=test-key
 }
 
 @test "doctor.sh: manifest inventory passes and ignores preserved project edits" {

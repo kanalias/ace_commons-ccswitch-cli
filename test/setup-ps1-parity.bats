@@ -23,14 +23,14 @@ stage_repo() {
 write_fake_env_pro() {
   # $1 = host line (empty to omit), $2 = key line (empty to omit)
   : > "$STAGE/.env"
-  [ -n "${1:-}" ] && echo "proxy_host=$1" >> "$STAGE/.env"
-  [ -n "${2:-}" ] && echo "proxy_key=$2" >> "$STAGE/.env"
+  [ -n "${1:-}" ] && echo "AI_9ROUTER_BASE_URL=$1" >> "$STAGE/.env"
+  [ -n "${2:-}" ] && echo "AI_9ROUTER_API_KEY=$2" >> "$STAGE/.env"
 }
 
 write_fake_kimi_env() {
   : > "$STAGE/.env"
-  echo "kimi_api_key_force_subscription=1" >> "$STAGE/.env"
-  if [ -n "${1:-}" ]; then echo "kimi_api_key=$1" >> "$STAGE/.env"; fi
+  echo "KIMI_API_KEY_FORCE_SUBSCRIPTION=1" >> "$STAGE/.env"
+  if [ -n "${1:-}" ]; then echo "KIMI_API_KEY=$1" >> "$STAGE/.env"; fi
 }
 
 setup() {
@@ -100,12 +100,12 @@ require_pwsh() {
   [ "$key" = "$TEST_KEY" ]
 }
 
-@test "non-interactive: kimi force subscription applies kimi_api_key only to kimi profile" {
+@test "non-interactive: kimi force subscription applies KIMI_API_KEY only to kimi profile" {
   require_pwsh
   write_fake_kimi_env "$TEST_KEY"
   run bash -c "cd '$STAGE' && env USERPROFILE='$HOME' pwsh -NoProfile -File ai-proxy/setup.ps1 </dev/null"
   [ "$status" -eq 0 ]
-  [[ "$output" == *".env kimi_api_key applied to profiles\kimi.json"* ]]
+  [[ "$output" == *".env KIMI_API_KEY applied to profiles\kimi.json"* ]]
   base=$(jq -r '.ANTHROPIC_BASE_URL' "$HOME/.claude/profiles/kimi.json")
   key=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/kimi.json")
   claude_key=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/claude.json")

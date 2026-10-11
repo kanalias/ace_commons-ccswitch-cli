@@ -9,14 +9,14 @@ Bộ script cá nhân/team quản lý setup Claude Code: đổi endpoint auth nh
 | Đổi model/endpoint Claude Code nhanh (Claude/Codex/DeepSeek/Kimi qua proxy 9router, hoặc quay lại subscription) | **Phần 1** |
 | Cài mechanism delegate subagent + rules + guard hooks + git pre-push scan vào **project khác** | **Phần 2** |
 | Chỉnh mốc Claude Code tự nén hội thoại (hoặc tắt hẳn) | **Phần 3** |
-| Giảm context window bằng cách tắt tính năng / tool Claude Code không cần (`disableWorkflows`, `denyTools`) | **Phần 4** |
+| Giảm context window bằng cách tắt tính năng / tool Claude Code không cần (`CLAUDE_DISABLE_WORKFLOWS`, `CLAUDE_DENY_TOOLS`) | **Phần 4** |
 
 ### Yêu cầu hệ thống
 
 | Phụ thuộc | Cần cho | Cài |
 |---|---|---|
 | `bash` | Tất cả (mac/linux native; Windows qua Git Bash/WSL/Cygwin) | có sẵn mac/linux; Windows: Git Bash hoặc WSL |
-| `jq` | Phần 1 (profile JSON), Phần 2 (wire `settings.json`), Phần 3 (`autoCompactWindow`), Phần 4 (`disableWorkflows`, `denyTools`) | `brew install jq` / `apt install jq` |
+| `jq` | Phần 1 (profile JSON), Phần 2 (wire `settings.json`), Phần 3 (`autoCompactWindow`), Phần 4 (`CLAUDE_DISABLE_WORKFLOWS`, `CLAUDE_DENY_TOOLS`) | `brew install jq` / `apt install jq` |
 | `curl` | Phần 1 (health-check proxy) | có sẵn hầu hết hệ thống |
 | `git` | Phần 2 (worktree isolation cho delegate wrapper + git pre-push hook) | `brew install git` / `apt install git` |
 | `gitleaks` | Phần 2 (git pre-push scan) | `brew install gitleaks` — thiếu thì hook advisory-skip, không chặn |
@@ -28,7 +28,7 @@ Repo này gồm 4 phần độc lập:
 1. **[`install-9router-proxy.sh`](#phần-1--ccswitch-endpoint-switcher)** — `ccswitch` CLI, đổi endpoint auth của Claude Code (9router / subscription). Lần đầu clone chạy [`install-first-time.sh`](#phần-1--ccswitch-endpoint-switcher) (alias của script này, tên rõ nghĩa hơn).
 2. **[`install-harness.sh`](#phần-2--harness-orchestrator--subagent)** — cài mechanism orchestrator + delegate subagent (agent persona, wrapper script, rules, guard/quality hooks, slash commands, skills, git pre-push hook) vào **project khác**.
 3. **[`install-auto-compact.sh`](#phần-3--auto-compact-window)** — chỉnh mốc `autoCompactWindow` (khi nào Claude Code tự nén context) hoặc tắt hẳn tính năng, qua `~/.claude/settings.json` (hoặc `./.claude/settings.json` cho riêng project).
-4. **[`install-optimize-claude.sh`](#phần-4--optimize-claude)** — đọc `.env` (repo root), ghi `~/.claude/settings.json` để tắt tính năng nặng (`disableWorkflows`) + deny tool built-in không dùng (`denyTools`, bỏ schema tool khỏi context) nhằm giảm context window.
+4. **[`install-optimize-claude.sh`](#phần-4--optimize-claude)** — đọc `.env` (repo root), ghi `~/.claude/settings.json` để tắt tính năng nặng (`CLAUDE_DISABLE_WORKFLOWS`) + deny tool built-in không dùng (`CLAUDE_DENY_TOOLS`, bỏ schema tool khỏi context) nhằm giảm context window.
 
 Phần 1 tự detect OS (macOS/Linux chạy bash trực tiếp; Windows qua Git Bash/WSL/Cygwin tự gọi PowerShell) — không cần chọn `.sh` hay `.ps1` thủ công. Phần 2 — delegate wrapper bash-only, Windows cần WSL/Git-Bash, không chạy CMD/PowerShell thuần. Phần 3 và 4 — thuần bash + `jq`, không có bản `.ps1`, chạy trên Windows cần Git Bash/WSL.
 
@@ -52,7 +52,7 @@ Phần 1 tự detect OS (macOS/Linux chạy bash trực tiếp; Windows qua Git 
 > `subscription` KHÔNG phải profile file: nó xóa block `env` để Claude Code quay về OAuth login gốc.
 > Alias tương thích ngược: `original` / `direct` / `clear` → `subscription`.
 >
-> Kimi có mode phụ **direct-endpoint** (`kimi_api_key_force_subscription=1` trong `.env`): profile `kimi.json` trỏ thẳng endpoint Anthropic-compatible của Kimi `https://api.moonshot.ai/anthropic` với key Kimi riêng, không đi qua 9router. Mặc định (`=0`) → Kimi đi qua 9router như 3 target còn lại.
+> Kimi có mode phụ **direct-endpoint** (`KIMI_API_KEY_FORCE_SUBSCRIPTION=1` trong `.env`): profile `kimi.json` trỏ thẳng endpoint Anthropic-compatible của Kimi `https://api.moonshot.ai/anthropic` với key Kimi riêng, không đi qua 9router. Mặc định (`=0`) → Kimi đi qua 9router như 3 target còn lại.
 
 ### 1.1 Cài đặt
 
@@ -80,15 +80,15 @@ Installer sẽ:
 **Cách nhanh nhất — `.env`:** tạo file `.env` (gitignored) ở repo root:
 
 ```bash
-proxy_host=https://9router.proxy.example.com/v1
-proxy_key=<your-9router-key>
+AI_9ROUTER_BASE_URL=https://9router.proxy.example.com/v1
+AI_9ROUTER_API_KEY=<your-9router-key>
 
 # optional: Kimi direct-endpoint mode (bypass 9router, dùng endpoint Kimi thật)
-kimi_api_key_force_subscription=1
-kimi_api_key=<your-kimi-key>
+KIMI_API_KEY_FORCE_SUBSCRIPTION=1
+KIMI_API_KEY=<your-kimi-key>
 ```
 
-(mẫu có sẵn ở `.env.example`). Khi `setup.sh`/`setup.ps1` chạy và thấy file này có đủ cả 2 biến, nó **ghi thẳng** `proxy_host` + `proxy_key` vào cả 5 file (`claude.json` / `codex.json` / `deepseek.json` / `kimi.json` / `gemini.json`) — không hỏi, interactive hay non-interactive đều như nhau. Nếu `kimi_api_key_force_subscription=1` + `kimi_api_key` có mặt, nó ghi riêng `~/.claude/profiles/kimi.json` với endpoint Anthropic-compatible thật của Kimi `https://api.moonshot.ai/anthropic` (bỏ qua 9router). `.env` là nguồn chuẩn duy nhất (source of truth): một profile đã có key thật vẫn bị ghi đè (có in thông báo ghi đè), chạy lại script bất kỳ lúc nào để resync theo `.env` mới nhất.
+(mẫu có sẵn ở `.env.example`). Khi `setup.sh`/`setup.ps1` chạy và thấy file này có đủ cả 2 biến, nó **ghi thẳng** `AI_9ROUTER_BASE_URL` + `AI_9ROUTER_API_KEY` vào cả 5 file (`claude.json` / `codex.json` / `deepseek.json` / `kimi.json` / `gemini.json`) — không hỏi, interactive hay non-interactive đều như nhau. Nếu `KIMI_API_KEY_FORCE_SUBSCRIPTION=1` + `KIMI_API_KEY` có mặt, nó ghi riêng `~/.claude/profiles/kimi.json` với endpoint Anthropic-compatible thật của Kimi `https://api.moonshot.ai/anthropic` (bỏ qua 9router). `.env` là nguồn chuẩn duy nhất (source of truth): một profile đã có key thật vẫn bị ghi đè (có in thông báo ghi đè), chạy lại script bất kỳ lúc nào để resync theo `.env` mới nhất.
 
 Không có `.env`, hoặc thiếu 1 trong 2 biến → bỏ qua bước này, dùng flow nhập tay:
 
@@ -297,7 +297,7 @@ Cài toàn bộ harness và override mọi file đã tồn tại [Y/n]: y
 ✅ Xong. Chạy scripts/delegate/doctor.sh trong project đích để kiểm tra CLI + env key.
 ```
 
-Sau khi cài, chạy `scripts/delegate/doctor.sh` (trong project đích) để kiểm tra preflight — CLI `git`/`jq`/`aider`/`codex`/`gemini` có cài chưa, có đang trong git repo không, key 9router/`deepseek_api_key` resolve được không (không bao giờ in giá trị secret thật) — và health của hooks: wiring trong `settings.json`, orphan (hook có file nhưng chưa wire), cú pháp `bash -n` từng hook, và có bị drift so với template gốc trong `harness/templates/hooks/` không:
+Sau khi cài, chạy `scripts/delegate/doctor.sh` (trong project đích) để kiểm tra preflight — CLI `git`/`jq`/`aider`/`codex`/`gemini` có cài chưa, có đang trong git repo không, key 9router/`DEEPSEEK_API_KEY` resolve được không (không bao giờ in giá trị secret thật) — và health của hooks: wiring trong `settings.json`, orphan (hook có file nhưng chưa wire), cú pháp `bash -n` từng hook, và có bị drift so với template gốc trong `harness/templates/hooks/` không:
 
 ```text
 $ scripts/delegate/doctor.sh
@@ -312,7 +312,7 @@ Git repo:
   ✓ cwd is inside a git work tree
 
 Env keys (presence only — never print values):
-  ✓ 9router (proxy_host + proxy_key) resolved
+  ✓ 9router (AI_9ROUTER_BASE_URL + AI_9ROUTER_API_KEY) resolved
   ✓ deepseek fallback key resolved
 
 Hooks:
@@ -337,7 +337,7 @@ Ví dụ khi hook chặn push (phát hiện leak):
 
 ```text
 🔍 Scanning for secrets with gitleaks...
-Finding:     proxy_key=sk-abc123...
+Finding:     AI_9ROUTER_API_KEY=sk-abc123...
 File:        .env
 Line:        3
 Rule:        generic-api-key
@@ -445,12 +445,12 @@ Script đọc 2 key trong `.env` (repo root) — key nào thiếu thì bỏ qua 
 
 ```bash
 # trong .env
-disableWorkflows=true
-denyTools=Artifact,ArtifactComments,ArtifactData,CronCreate,CronDelete,CronList,DesignSync,ListAgents,NotebookEdit,PushNotification,ReportFindings,ScheduleWakeup
+CLAUDE_DISABLE_WORKFLOWS=true
+CLAUDE_DENY_TOOLS=Artifact,ArtifactComments,ArtifactData,CronCreate,CronDelete,CronList,DesignSync,ListAgents,NotebookEdit,PushNotification,ReportFindings,ScheduleWakeup
 ```
 
-- `disableWorkflows=true` → ghi `settings.json` tắt "Dynamic workflows" (script JS Claude tự viết để orchestrate nhiều subagent quy mô lớn — KHÁC `.claude/workflows/` CI/CD). Tắt xong `/deep-research`, keyword `ultracode`, `/workflows` view không dùng được. KHÔNG ảnh hưởng Subagent (Agent tool), Skill, `/loop`, orchestrator routing rule.
-- `denyTools=<tên tool, cách nhau dấu phẩy>` → union vào `permissions.deny` của `settings.json` (idempotent, giữ entry deny có sẵn, không gỡ tool đã bỏ khỏi list — muốn dùng lại thì tự xoá trong `settings.json`). Deny theo **tên trần** = Claude Code không nạp schema tool đó vào context; 12 tool mặc định trong `.env.example` ≈ 23k token/session. Chỉ nhận tên tool (`[A-Za-z0-9_]`), không nhận pattern `Bash(...)`. Deny thắng allow.
+- `CLAUDE_DISABLE_WORKFLOWS=true` → ghi `settings.json` tắt "Dynamic workflows" (script JS Claude tự viết để orchestrate nhiều subagent quy mô lớn — KHÁC `.claude/workflows/` CI/CD). Tắt xong `/deep-research`, keyword `ultracode`, `/workflows` view không dùng được. KHÔNG ảnh hưởng Subagent (Agent tool), Skill, `/loop`, orchestrator routing rule.
+- `CLAUDE_DENY_TOOLS=<tên tool, cách nhau dấu phẩy>` → union vào `permissions.deny` của `settings.json` (idempotent, giữ entry deny có sẵn, không gỡ tool đã bỏ khỏi list — muốn dùng lại thì tự xoá trong `settings.json`). Deny theo **tên trần** = Claude Code không nạp schema tool đó vào context; 12 tool mặc định trong `.env.example` ≈ 23k token/session. Chỉ nhận tên tool (`[A-Za-z0-9_]`), không nhận pattern `Bash(...)`. Deny thắng allow.
 - `.env` không có key nào → script bỏ qua, không đụng gì.
 
 Yêu cầu `jq`. Tự tạo `settings.json` (`{}`) nếu chưa có. Cần **session mới** để Claude Code đọc lại settings sau khi chạy.
@@ -492,7 +492,7 @@ ccswitch-cli-claude/
 │       └── git-hooks/pre-push              # gitleaks scan trước push (cài vào .git/hooks/ project đích)
 │
 ├── install-auto-compact.sh       # Phần 3 — set/auto/off/on/status autoCompactWindow, đứng riêng
-├── install-optimize-claude.sh    # Phần 4 — disableWorkflows + denyTools từ .env, đứng riêng
+├── install-optimize-claude.sh    # Phần 4 — CLAUDE_DISABLE_WORKFLOWS + CLAUDE_DENY_TOOLS từ .env, đứng riêng
 │
 ├── scripts/delegate/             # bản wrapper THẬT dùng trong repo này (đồng bộ với harness/templates/scripts/delegate/)
 ├── .claude/                      # harness bản THẬT của repo này (agents, hooks, skills, rules)

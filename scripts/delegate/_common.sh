@@ -16,7 +16,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
 #       .env.runtime + trust-root .env-bootstrap now merged into .env.
 #       2026-07-20 consolidation: ai-proxy/.env.pro moved to repo root as
 #       .env — dropped from this loop, already covered by the 2nd entry).
-# Holds 9router creds as proxy_host/proxy_key (ccswitch's own var names);
+# Holds 9router creds as AI_9ROUTER_BASE_URL/AI_9ROUTER_API_KEY (ccswitch's own var names);
 # aliased below to PROXY_9ROUTER_BASE_URL/_TOKEN.
 # Only if files exist. Never echo values.
 load_env_chain() {
@@ -38,17 +38,17 @@ load_env_chain() {
     fi
   done
 
-  # ai-proxy/.env.pro var names (proxy_host/proxy_key) → PROXY_9ROUTER_* generic
+  # ai-proxy/.env.pro var names (AI_9ROUTER_BASE_URL/AI_9ROUTER_API_KEY) → PROXY_9ROUTER_* generic
   # names delegate wrappers expect. Only set if not already set by host env.
-  : "${PROXY_9ROUTER_BASE_URL:=${proxy_host:-}}"
-  : "${PROXY_9ROUTER_TOKEN:=${proxy_key:-}}"
+  : "${PROXY_9ROUTER_BASE_URL:=${AI_9ROUTER_BASE_URL:-}}"
+  : "${PROXY_9ROUTER_TOKEN:=${AI_9ROUTER_API_KEY:-}}"
   export PROXY_9ROUTER_BASE_URL PROXY_9ROUTER_TOKEN
 
   # Project-prefix → generic alias (Aider/Codex/Gemini CLIs expect generic names).
   # Only set generic if currently empty (don't override host-level env).
-  # deepseek_api_key = raw var name in ai-proxy/.env.pro; PROXY_DEEPSEEK_API_KEY
+  # DEEPSEEK_API_KEY comes straight from .env; PROXY_DEEPSEEK_API_KEY
   # kept as alt override name for host-level env.
-  : "${DEEPSEEK_API_KEY:=${PROXY_DEEPSEEK_API_KEY:-${deepseek_api_key:-}}}"
+  : "${DEEPSEEK_API_KEY:=${PROXY_DEEPSEEK_API_KEY:-}}"
   : "${OPENAI_API_KEY:=${PROXY_OPENAI_API_KEY:-}}"
   : "${ANTHROPIC_API_KEY:=${PROXY_ANTHROPIC_API_KEY:-}}"
   # GEMINI_USE_OAUTH=1 → route Gemini CLI qua OAuth Workspace + GOOGLE_CLOUD_PROJECT

@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# setup.sh: .env proxy flow (proxy_host + proxy_key applied to all 3 profiles).
+# setup.sh: .env proxy flow (AI_9ROUTER_BASE_URL + AI_9ROUTER_API_KEY applied to all 3 profiles).
 # .env is gitignored and may hold a real key on this machine — every test stages
 # a throwaway copy repo into a FAKE .env, so the real file is never touched.
 
@@ -22,14 +22,14 @@ stage_repo() {
 write_fake_env_pro() {
   # $1 = host line (empty to omit), $2 = key line (empty to omit)
   : > "$STAGE/.env"
-  if [ -n "${1:-}" ]; then echo "proxy_host=$1" >> "$STAGE/.env"; fi
-  if [ -n "${2:-}" ]; then echo "proxy_key=$2" >> "$STAGE/.env"; fi
+  if [ -n "${1:-}" ]; then echo "AI_9ROUTER_BASE_URL=$1" >> "$STAGE/.env"; fi
+  if [ -n "${2:-}" ]; then echo "AI_9ROUTER_API_KEY=$2" >> "$STAGE/.env"; fi
 }
 
 write_fake_kimi_env() {
   : > "$STAGE/.env"
-  echo "kimi_api_key_force_subscription=1" >> "$STAGE/.env"
-  if [ -n "${1:-}" ]; then echo "kimi_api_key=$1" >> "$STAGE/.env"; fi
+  echo "KIMI_API_KEY_FORCE_SUBSCRIPTION=1" >> "$STAGE/.env"
+  if [ -n "${1:-}" ]; then echo "KIMI_API_KEY=$1" >> "$STAGE/.env"; fi
 }
 
 setup() {
@@ -41,8 +41,8 @@ setup() {
   write_fake_env_pro "$TEST_HOST" "$TEST_KEY"
   run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"non-interactive shell — using proxy_host + proxy_key from .env (default Yes)"* ]]
-  [[ "$output" == *".env proxy_host + proxy_key applied to profiles/"* ]]
+  [[ "$output" == *"non-interactive shell — using AI_9ROUTER_BASE_URL + AI_9ROUTER_API_KEY from .env (default Yes)"* ]]
+  [[ "$output" == *".env AI_9ROUTER_BASE_URL + AI_9ROUTER_API_KEY applied to profiles/"* ]]
   for p in claude codex deepseek; do
     host=$(jq -r '.ANTHROPIC_BASE_URL' "$HOME/.claude/profiles/$p.json")
     key=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/$p.json")
@@ -51,20 +51,20 @@ setup() {
   done
 }
 
-@test "non-interactive: .env is ignored when proxy_key is missing" {
+@test "non-interactive: .env is ignored when AI_9ROUTER_API_KEY is missing" {
   write_fake_env_pro "$TEST_HOST" ""
   run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
   [ "$status" -eq 0 ]
-  [[ "$output" == *".env found but missing proxy_host/proxy_key — ignored"* ]]
+  [[ "$output" == *".env found but missing AI_9ROUTER_BASE_URL/AI_9ROUTER_API_KEY — ignored"* ]]
   key=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/claude.json")
   [[ "$key" == *"<your-9router-key>"* ]]
 }
 
-@test "non-interactive: .env is ignored when proxy_host is missing" {
+@test "non-interactive: .env is ignored when AI_9ROUTER_BASE_URL is missing" {
   write_fake_env_pro "" "$TEST_KEY"
   run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
   [ "$status" -eq 0 ]
-  [[ "$output" == *".env found but missing proxy_host/proxy_key — ignored"* ]]
+  [[ "$output" == *".env found but missing AI_9ROUTER_BASE_URL/AI_9ROUTER_API_KEY — ignored"* ]]
   key=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/claude.json")
   [[ "$key" == *"<your-9router-key>"* ]]
 }
@@ -78,8 +78,8 @@ setup() {
 }
 
 @test "non-interactive: .env ALWAYS overrides even when a profile already holds a real key" {
-  # design (setup.sh 2b): .env is the source of truth. When both proxy_host and
-  # proxy_key are present it overwrites all three profiles unconditionally — a
+  # design (setup.sh 2b): .env is the source of truth. When both AI_9ROUTER_BASE_URL and
+  # AI_9ROUTER_API_KEY are present it overwrites all three profiles unconditionally — a
   # pre-existing real key is replaced, and a notice is printed so the override
   # is not silent.
   write_fake_env_pro "$TEST_HOST" "$TEST_KEY"
@@ -94,13 +94,13 @@ setup() {
 
 @test "interactive: a complete .env auto-applies to all 3 profiles with no prompt (pty)" {
   command -v expect >/dev/null 2>&1 || skip "expect not installed"
-  # With both proxy_host + proxy_key present, setup.sh applies unconditionally — there is
+  # With both AI_9ROUTER_BASE_URL + AI_9ROUTER_API_KEY present, setup.sh applies unconditionally — there is
   # no interactive confirmation to answer, even on a real tty. It should reach eof on its own.
   write_fake_env_pro "$TEST_HOST" "$TEST_KEY"
   run expect -c "
     set timeout 10
     spawn bash -c \"cd '$STAGE' && bash ai-proxy/setup.sh\"
-    expect \".env proxy_host + proxy_key applied to profiles/*\"
+    expect \".env AI_9ROUTER_BASE_URL + AI_9ROUTER_API_KEY applied to profiles/*\"
     expect eof
   "
   [ "$status" -eq 0 ]
@@ -134,11 +134,11 @@ setup() {
   [[ "$key" == *"<your-9router-key>"* ]]
 }
 
-@test "non-interactive: kimi force subscription applies kimi_api_key only to kimi profile" {
+@test "non-interactive: kimi force subscription applies KIMI_API_KEY only to kimi profile" {
   write_fake_kimi_env "$TEST_KEY"
   run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
   [ "$status" -eq 0 ]
-  [[ "$output" == *".env kimi_api_key applied to profiles/kimi.json"* ]]
+  [[ "$output" == *".env KIMI_API_KEY applied to profiles/kimi.json"* ]]
   base=$(jq -r '.ANTHROPIC_BASE_URL' "$HOME/.claude/profiles/kimi.json")
   key=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/kimi.json")
   claude_key=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/claude.json")
@@ -151,7 +151,7 @@ setup() {
   write_fake_kimi_env ""
   run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"kimi_api_key_force_subscription=1 but kimi_api_key missing"* ]]
+  [[ "$output" == *"KIMI_API_KEY_FORCE_SUBSCRIPTION=1 but KIMI_API_KEY missing"* ]]
   key=$(jq -r '.ANTHROPIC_AUTH_TOKEN' "$HOME/.claude/profiles/kimi.json")
   [[ "$key" == *"<your-9router-key>"* ]]
 }

@@ -37,7 +37,7 @@ echo "  ✓ statusline-context.sh (context-usage early-warning bar)"
 # 2. profile templates — create missing profiles; refresh model defaults in existing
 # profiles while preserving real host/key. Re-run setup after repo model updates.
 # 5 profiles: claude/codex/deepseek/kimi/gemini via 9router share ONE token.
-# kimi_api_key_force_subscription=1 switches kimi to Kimi's own direct Anthropic-compatible endpoint instead.
+# KIMI_API_KEY_FORCE_SUBSCRIPTION=1 switches kimi to Kimi's own direct Anthropic-compatible endpoint instead.
 # `subscription` is the env-clear fallback (no file, no key).
 PROFILE_TARGETS=(claude codex deepseek kimi gemini)
 ROUTER_TARGETS=(claude codex deepseek kimi gemini)
@@ -63,7 +63,7 @@ done
 
 # 2b. fill credentials into all router profiles (claude/codex/deepseek/kimi/gemini share ONE 9router token).
 # Preferred source: `.env` at repo root (one level up from this script's dir, gitignored)
-# holding `proxy_host=` + `proxy_key=`. When both are present, ALWAYS overwrite host + key
+# holding `AI_9ROUTER_BASE_URL=` + `AI_9ROUTER_API_KEY=`. When both are present, ALWAYS overwrite host + key
 # in all three router profiles — no prompt, no placeholder check, interactive or not. `.env` is the
 # source of truth; re-run this script any time it changes to resync. No `.env` (or missing
 # fields) falls back to the manual prompts (host, then key). Key values are never echoed.
@@ -88,7 +88,7 @@ mask_secret() {  # mask_secret <value> — first4...last4 + length; never the fu
   if [ "$len" -le 8 ]; then printf '%s' "****"; else printf '%s...%s (len=%d)' "${v:0:4}" "${v: -4}" "$len"; fi
 }
 
-apply_env_pro() {  # write proxy_host + proxy_key from .env into all router profiles
+apply_env_pro() {  # write AI_9ROUTER_BASE_URL + AI_9ROUTER_API_KEY from .env into all router profiles
   local failed=0 target dst
   for target in "${ROUTER_TARGETS[@]}"; do
     dst="$PROFILES/$target.json"
@@ -99,9 +99,9 @@ apply_env_pro() {  # write proxy_host + proxy_key from .env into all router prof
       || { echo "  ❌ failed to write .env values to profiles/$target.json (profile unchanged)"; rm -f "$dst.tmp"; failed=1; }
   done
   if [ "$failed" -eq 0 ]; then
-    echo "  ✓ .env proxy_host + proxy_key applied to profiles/{$(IFS=,; echo "${ROUTER_TARGETS[*]}")}.json"
-    echo "    1. proxy_key : $(mask_secret "$ENV_PRO_KEY")"
-    echo "    2. proxy_host: $ENV_PRO_HOST"
+    echo "  ✓ .env AI_9ROUTER_BASE_URL + AI_9ROUTER_API_KEY applied to profiles/{$(IFS=,; echo "${ROUTER_TARGETS[*]}")}.json"
+    echo "    1. AI_9ROUTER_API_KEY : $(mask_secret "$ENV_PRO_KEY")"
+    echo "    2. AI_9ROUTER_BASE_URL: $ENV_PRO_HOST"
     echo "    3. updated  : ${#ROUTER_TARGETS[@]} profile(s)"
     for target in "${ROUTER_TARGETS[@]}"; do
       echo "       - $PROFILES/$target.json"
@@ -109,10 +109,10 @@ apply_env_pro() {  # write proxy_host + proxy_key from .env into all router prof
   fi
 }
 
-apply_kimi_env() {  # write kimi_api_key from .env into kimi profile only when forced
+apply_kimi_env() {  # write KIMI_API_KEY from .env into kimi profile only when forced
   [ "${KIMI_FORCE_SUBSCRIPTION:-0}" = "1" ] || return 0
   if [ -z "${KIMI_ENV_KEY:-}" ]; then
-    echo "  • kimi_api_key_force_subscription=1 but kimi_api_key missing — kimi profile kept"
+    echo "  • KIMI_API_KEY_FORCE_SUBSCRIPTION=1 but KIMI_API_KEY missing — kimi profile kept"
     return
   fi
   local dst="$PROFILES/kimi.json"
@@ -121,7 +121,7 @@ apply_kimi_env() {  # write kimi_api_key from .env into kimi profile only when f
   jq --arg k "$KIMI_ENV_KEY" '.ANTHROPIC_BASE_URL = "https://api.moonshot.ai/anthropic" | .ANTHROPIC_AUTH_TOKEN = $k | .ANTHROPIC_DEFAULT_OPUS_MODEL = "kimi-k3" | .ANTHROPIC_DEFAULT_SONNET_MODEL = "kimi-k3" | .ANTHROPIC_DEFAULT_HAIKU_MODEL = "kimi-k3" | .ANTHROPIC_DEFAULT_FABLE_MODEL = "kimi-k3"' "$dst" > "$dst.tmp" \
     && mv "$dst.tmp" "$dst" \
     || { echo "  ❌ failed to write .env kimi key to profiles/kimi.json (profile unchanged)"; rm -f "$dst.tmp"; return; }
-  echo "  ✓ .env kimi_api_key applied to profiles/kimi.json (direct endpoint mode)"
+  echo "  ✓ .env KIMI_API_KEY applied to profiles/kimi.json (direct endpoint mode)"
 }
 
 prompt_host() {  # manual base-URL prompt — Enter keeps whatever the profiles already have
@@ -170,10 +170,10 @@ prompt_shared_key() {
 
 ENV_PRO_HOST=""; ENV_PRO_KEY=""; KIMI_FORCE_SUBSCRIPTION="0"; KIMI_ENV_KEY=""
 if [ -f "$ENV_PRO" ]; then
-  ENV_PRO_HOST=$(env_pro_val proxy_host)
-  ENV_PRO_KEY=$(env_pro_val proxy_key)
-  KIMI_FORCE_SUBSCRIPTION=$(env_pro_val kimi_api_key_force_subscription)
-  KIMI_ENV_KEY=$(env_pro_val kimi_api_key)
+  ENV_PRO_HOST=$(env_pro_val AI_9ROUTER_BASE_URL)
+  ENV_PRO_KEY=$(env_pro_val AI_9ROUTER_API_KEY)
+  KIMI_FORCE_SUBSCRIPTION=$(env_pro_val KIMI_API_KEY_FORCE_SUBSCRIPTION)
+  KIMI_ENV_KEY=$(env_pro_val KIMI_API_KEY)
 fi
 
 USE_ENV_PRO=0
@@ -181,7 +181,7 @@ if [ -n "$ENV_PRO_HOST" ] && [ -n "$ENV_PRO_KEY" ]; then
   USE_ENV_PRO=1
   any_real_key && echo "  • profiles already hold a key — .env always overrides host+key (by design, no prompt)."
 elif [ -f "$ENV_PRO" ]; then
-  echo "  • .env found but missing proxy_host/proxy_key — ignored"
+  echo "  • .env found but missing AI_9ROUTER_BASE_URL/AI_9ROUTER_API_KEY — ignored"
 fi
 
 if [ "$USE_ENV_PRO" -eq 1 ]; then

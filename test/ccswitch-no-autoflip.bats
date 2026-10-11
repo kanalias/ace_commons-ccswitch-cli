@@ -128,7 +128,7 @@ setup() {
 }
 
 # Custom-host regression: real installs route through a router host that is NOT the repo's
-# placeholder (*9router.proxy.example.com*) — set via setup.sh .env proxy_host / `ccswitch
+# placeholder (*9router.proxy.example.com*) — set via setup.sh .env AI_9ROUTER_BASE_URL / `ccswitch
 # set-host`. is_router_url() must still recognize it (host matches a profile's
 # ANTHROPIC_BASE_URL), not fall through to "custom".
 

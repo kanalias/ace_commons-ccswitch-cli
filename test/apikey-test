@@ -3,7 +3,7 @@
 # API KEY TEST — live integration against the 9router proxy
 # =============================================================================
 # WHAT IT TESTS
-#   Endpoint : https://9router.proxy.example.com/v1   (from .env `proxy_host`)
+#   Endpoint : https://9router.proxy.example.com/v1   (from .env `AI_9ROUTER_BASE_URL`)
 #   Auth     : /v1/models rejects a keyless request with 401.
 #   Providers: for each of Gemini / OpenAI / DeepSeek / Kimi —
 #                1) the model id is registered in /v1/models, and
@@ -11,7 +11,7 @@
 #                   with finish_reason=stop (HTTP 200).
 #   All three providers go through the SAME 9router endpoint + client key.
 #
-# CONFIG (repo-root .env, gitignored — no leak): proxy_host, proxy_key,
+# CONFIG (repo-root .env, gitignored — no leak): AI_9ROUTER_BASE_URL, AI_9ROUTER_API_KEY,
 #   GEMINI_MODEL, OPENAI_MODEL, DEEPSEEK_MODEL, KIMI_MODEL. Never prints token.
 #
 # REPORT: after the run a PASS/FAIL summary + per-provider latency table is
@@ -32,12 +32,12 @@ setup() {
 
   local envf; envf="$(repo_root)/.env"
   [ -f "$envf" ] || skip "no .env at repo root"
-  set -a; . "$envf"; set +a   # proxy_host, proxy_key, *_MODEL
+  set -a; . "$envf"; set +a   # AI_9ROUTER_BASE_URL, AI_9ROUTER_API_KEY, *_MODEL
 
-  BASE="${proxy_host:-}"
-  TOKEN="${proxy_key:-}"
-  [ -n "$BASE" ]  || skip "proxy_host unset in .env"
-  [ -n "$TOKEN" ] || skip "proxy_key unset in .env"
+  BASE="${AI_9ROUTER_BASE_URL:-}"
+  TOKEN="${AI_9ROUTER_API_KEY:-}"
+  [ -n "$BASE" ]  || skip "AI_9ROUTER_BASE_URL unset in .env"
+  [ -n "$TOKEN" ] || skip "AI_9ROUTER_API_KEY unset in .env"
 
   # Model ids per provider. DEEPSEEK_MODEL/KIMI_MODEL carry the ccswitch adapter
   # prefix "openai/" — strip it to the router-native id (ds/... , kimi/...).
@@ -139,7 +139,7 @@ _ping() {
 # bats, even without -t). Reads rows recorded by _ping.
 teardown_file() {
   local rep="$BATS_FILE_TMPDIR/report"
-  local host; host="$(grep -E '^proxy_host=' "$(repo_root)/.env" 2>/dev/null | sed 's/^proxy_host=//')"
+  local host; host="$(grep -E '^AI_9ROUTER_BASE_URL=' "$(repo_root)/.env" 2>/dev/null | sed 's/^AI_9ROUTER_BASE_URL=//')"
   {
     echo
     echo "================ 9router API key test — REPORT ================"

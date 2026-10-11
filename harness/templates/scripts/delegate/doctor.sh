@@ -104,16 +104,16 @@ resolved_any() {
 if [[ "$IN_GIT_REPO" -eq 1 ]]; then
   REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
-  ROUTER_BASE_OK="$(resolved_any proxy_host PROXY_9ROUTER_BASE_URL)"
-  ROUTER_TOKEN_OK="$(resolved_any proxy_key PROXY_9ROUTER_TOKEN)"
+  ROUTER_BASE_OK="$(resolved_any AI_9ROUTER_BASE_URL PROXY_9ROUTER_BASE_URL)"
+  ROUTER_TOKEN_OK="$(resolved_any AI_9ROUTER_API_KEY PROXY_9ROUTER_TOKEN)"
   if [[ "$ROUTER_BASE_OK" == "1" && "$ROUTER_TOKEN_OK" == "1" ]]; then
     ROUTER_OK=1
   else
     ROUTER_OK=0
   fi
-  check "$ROUTER_OK" "9router (proxy_host + proxy_key) resolved"
+  check "$ROUTER_OK" "9router (AI_9ROUTER_BASE_URL + AI_9ROUTER_API_KEY) resolved"
 
-  DS_OK="$(resolved_any deepseek_api_key DEEPSEEK_API_KEY PROXY_DEEPSEEK_API_KEY)"
+  DS_OK="$(resolved_any DEEPSEEK_API_KEY PROXY_DEEPSEEK_API_KEY)"
   check "$DS_OK" "deepseek fallback key resolved"
 
   if [[ "$ROUTER_OK" -ne 1 && "$DS_OK" -ne 1 ]]; then

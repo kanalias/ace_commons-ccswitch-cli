@@ -16,34 +16,34 @@ setup() {
   echo '{}' > "$S"
 }
 
-@test "denyTools alone (no disableWorkflows) is applied — keys are independent" {
-  echo 'denyTools=Artifact, CronCreate,NotebookEdit' > "$STAGE/.env"
+@test "CLAUDE_DENY_TOOLS alone (no CLAUDE_DISABLE_WORKFLOWS) is applied — keys are independent" {
+  echo 'CLAUDE_DENY_TOOLS=Artifact, CronCreate,NotebookEdit' > "$STAGE/.env"
   run "$OPT"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"không có disableWorkflows — bỏ qua"* ]]
+  [[ "$output" == *"không có CLAUDE_DISABLE_WORKFLOWS — bỏ qua"* ]]
   [ "$(jq -c '.permissions.deny' "$S")" = '["Artifact","CronCreate","NotebookEdit"]' ]
   [ "$(jq 'has("disableWorkflows")' "$S")" = "false" ]
 }
 
-@test "denyTools is idempotent and preserves pre-existing deny entries + order" {
+@test "CLAUDE_DENY_TOOLS is idempotent and preserves pre-existing deny entries + order" {
   echo '{"permissions":{"deny":["Bash(rm -rf *)","CronCreate"],"allow":["Read"]}}' > "$S"
-  echo 'denyTools=Artifact,CronCreate,Artifact' > "$STAGE/.env"
+  echo 'CLAUDE_DENY_TOOLS=Artifact,CronCreate,Artifact' > "$STAGE/.env"
   run "$OPT"; [ "$status" -eq 0 ]
   run "$OPT"; [ "$status" -eq 0 ]
   [ "$(jq -c '.permissions.deny' "$S")" = '["Bash(rm -rf *)","CronCreate","Artifact"]' ]
   [ "$(jq -c '.permissions.allow' "$S")" = '["Read"]' ]
 }
 
-@test "denyTools rejects non-bare-name values and leaves settings untouched" {
-  echo 'denyTools=Artifact,Bash(rm -rf *)' > "$STAGE/.env"
+@test "CLAUDE_DENY_TOOLS rejects non-bare-name values and leaves settings untouched" {
+  echo 'CLAUDE_DENY_TOOLS=Artifact,Bash(rm -rf *)' > "$STAGE/.env"
   run "$OPT"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"denyTools trong .env phải là tên tool"* ]]
+  [[ "$output" == *"CLAUDE_DENY_TOOLS trong .env phải là tên tool"* ]]
   [ "$(cat "$S")" = "{}" ]
 }
 
-@test "disableWorkflows=true and denyTools both applied in one run" {
-  printf 'disableWorkflows=true\ndenyTools=Artifact\n' > "$STAGE/.env"
+@test "CLAUDE_DISABLE_WORKFLOWS=true and CLAUDE_DENY_TOOLS both applied in one run" {
+  printf 'CLAUDE_DISABLE_WORKFLOWS=true\nCLAUDE_DENY_TOOLS=Artifact\n' > "$STAGE/.env"
   run "$OPT"
   [ "$status" -eq 0 ]
   [ "$(jq '.disableWorkflows' "$S")" = "true" ]
@@ -51,9 +51,9 @@ setup() {
 }
 
 @test "no known keys in .env → exit 0, settings untouched" {
-  echo 'proxy_host=https://x.test/v1' > "$STAGE/.env"
+  echo 'AI_9ROUTER_BASE_URL=https://x.test/v1' > "$STAGE/.env"
   run "$OPT"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"không có denyTools — bỏ qua"* ]]
+  [[ "$output" == *"không có CLAUDE_DENY_TOOLS — bỏ qua"* ]]
   [ "$(cat "$S")" = "{}" ]
 }

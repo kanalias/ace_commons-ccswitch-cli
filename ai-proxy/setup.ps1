@@ -36,7 +36,7 @@ Write-Host "  ✓ statusline-context.sh (context-usage early-warning bar)"
 # 2. profile templates — create missing profiles; refresh model defaults in existing
 # profiles while preserving real host/key. Re-run setup after repo model updates.
 # 5 profiles: claude/codex/deepseek/kimi/gemini via 9router share ONE token.
-# kimi_api_key_force_subscription=1 switches kimi to Kimi's own direct Anthropic-compatible endpoint instead.
+# KIMI_API_KEY_FORCE_SUBSCRIPTION=1 switches kimi to Kimi's own direct Anthropic-compatible endpoint instead.
 $ProfileTargets = @("claude", "codex", "deepseek", "kimi", "gemini")
 $RouterTargets = @("claude", "codex", "deepseek", "kimi", "gemini")
 $ModelFields = @(
@@ -69,7 +69,7 @@ foreach ($t in $ProfileTargets) {
 
 # 2b. fill credentials into all 3 profiles (claude/codex/deepseek share ONE 9router token).
 # Preferred source: `.env` at repo root (one level up from this script's dir, gitignored)
-# holding `proxy_host=` + `proxy_key=`. When both are present, ALWAYS overwrite host + key
+# holding `AI_9ROUTER_BASE_URL=` + `AI_9ROUTER_API_KEY=`. When both are present, ALWAYS overwrite host + key
 # in all three profiles — no prompt, no placeholder check, interactive or not. `.env` is the
 # source of truth; re-run this script any time it changes to resync. No `.env` (or missing
 # fields) falls back to the manual prompts (host, then key). Key values are never echoed.
@@ -124,7 +124,7 @@ function Set-KimiProfileFromEnv([string]$key) {
     $p.ANTHROPIC_DEFAULT_HAIKU_MODEL = "kimi-k3"
     $p.ANTHROPIC_DEFAULT_FABLE_MODEL = "kimi-k3"
     $p | ConvertTo-Json -Depth 10 | Set-Content $dst -Encoding UTF8
-    Write-Host "  ✓ .env kimi_api_key applied to profiles\kimi.json (direct endpoint mode)"
+    Write-Host "  ✓ .env KIMI_API_KEY applied to profiles\kimi.json (direct endpoint mode)"
   } catch {
     Write-Host "  ❌ failed to write profiles\kimi.json (profile unchanged)"
   }
@@ -132,10 +132,10 @@ function Set-KimiProfileFromEnv([string]$key) {
 
 $envProHost = ""; $envProKey = ""; $kimiForceSubscription = "0"; $kimiEnvKey = ""
 if (Test-Path $EnvPro) {
-  $envProHost = Get-EnvProValue "proxy_host"
-  $envProKey  = Get-EnvProValue "proxy_key"
-  $kimiForceSubscription = Get-EnvProValue "kimi_api_key_force_subscription"
-  $kimiEnvKey = Get-EnvProValue "kimi_api_key"
+  $envProHost = Get-EnvProValue "AI_9ROUTER_BASE_URL"
+  $envProKey  = Get-EnvProValue "AI_9ROUTER_API_KEY"
+  $kimiForceSubscription = Get-EnvProValue "KIMI_API_KEY_FORCE_SUBSCRIPTION"
+  $kimiEnvKey = Get-EnvProValue "KIMI_API_KEY"
 }
 
 $useEnvPro = $false
@@ -143,12 +143,12 @@ if ($envProHost -and $envProKey) {
   $useEnvPro = $true
   if (Test-AnyRealKey) { Write-Host "  • profiles already hold a key — .env always overrides host+key (by design, no prompt)." }
 } elseif (Test-Path $EnvPro) {
-  Write-Host "  • .env found but missing proxy_host/proxy_key — ignored"
+  Write-Host "  • .env found but missing AI_9ROUTER_BASE_URL/AI_9ROUTER_API_KEY — ignored"
 }
 
 if ($useEnvPro) {
   if (Set-AllProfiles $envProHost $envProKey) {
-    Write-Host "  ✓ .env proxy_host + proxy_key applied to profiles\{$($RouterTargets -join ',')}.json"
+    Write-Host "  ✓ .env AI_9ROUTER_BASE_URL + AI_9ROUTER_API_KEY applied to profiles\{$($RouterTargets -join ',')}.json"
   }
 } elseif ([Console]::IsInputRedirected) {
   Write-Host "  • non-interactive session — skipped key prompt (edit profiles\*.json manually)"
@@ -184,7 +184,7 @@ if ($useEnvPro) {
 }
 if ($kimiForceSubscription -eq "1") {
   if ($kimiEnvKey) { Set-KimiProfileFromEnv $kimiEnvKey }
-  else { Write-Host "  • kimi_api_key_force_subscription=1 but kimi_api_key missing — kimi profile kept" }
+  else { Write-Host "  • KIMI_API_KEY_FORCE_SUBSCRIPTION=1 but KIMI_API_KEY missing — kimi profile kept" }
 }
 $kimiEnvKey = $null
 

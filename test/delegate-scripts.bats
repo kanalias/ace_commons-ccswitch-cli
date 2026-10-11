@@ -71,8 +71,8 @@ EOF
 @test "run-aider-deepseek.sh: routes via 9router when PROXY_9ROUTER_* set" {
   write_stub aider
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key
 EOF
   run bash -c "cd '$STAGE' && bash scripts/delegate/run-aider-deepseek.sh feat task file.txt"
   [ "$status" -eq 0 ]
@@ -164,8 +164,8 @@ EOF
 @test "run-codex.sh: adds 9router provider args when PROXY_9ROUTER_* set" {
   write_stub codex
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key
 EOF
   run bash -c "cd '$STAGE' && bash scripts/delegate/run-codex.sh feat task review"
   [ "$status" -eq 0 ]
@@ -342,11 +342,11 @@ EOF
   [ "$last_line" -eq 0 ]
 }
 
-@test "_common.sh load_env_chain: aliases proxy_host/proxy_key + deepseek_api_key" {
+@test "_common.sh load_env_chain: aliases AI_9ROUTER_BASE_URL/AI_9ROUTER_API_KEY + DEEPSEEK_API_KEY" {
   cat > "$STAGE/.env" <<EOF
-proxy_host=https://fake-9router.test/v1
-proxy_key=fake-9router-key
-deepseek_api_key=fake-ds-direct-key
+AI_9ROUTER_BASE_URL=https://fake-9router.test/v1
+AI_9ROUTER_API_KEY=fake-9router-key
+DEEPSEEK_API_KEY=fake-ds-direct-key
 EOF
   run bash -c "cd '$STAGE' && source scripts/delegate/_common.sh && load_env_chain && echo BASE=\$PROXY_9ROUTER_BASE_URL && echo HASKEY=\${PROXY_9ROUTER_TOKEN:+yes} && echo HASDS=\${DEEPSEEK_API_KEY:+yes}"
   [ "$status" -eq 0 ]

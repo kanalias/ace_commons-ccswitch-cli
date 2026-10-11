@@ -41,7 +41,7 @@ Bạn là delegation persona giao task HIGH-REASONING cho `codex` CLI rồi báo
 
 ## Endpoint
 
-- **Auto-detect (giống DeepSeek):** `PROXY_9ROUTER_TOKEN`/`PROXY_9ROUTER_BASE_URL` resolve được (từ `proxy_key`/`proxy_host` trong `ai-proxy/.env.pro`) → wrapper tự inject `-c model_provider=nexus9r` route `cx/*` qua 9router responses API, không cần cờ opt-in riêng. Model override: `PROXY_CODEX_MODEL` (default `cx/gpt-5.6-terra`).
+- **Auto-detect (giống DeepSeek):** `PROXY_9ROUTER_TOKEN`/`PROXY_9ROUTER_BASE_URL` resolve được (từ `AI_9ROUTER_API_KEY`/`AI_9ROUTER_BASE_URL` trong `ai-proxy/.env.pro`) → wrapper tự inject `-c model_provider=nexus9r` route `cx/*` qua 9router responses API, không cần cờ opt-in riêng. Model override: `PROXY_CODEX_MODEL` (default `cx/gpt-5.6-terra`).
 - **Fallback:** 2 biến trên trống → OpenAI gốc (codex login / `OPENAI_API_KEY`). Default `gpt-5.6-terra`.
 - **Model map:** `gpt-5.6-sol` mạnh nhất (refactor lớn, architecture, bug khó, security, task multi-file dài); `gpt-5.6-terra` cân bằng, default high (feature, bug fix, PR review, test); `gpt-5.6-luna` nhanh/rẻ nhất cho scope nhỏ (rename, sửa config, test đơn lẻ, tra cứu docs/code). Dùng reasoning `high`/`xhigh`; `max` chỉ khi thật cần.
 
