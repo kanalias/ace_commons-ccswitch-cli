@@ -58,3 +58,11 @@ Quy tắc chung, áp MỌI supplier (danh sách mở, không giới hạn: Anthr
   Ví dụ: `[MacMini2][Crawler] [⏳ queued] Service nhadathue-tiktok`.
 - `<Env>` = `HOST_LABEL`; `<Project>` + `<service>` tự gợi ý từ tên folder (git root / folder có `package.json`) ở lần dùng đầu rồi lưu `~/.config/acegalaxy/service-alert.json` (lib ≥ v0.9.0; đổi tên: `service-alert init`). `ALERT_PROJECT` / `--project` chỉ để ghi đè (vd container không có `.git`). Status ∈ `ok|fail|warn|info|queued|running`. Tên tự gợi ý > 16 ký tự được lib tự rút gọn (cắt từ dài nhất, giữ từ ngắn); muốn tên đẹp hơn → rút gọn tay nhưng vẫn giữ nguyên ý nghĩa, vd `share-fp2group-fb-personal` → `fp2g-fb-personal`; đặt bằng `service-alert init`.
 - CẤM tự dựng chuỗi header, tự gọi `api.telegram.org`, hoặc fork format trong project. Cần đổi mẫu → sửa trong lib `lib-ott-gateway` + release tag, rồi bump version ở các project dùng.
+
+## Lib `@acegalaxy/*` — cài từ git tag, KHÔNG qua npm registry (BẮT BUỘC)
+
+- Khai báo dạng `"@acegalaxy/lib-<name>": "github:acegalaxy-co/<repo>#vX.Y.Z"` — pin **tag**, không pin branch/commit trần, không dùng version range (`^1.2.0`) hay registry (npmjs, GitHub Packages).
+- Lib giữ `private: true`, repo private: KHÔNG `npm publish`, không `publishConfig`, không `.npmrc`/token registry. Phát hành lib = push tag `vX.Y.Z` trên repo lib.
+- Lib phụ thuộc lib `@acegalaxy/*` khác cũng khai báo bằng git tag như trên.
+- Máy cài (local, server, CI runner) cần quyền đọc repo qua SSH/deploy key GitHub — thiếu quyền thì cấp key, không chuyển sang publish.
+- Nâng version: sửa tag rồi cài lại đúng tag (`npm install github:acegalaxy-co/<repo>#<tag>`), kiểm `node_modules/@acegalaxy/<lib>/package.json` + lockfile `resolved` là `git+ssh://…` trước khi tin kết quả. Quy trình đầy đủ: skill `ace-library`.
