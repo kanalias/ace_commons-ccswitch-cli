@@ -1,0 +1,1 @@
+- Chỉ được `git commit`. KHÔNG chạy `git push`, `gh pr create`, hay bất kỳ lệnh đẩy lên remote.
