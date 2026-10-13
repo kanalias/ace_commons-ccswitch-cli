@@ -45,6 +45,12 @@
 #   HARNESS_DEPLOY_HEALTHCHECK   healthcheck command/URL                  (default: <healthcheck-cmd>)
 #   HARNESS_CLOAK_MCP_CMD        command that launches the CloakBrowser MCP server, baked into agents/browser-web.md as @@CLOAK_MCP_CMD@@
 #                                (default: `command -v cloakbrowsermcp`, else the literal `cloakbrowsermcp`)
+#   HARNESS_ADOPT_FILES          CSV of project-relative paths (e.g. .claude/agents/browser-web.md) to take from the harness even though
+#                                the project owns them. On UPDATE (previous manifest exists), an existing file NOT in the previous
+#                                manifest's syncFiles (or listed in preservePaths) is project-owned: kept, recorded in preservePaths,
+#                                NOTE printed. First install (no manifest) is unchanged (HARNESS_OVERWRITE decides). Alternative: delete the file.
+#   Delegate model defaults (gemini/codex/deepseek): HARNESS_<X>_MODEL_DEFAULT > harness .env (main checkout's .env when run from a linked
+#                                worktree) > model recorded in the target's manifest (modelDefaults) > built-in literal.
 #   HARNESS_OVERWRITE            forced to "all" once HARNESS_INSTALL_ALL confirms (per-file overwrite prompt removed)
 set -euo pipefail
 
@@ -102,15 +108,43 @@ sha256_file() {
 # target project won't have this .env, so templates can't read it at runtime.
 # _common.sh:load_env_chain() only exports names matching ^[A-Za-z_][A-Za-z0-9_]*=,
 # so read directly here instead of sourcing that parser.
-read_dotenv_var() { # read_dotenv_var <VAR_NAME> <default>
-  local name="$1" default="$2" f="$HARNESS_DIR/../.env" val
-  [ -f "$f" ] || { printf '%s' "$default"; return; }
+# .env lookup: harness repo root first; a linked git worktree has no .env (gitignored)
+# → fall back to the main checkout's .env (git common dir's parent). Values never printed.
+dotenv_file() {
+  local f="$HARNESS_DIR/../.env" common
+  if [ ! -f "$f" ] && common="$(cd "$HARNESS_DIR" && cd "$(git rev-parse --git-common-dir 2>/dev/null)" 2>/dev/null && pwd -P)" && [ -n "$common" ]; then
+    f="$(dirname "$common")/.env"
+  fi
+  [ -f "$f" ] && printf '%s' "$f"
+  return 0
+}
+read_dotenv_var() { # read_dotenv_var <VAR_NAME> <default> — default if file/key missing or empty
+  local name="$1" default="$2" f val
+  f="$(dotenv_file)"
+  [ -n "$f" ] || { printf '%s' "$default"; return; }
   val="$(grep -E "^${name}=" "$f" | tail -n1 | cut -d= -f2-)"
   printf '%s' "${val:-$default}"
 }
-GEMINI_MODEL_DEFAULT="${HARNESS_GEMINI_MODEL_DEFAULT:-$(read_dotenv_var GEMINI_MODEL gemini-3.5-flash)}"
-CODEX_MODEL_DEFAULT="${HARNESS_CODEX_MODEL_DEFAULT:-$(read_dotenv_var CODEX_MODEL gpt-5.6-luna)}"
-DEEPSEEK_MODEL_DEFAULT="${HARNESS_DEEPSEEK_MODEL_DEFAULT:-$(read_dotenv_var DEEPSEEK_MODEL openai/ds/deepseek-v4-pro)}"
+# resolve_model <key> <HARNESS_ env override name> <.env var> <built-in literal>
+# precedence: env override > .env key > model recorded in target's previous manifest (modelDefaults) > literal
+model_from_manifest() { # model_from_manifest <key> → recorded value or empty
+  [ -f "$PREVIOUS_MANIFEST" ] || return 0
+  jq -r --arg k "$1" '.modelDefaults[$k] // empty' "$PREVIOUS_MANIFEST" 2>/dev/null || true
+}
+resolve_model() {
+  local key="$1" override="${!2:-}" val prev
+  [ -n "$override" ] && { printf '%s' "$override"; return; }
+  val="$(read_dotenv_var "$3" "")"
+  [ -n "$val" ] && { printf '%s' "$val"; return; }
+  prev="$(model_from_manifest "$key")"
+  [ -n "$prev" ] && { printf '%s' "$prev"; return; }
+  printf '%s' "$4"
+}
+note_model_kept() { # note_model_kept <key> <HARNESS_ env override name> <.env var> <resolved value>
+  [ -z "${!2:-}" ] && [ -z "$(read_dotenv_var "$3" "")" ] && [ -n "$(model_from_manifest "$1")" ] \
+    && echo "NOTE: $1 model default kept from target's previous install (no $2 / .env $3 found)" >&2
+  return 0
+}
 
 command -v jq >/dev/null 2>&1 || { echo "❌ 'jq' required. Install: brew install jq (mac) / apt install jq (linux)"; exit 1; }
 command -v git >/dev/null 2>&1 || echo "⚠️ 'git' not found — recommended (delegate wrappers need worktrees to run, though installer itself will still work)."
@@ -426,6 +460,9 @@ substitute_file() {
   mv "$tmp" "$dest"
 }
 
+adopt_requested() { # HARNESS_ADOPT_FILES = CSV of dest paths (relative to project root) to take from harness
+  case ",${HARNESS_ADOPT_FILES:-}," in *",$1,"*) return 0 ;; *) return 1 ;; esac
+}
 WRITTEN=()
 SYNC_WRITTEN=()
 PRESERVE_PATHS=()
@@ -441,6 +478,19 @@ install_file() { # install_file <src-rel-under-templates/> <dest-rel-under-route
     PRESERVE_PATHS+=("$dest_rel")
     echo "  • $dest_rel (kept existing)"
     return 0
+  fi
+  # project-owned guard: only with a previous manifest (first install can't tell ours from theirs —
+  # there should_overwrite/HARNESS_OVERWRITE decide). Existing file that harness never wrote
+  # (not in previous syncFiles) or already chose to keep (previous preservePaths) is kept.
+  # rules/common is exempt: guardrails are always overwritten (source-of-truth wins).
+  if [ "$HAVE_PREV" -eq 1 ] && [ "$mode" != "preserve" ] && [ -e "$dest" ] \
+     && [[ "$dest_rel" != .claude/rules/common/* ]] && ! adopt_requested "$dest_rel"; then
+    if ! printf '%s\n' "$PREV_SYNC" | grep -qxF -- "$dest_rel" || printf '%s\n' "$PREV_PRESERVE" | grep -qxF -- "$dest_rel"; then
+      PRESERVE_PATHS+=("$dest_rel")
+      echo "  • $dest_rel (kept — project-owned)"
+      echo "NOTE: $dest_rel exists and is not harness-managed — kept. To adopt the harness version: HARNESS_ADOPT_FILES=$dest_rel (or delete the file) and re-run install.sh" >&2
+      return 0
+    fi
   fi
   if [ "$mode" != "sync" ] && [ -e "$dest" ] && ! should_overwrite "$dest_rel"; then
     PRESERVE_PATHS+=("$dest_rel")
@@ -459,6 +509,21 @@ echo "▶ Cài harness vào $ROUTE_DIR"
 # Read here (before we write anything) so migration checks below and the
 # hooks/deny/env ownership carry-forward further down can both use it.
 PREVIOUS_MANIFEST="$ROUTE_DIR/$MANIFEST_REL"
+
+GEMINI_MODEL_DEFAULT="$(resolve_model gemini HARNESS_GEMINI_MODEL_DEFAULT GEMINI_MODEL gemini-3.5-flash)"
+CODEX_MODEL_DEFAULT="$(resolve_model codex HARNESS_CODEX_MODEL_DEFAULT CODEX_MODEL gpt-5.6-luna)"
+DEEPSEEK_MODEL_DEFAULT="$(resolve_model deepseek HARNESS_DEEPSEEK_MODEL_DEFAULT DEEPSEEK_MODEL openai/ds/deepseek-v4-pro)"
+note_model_kept gemini HARNESS_GEMINI_MODEL_DEFAULT GEMINI_MODEL
+note_model_kept codex HARNESS_CODEX_MODEL_DEFAULT CODEX_MODEL
+note_model_kept deepseek HARNESS_DEEPSEEK_MODEL_DEFAULT DEEPSEEK_MODEL
+
+# Ownership of existing files (see install_file): paths harness wrote last time vs paths it only kept.
+PREV_SYNC=""; PREV_PRESERVE=""; HAVE_PREV=0
+if [ -f "$PREVIOUS_MANIFEST" ] && jq -e '.syncFiles | type == "array"' "$PREVIOUS_MANIFEST" >/dev/null 2>&1; then
+  HAVE_PREV=1
+  PREV_SYNC="$(jq -r '.syncFiles[]?.path' "$PREVIOUS_MANIFEST")"
+  PREV_PRESERVE="$(jq -r '.preservePaths[]?' "$PREVIOUS_MANIFEST" 2>/dev/null || true)"
+fi
 
 if [ "$SEL_SUBAGENTS" -eq 1 ]; then
   echo "── delegate subagents + wrappers ──"
@@ -1010,7 +1075,8 @@ write_manifest() {
     --argjson files "$files_json" --argjson preserve "$preserve_json" \
     --argjson hooks "$hooks_json" --argjson deny "$deny_json" --argjson env "$env_json" \
     --arg status "$OWNED_STATUSLINE" --argjson install "$(install_env_json)" \
-    '{schemaVersion:1,harnessVersion:$hv,syncFiles:$files,preservePaths:$preserve,installEnv:$install,settings:{hooks:$hooks,deny:$deny,env:$env,statusLineCommand:(if $status=="" then null else $status end)}}' > "$tmp"
+    --arg mg "$GEMINI_MODEL_DEFAULT" --arg mc "$CODEX_MODEL_DEFAULT" --arg md "$DEEPSEEK_MODEL_DEFAULT" \
+    '{schemaVersion:1,harnessVersion:$hv,syncFiles:$files,preservePaths:$preserve,installEnv:$install,modelDefaults:{gemini:$mg,codex:$mc,deepseek:$md},settings:{hooks:$hooks,deny:$deny,env:$env,statusLineCommand:(if $status=="" then null else $status end)}}' > "$tmp"
   mv "$tmp" "$manifest"
   echo "  ✓ $MANIFEST_REL"
 }
