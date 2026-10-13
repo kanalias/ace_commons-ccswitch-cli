@@ -127,6 +127,7 @@ ccswitch kimi         # switch → Kimi qua 9router (kimi/*)
 ccswitch subscription # gỡ block env → Claude Code OAuth subscription login
 ccswitch check        # probe health các profile (claude/codex/deepseek/kimi) + verify subscription
 ccswitch fallback     # giữ target đang active nếu router healthy; router chết → subscription (safe-harbor)
+                       #   chỉ hạ khi máy CÓ OAuth credential; không có → giữ nguyên router + cảnh báo
 ccswitch set-key [p]  # nhập key mới (ẩn) cho profile p (mặc định claude; claude/codex/deepseek/kimi share CHUNG 1 token — chạy set-key lại cho các target còn lại với CÙNG giá trị, hoặc dùng `ccswitch update` để sync) rồi apply
 ccswitch update [src] # đồng bộ ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN từ profile src (mặc định claude)
                        #   sang các profile còn lại trong ORDER — hỏi [y/N] trước khi ghi đè TỪNG file;
@@ -140,7 +141,7 @@ Mỗi lần `apply`/clear tạo backup `settings.json.bak`. Health probe:
   - mac → Keychain service `Claude Code-credentials`
   - linux → `~/.claude/.credentials.json`
   - Có credential → `✓ logged in (email, subscriptionType) [nguồn]`. Email lấy từ `~/.claude.json` `.oauthAccount`, `subscriptionType` từ credential.
-  - Không → `✗ NO OAuth credential — safe-harbor will prompt login on first use`. Đây là cảnh báo thật: nếu fallback về subscription mà chưa từng login, Claude sẽ hiện màn đăng nhập.
+  - Không → `✗ NO OAuth credential — safe-harbor will prompt login on first use`. Từ 2026-10-13 `ccswitch fallback` (và hook auto-switch) **không hạ xuống subscription** trong trường hợp này — giữ nguyên router và cảnh báo. Lý do: máy headless chạy `claude -p` (MacMini2) từng bị 1 lần router restart 2 phút biến thành "Not logged in" 16 giờ, vì fallback không tự nâng lại. `ccswitch subscription` gõ tay vẫn chuyển bình thường.
   - KHÔNG in token — chỉ metadata.
 
 ---

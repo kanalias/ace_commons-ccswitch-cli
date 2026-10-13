@@ -375,6 +375,17 @@ switch ($Command) {
     }
     $c = Test-Profile $t
     if ($c -eq "200") { Write-Host "→ router healthy: $t (no change)"; exit 0 }
+    # Demote only into a harbor that exists (parity with ccswitch.sh has_subscription_cred):
+    # no OAuth credential -> subscription would be "Not logged in"; keep the router instead.
+    $hasCred = $false
+    foreach ($f in @((Join-Path $ClaudeDir ".credentials.json"), (Join-Path $ClaudeDir "credentials.json"))) {
+      if ((Test-Path $f) -and ((Get-Item $f).Length -gt 0)) { $hasCred = $true }
+    }
+    if (-not $hasCred) {
+      Write-Host "⚠️  $t down ($c) but NO OAuth credential on this machine — subscription would be `"Not logged in`"."
+      Write-Host "   Keeping router '$t' (no change). To enable the safe-harbor: run 'claude' + /login."
+      exit 0
+    }
     Write-Host "  $t down ($c) → safe-harbor: subscription (OAuth)"
     Set-ProfileEnv "subscription"
   }

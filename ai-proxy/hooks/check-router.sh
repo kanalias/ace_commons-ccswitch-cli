@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # SessionStart hook — (1) LUÔN in banner: endpoint đang chạy + thứ tự fallback + hướng dẫn.
 # (2) Nếu đang ở router mà endpoint timeout/lỗi → AUTO-SWITCH (ccswitch fallback).
+#     Máy không có OAuth login → fallback giữ nguyên router (subscription sẽ "Not logged in").
 #
 # NOTE: Claude Code loads env at process launch, BEFORE this hook. A switch here heals
 # ~/.claude/settings.json for the NEXT start; the CURRENT session may still use the old
@@ -125,7 +126,10 @@ fi
 echo "⚠️  router (${base}) health=${code} (timeout/lỗi) — auto-switching:" >&2
 out="$(bash "$CCSWITCH" fallback 2>&1)"; rc=$?
 echo "$out" | sed 's/^/   /' >&2
-if [ "$rc" -eq 0 ]; then
+new_base=$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$SETTINGS" 2>/dev/null || true)
+if [ "$rc" -eq 0 ] && [ "$new_base" = "$settings_base" ]; then
+  : # fallback kept the router (no OAuth login to fall back to) — nothing to reload
+elif [ "$rc" -eq 0 ]; then
   echo "   ↻ restart Claude Code (quit + reopen) / Reload Window để nạp endpoint mới." >&2
 else
   echo "   ❌ fallback lỗi — kiểm tra router; subscription (gỡ env) luôn về được, thử: ccswitch subscription." >&2

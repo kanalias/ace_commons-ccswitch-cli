@@ -32,6 +32,7 @@
 #                           #   N vendors running IN PARALLEL. NOTE: same 9router account = shared quota.
 #   ccswitch check          # probe router health (all profiles) + verify subscription OAuth credential
 #   ccswitch fallback       # active router profile if healthy, else fall back to subscription
+#                           #   (only when an OAuth login exists; otherwise keeps the router)
 #   ccswitch set-key [p]    # prompt (hidden) for a new key, write it into profile p (default claude), then apply
 #   ccswitch set-host <url> [p]  # write a new base URL into profile p (default claude), then apply
 #   ccswitch update [src]   # sync ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN from profile src (default
@@ -199,6 +200,21 @@ current() {
 #   linux -> ~/.claude/.credentials.json
 # Account email + subscriptionType come from ~/.claude.json (oauthAccount) when present.
 # Echoes a one-line status; never prints tokens.
+#
+# has_subscription_cred: 0 when this machine holds a Claude Code OAuth credential. `fallback`
+# requires it before demoting — without a login, subscription is "Not logged in", not a harbor.
+has_subscription_cred() {
+  if command -v security >/dev/null 2>&1 \
+     && security find-generic-password -s "Claude Code-credentials" -w >/dev/null 2>&1; then
+    return 0
+  fi
+  local f
+  for f in "$CLAUDE_DIR/.credentials.json" "$CLAUDE_DIR/credentials.json"; do
+    [ -s "$f" ] && return 0
+  done
+  return 1
+}
+
 probe_subscription() {
   local cred="" src=""
   if command -v security >/dev/null 2>&1; then
@@ -502,6 +518,14 @@ case "${1:-status}" in
       echo "→ router healthy: $t (no change)"
       exit 0
     fi
+    # Demote only into a harbor that exists. A headless host with no OAuth login (server
+    # running `claude -p` jobs) would turn a 2-minute router restart into a permanent
+    # "Not logged in" — fallback never promotes back. Keep the router: it recovers on its own.
+    if ! has_subscription_cred; then
+      echo "⚠️  $t down ($c) but NO OAuth credential on this machine — subscription would be \"Not logged in\"."
+      echo "   Keeping router '$t' (no change). To enable the safe-harbor: run 'claude' + /login."
+      exit 0
+    fi
     echo "  $t down ($c) → safe-harbor: subscription (OAuth)"
     apply subscription ;;
   spawn)
@@ -564,6 +588,7 @@ COMMANDS
   status  (default)   show active target (by model prefix) + health + subscription
   check               probe health of every router profile + verify subscription
   fallback            keep active router if healthy, else drop to subscription
+                      (needs an OAuth login on this machine; without one the router is kept)
   spawn <target> [..] launch a SEPARATE pinned instance (settings.json untouched)
   set-key [profile]   paste a key (hidden) into a profile, then apply  (default: claude)
   set-host <url> [p]  write a base URL into a profile, then apply      (default: claude)
