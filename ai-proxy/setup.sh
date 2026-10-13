@@ -24,11 +24,20 @@ PRIOR_INSTALL=0
 { [ -e "$CLAUDE_DIR/ccswitch.sh" ] || [ -L "$CLAUDE_DIR/ccswitch.sh" ]; } && PRIOR_INSTALL=1
 
 # 1. tool + hook (always refreshed — no secrets inside)
-ln -sfn "$SRC/ccswitch.sh" "$CLAUDE_DIR/ccswitch.sh"
+# Standalone copy, NOT a symlink: a symlink dies whenever the repo file is briefly absent
+# (checkout/merge/move). Atomic tmp+mv also replaces an old symlink install. Later repo
+# updates are picked up by ccswitch.sh's own self-sync (reads .ccswitch-repo below).
+_tmp=$(mktemp "$CLAUDE_DIR/.ccswitch.sh.XXXXXX")
+cp "$SRC/ccswitch.sh" "$_tmp" && chmod +x "$_tmp" && mv -f "$_tmp" "$CLAUDE_DIR/ccswitch.sh"
 cp "$SRC/hooks/check-router.sh" "$HOOKS/check-router.sh"
-chmod +x "$SRC/ccswitch.sh" "$HOOKS/check-router.sh"
-echo "  ✓ ccswitch.sh linked + hooks/check-router.sh"
-printf '%s\n' "$(dirname "$SRC")" > "$CLAUDE_DIR/.ccswitch-repo"
+chmod +x "$HOOKS/check-router.sh"
+echo "  ✓ ccswitch.sh installed (copy, self-syncs from repo) + hooks/check-router.sh"
+# Record the MAIN checkout, never a linked worktree: worktrees get removed after merge,
+# which would orphan the install (self-sync source + `ccswitch install`). Non-git copy → as-is.
+REPO_ROOT="$(dirname "$SRC")"
+_common=$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
+[ -n "$_common" ] && [ -f "$(dirname "$_common")/ai-proxy/ccswitch.sh" ] && REPO_ROOT="$(dirname "$_common")"
+printf '%s\n' "$REPO_ROOT" > "$CLAUDE_DIR/.ccswitch-repo"
 echo "  ✓ repo path recorded (ccswitch install)"
 cp "$SRC/statusline-context.sh" "$CLAUDE_DIR/statusline-context.sh"
 chmod +x "$CLAUDE_DIR/statusline-context.sh"

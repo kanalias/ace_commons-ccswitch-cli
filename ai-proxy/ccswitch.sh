@@ -46,6 +46,21 @@
 set -euo pipefail
 
 CLAUDE_DIR="$HOME/.claude"
+
+# Self-sync: the installed copy (~/.claude/ccswitch.sh) refreshes itself from the repo recorded
+# in .ccswitch-repo whenever the repo version differs, so `git pull` needs no re-run of setup.
+# tmp+mv is atomic (running bash keeps the old inode); repo moved/missing/broken → keep running
+# the installed copy instead of dying. Opt out: CCSWITCH_NO_SELF_SYNC=1.
+# ponytail: syncs any content diff incl. uncommitted repo edits; pin to a git tag if that bites.
+_self="$CLAUDE_DIR/ccswitch.sh"; _tmp=""
+if [ -z "${CCSWITCH_NO_SELF_SYNC:-}" ] && [ ! -L "$_self" ] && [ "${BASH_SOURCE[0]}" -ef "$_self" ]; then
+  _src="$(cat "$CLAUDE_DIR/.ccswitch-repo" 2>/dev/null || true)/ai-proxy/ccswitch.sh"
+  if [ -f "$_src" ] && ! cmp -s "$_src" "$_self" && bash -n "$_src" 2>/dev/null; then
+    _tmp=$(mktemp "$CLAUDE_DIR/.ccswitch.sh.XXXXXX") && cp "$_src" "$_tmp" && chmod +x "$_tmp" \
+      && mv -f "$_tmp" "$_self" && { echo "↻ ccswitch.sh synced from repo" >&2; exec bash "$_self" "$@"; }
+    [ -n "$_tmp" ] && rm -f "$_tmp"
+  fi
+fi
 SETTINGS="$CLAUDE_DIR/settings.json"
 PROFILES="$CLAUDE_DIR/profiles"
 # persisted user choice — claude|codex|deepseek|kimi|gemini|subscription, written after EVERY

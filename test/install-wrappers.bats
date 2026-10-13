@@ -57,28 +57,69 @@ stage_setup_checkout() {
   [ "$model" = "opus" ]
 }
 
-@test "setup.sh links ccswitch.sh from a staged checkout when invoked from foreign CWD" {
+@test "setup.sh copies ccswitch.sh from a staged checkout when invoked from foreign CWD" {
   setup_fake_home
   stage_setup_checkout
 
   run env HOME="$HOME" SHELL="/bin/zsh" bash -c "cd '$foreign_cwd' && printf 'N\\n' | bash '$checkout/ai-proxy/setup.sh'"
   [ "$status" -eq 0 ]
-  [ -L "$HOME/.claude/ccswitch.sh" ]
-  [ "$(readlink "$HOME/.claude/ccswitch.sh")" = "$checkout/ai-proxy/ccswitch.sh" ]
+  [ ! -L "$HOME/.claude/ccswitch.sh" ]
+  cmp -s "$HOME/.claude/ccswitch.sh" "$checkout/ai-proxy/ccswitch.sh"
 }
 
 @test "setup.sh replaces stale ccswitch.sh and converges aliases on rerun" {
   setup_fake_home
   stage_setup_checkout
   mkdir -p "$HOME/.claude"
-  printf 'stale file\n' > "$HOME/.claude/ccswitch.sh"
+  ln -s "$BATS_TEST_TMPDIR/gone.sh" "$HOME/.claude/ccswitch.sh"  # dangling old symlink install
 
   run env HOME="$HOME" SHELL="/bin/zsh" bash -c "cd '$foreign_cwd' && printf 'N\\n' | bash '$checkout/ai-proxy/setup.sh'"
   [ "$status" -eq 0 ]
-  [ -L "$HOME/.claude/ccswitch.sh" ]
-  [ "$(readlink "$HOME/.claude/ccswitch.sh")" = "$checkout/ai-proxy/ccswitch.sh" ]
+  [ ! -L "$HOME/.claude/ccswitch.sh" ]
+  cmp -s "$HOME/.claude/ccswitch.sh" "$checkout/ai-proxy/ccswitch.sh"
 
   run env HOME="$HOME" SHELL="/bin/zsh" bash -c "cd '$foreign_cwd' && printf 'N\\n' | bash '$checkout/ai-proxy/setup.sh'"
   [ "$status" -eq 0 ]
   [ "$(grep -c '^alias ccswitch=' "$HOME/.zshrc")" -eq 1 ]
+}
+
+@test "installed ccswitch.sh self-syncs from repo, survives repo file missing" {
+  setup_fake_home
+  stage_setup_checkout
+  run env HOME="$HOME" SHELL="/bin/zsh" bash -c "cd '$foreign_cwd' && printf 'N\\n' | bash '$checkout/ai-proxy/setup.sh'"
+  [ "$status" -eq 0 ]
+
+  # repo gets a newer version → next run of the installed copy picks it up
+  printf '\n# repo update marker\n' >> "$checkout/ai-proxy/ccswitch.sh"
+  run env HOME="$HOME" bash "$HOME/.claude/ccswitch.sh" help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"synced from repo"* ]]
+  cmp -s "$HOME/.claude/ccswitch.sh" "$checkout/ai-proxy/ccswitch.sh"
+
+  # broken repo version is never installed
+  printf 'if then fi (\n' >> "$checkout/ai-proxy/ccswitch.sh"
+  run env HOME="$HOME" bash "$HOME/.claude/ccswitch.sh" help
+  [ "$status" -eq 0 ]
+  grep -q 'repo update marker' "$HOME/.claude/ccswitch.sh"
+  ! grep -q 'if then fi' "$HOME/.claude/ccswitch.sh"
+
+  # repo file gone (mid-checkout / repo moved) → installed copy still runs
+  rm "$checkout/ai-proxy/ccswitch.sh"
+  run env HOME="$HOME" bash "$HOME/.claude/ccswitch.sh" help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ccswitch"* ]]
+}
+
+@test "setup.sh run from a git worktree records the main checkout, not the worktree" {
+  setup_fake_home
+  main="$BATS_TEST_TMPDIR/main-repo"
+  mkdir -p "$main/ai-proxy"
+  cp "$ROOT/ai-proxy/setup.sh" "$ROOT/ai-proxy/ccswitch.sh" "$ROOT/ai-proxy/statusline-context.sh" "$main/ai-proxy/"
+  cp -R "$ROOT/ai-proxy/hooks" "$ROOT/ai-proxy/profiles" "$main/ai-proxy/"
+  git -C "$main" init -q && git -C "$main" add -A \
+    && git -C "$main" -c user.name=t -c user.email=t@t commit -qm init
+  git -C "$main" worktree add -q "$main/.claude/worktrees/wt" -b feat/wt
+  run env HOME="$HOME" SHELL="/bin/zsh" bash -c "printf 'N\\n' | bash '$main/.claude/worktrees/wt/ai-proxy/setup.sh'"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$HOME/.claude/.ccswitch-repo")" = "$(cd "$main" && pwd -P)" ] || [ "$(cat "$HOME/.claude/.ccswitch-repo")" = "$main" ]
 }
