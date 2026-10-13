@@ -32,17 +32,19 @@
 #   HARNESS_GROUP_GUARD          y/n — guard hooks, no prompt        (default: Y)
 #   HARNESS_GROUP_QUALITY        y/n — quality hooks, no prompt      (default: Y)
 #   HARNESS_GROUP_COMMANDS       y/n — audit-claude-md + audit-context-memory + audit-dependency + audit-vietnamese + clean-up-project + doctor-memory + git-cleanup-branch + git-commit + git-commit-describe + git-force-snapshot + git-push-safety + task-loop-feature + update-claude + update-codex + update-gemini + update-deepseek workflow skills (slash-invocable /<name>), no prompt (default: Y)
-#   HARNESS_GROUP_SKILLS         y/n — ace-library + check-hardcode + dep-ladder-check + diagram + fix-ledger + frontend-design + gen-image + orchestrate + research + ui-preview skills, no prompt (default: Y)
-#   HARNESS_GROUP_RULES          y/n — rules: common/ (11 invariant guardrails, always overwrite) + project/ (git-workflow, skill-superpowers, test-parallel, browser-mcp-profiles, processes-layout — kept if exist), no prompt (default: Y)
+#   HARNESS_GROUP_SKILLS         y/n — ace-library + check-hardcode + dep-ladder-check + diagram + fix-ledger + frontend-design + gen-image + orchestrate + research + ui-preview + web-browse skills (+ browser-uipreview/browser-web subagents), no prompt (default: Y)
+#   HARNESS_GROUP_RULES          y/n — rules: common/ (11 invariant guardrails, always overwrite) + project/ (git-workflow, browser-mcp-profiles, module-md, social-posting-safety, ... — kept if exist; system-ai-gateway/system-ott/fork-isolation only when their trigger is present in the target) , no prompt (default: Y)
 #   HARNESS_GROUP_GITHOOKS       y/n — git pre-push hook (gitleaks secret scan) into .git/hooks/, no prompt (default: Y; skipped if target not a git repo)
 #   HARNESS_GROUP_PII            y/n — OPT-IN pre-pii-guard hook (blocks VN phone/CCCD/personal email/address/GPS in edits, bash, mcp, push diff) + pii-scan.pl + self-test, no prompt (default: N)
-#   HARNESS_GROUP_DEPLOY        y/n — production-deploy/-cleanup/-reboot + deploy-doc skills (slash-invocable /production-*, /deploy-doc), no prompt (default: N — opt-in, most repos don't deploy to a prod host)
+#   HARNESS_GROUP_DEPLOY        y/n — production-deploy/-cleanup/-reboot/-rsync + deploy-doc skills (slash-invocable /production-*, /deploy-doc), no prompt (default: N — opt-in, most repos don't deploy to a prod host)
 #   HARNESS_DEPLOY_SSH_HOST      ssh alias of the prod host                (default: <deploy-ssh-host>)
 #   HARNESS_DEPLOY_SERVICE       target container/compose service name    (default: <service-name>)
 #   HARNESS_DEPLOY_PATH          repo path on the host                    (default: <remote-repo-path>)
 #   HARNESS_DEPLOY_BRANCH        branch to deploy                         (default: same as HARNESS_BRANCH)
 #   HARNESS_DEPLOY_REMOTE        git remote the host pulls from           (default: origin)
 #   HARNESS_DEPLOY_HEALTHCHECK   healthcheck command/URL                  (default: <healthcheck-cmd>)
+#   HARNESS_CLOAK_MCP_CMD        command that launches the CloakBrowser MCP server, baked into agents/browser-web.md as @@CLOAK_MCP_CMD@@
+#                                (default: `command -v cloakbrowsermcp`, else the literal `cloakbrowsermcp`)
 #   HARNESS_OVERWRITE            forced to "all" once HARNESS_INSTALL_ALL confirms (per-file overwrite prompt removed)
 set -euo pipefail
 
@@ -262,6 +264,9 @@ DEPLOY_PATH="${HARNESS_DEPLOY_PATH:-<remote-repo-path>}"
 DEPLOY_BRANCH="${HARNESS_DEPLOY_BRANCH:-$BRANCH}"
 DEPLOY_REMOTE="${HARNESS_DEPLOY_REMOTE:-origin}"
 DEPLOY_HEALTHCHECK="${HARNESS_DEPLOY_HEALTHCHECK:-<healthcheck-cmd>}"
+# CloakBrowser MCP launcher for agents/browser-web.md: env → PATH lookup → literal
+CLOAK_MCP_CMD="${HARNESS_CLOAK_MCP_CMD:-$(command -v cloakbrowsermcp 2>/dev/null || true)}"
+CLOAK_MCP_CMD="${CLOAK_MCP_CMD:-cloakbrowsermcp}"
 
 resolve_primary_remote() { # resolve_primary_remote <dir> → remote name or empty
   local dir="$1" current upstream remotes count
@@ -415,6 +420,7 @@ substitute_file() {
     line="${line//@@DEPLOY_BRANCH@@/$DEPLOY_BRANCH}"
     line="${line//@@DEPLOY_REMOTE@@/$DEPLOY_REMOTE}"
     line="${line//@@DEPLOY_HEALTHCHECK@@/$DEPLOY_HEALTHCHECK}"
+    line="${line//@@CLOAK_MCP_CMD@@/$CLOAK_MCP_CMD}"
     printf '%s\n' "$line" >> "$tmp"
   done < "$src"
   mv "$tmp" "$dest"
@@ -475,6 +481,8 @@ if [ "$SEL_GUARD" -eq 1 ]; then
   install_file "hooks/pre-edit-content-scan.sh"       ".claude/hooks/pre-edit-content-scan.sh"
   # allowlist for content-scan hook — per-repo customizable → keep existing edits
   install_file "allowed-hosts.txt"                    ".claude/allowed-hosts.txt" preserve
+  # path denylist for delete commands in pre-bash-gate.sh — per-repo customizable → preserve
+  install_file "protected-paths.txt"                  ".claude/protected-paths.txt" preserve
   # orchestration gate — block under-specified Task dispatch
   install_file "hooks/pre-task-dispatch-gate.sh"      ".claude/hooks/pre-task-dispatch-gate.sh"
   # browser profile gate — force Cloak/Playwright qua profile prj_<xx>_sv_<yy>
@@ -499,6 +507,8 @@ if [ "$SEL_QUALITY" -eq 1 ]; then
   install_file "hooks/session-start.sh"           ".claude/hooks/session-start.sh"
   # browser profile audit — called by session-start.sh (advisory) or manually with --strict
   install_file "hooks/browser-profile-audit.sh"   ".claude/hooks/browser-profile-audit.sh"
+  # inject per-directory doc (MODULE.md) on Read/Edit/Write — silent unless env.HARNESS_DIR_DOC_ROOTS is set
+  install_file "hooks/pre-read-inject-dir-doc.sh" ".claude/hooks/pre-read-inject-dir-doc.sh"
   # review/security subagents (independent second opinion — not delegate personas)
   install_file "agents/code-reviewer.md"  ".claude/agents/code-reviewer.md"
   install_file "agents/secret-scanner.md" ".claude/agents/secret-scanner.md"
@@ -520,7 +530,7 @@ fi
 # Group membership is derived from the skill's own name (no separate list to
 # keep in sync):
 #   production-* / deploy-doc                              → SEL_DEPLOY
-#   ace-library / check-hardcode / dep-ladder-check / diagram / fix-ledger / frontend-design / gen-image / orchestrate / research / ui-preview → SEL_SKILLS (skill-only, never had a command;
+#   ace-library / check-hardcode / dep-ladder-check / diagram / fix-ledger / frontend-design / gen-image / orchestrate / research / ui-preview / web-browse → SEL_SKILLS (skill-only, never had a command;
 #                                                                               orchestrate also covers resume-orchestration)
 #   everything else (former slash-commands)                → SEL_COMMANDS
 if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -eq 1 ] || [ "$SEL_DEPLOY" -eq 1 ]; then
@@ -530,7 +540,7 @@ if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -e
     group_flag=0
     case "$skill_name" in
       production-*|deploy-doc) group_flag="$SEL_DEPLOY" ;;
-      ace-library|check-hardcode|dep-ladder-check|diagram|fix-ledger|frontend-design|gen-image|orchestrate|research|ui-preview) group_flag="$SEL_SKILLS" ;;
+      ace-library|check-hardcode|dep-ladder-check|diagram|fix-ledger|frontend-design|gen-image|orchestrate|research|ui-preview|web-browse) group_flag="$SEL_SKILLS" ;;
       *) group_flag="$SEL_COMMANDS" ;;
     esac
     [ "$group_flag" -eq 1 ] || continue
@@ -541,6 +551,8 @@ if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -e
   done < <(find "$TEMPLATES_DIR/skills" -mindepth 1 -maxdepth 1 -type d | sort)
   # /ui-preview runs in this subagent (context: fork) — MCP tool defs never load in main
   [ "$SEL_SKILLS" -eq 1 ] && install_file "agents/browser-uipreview.md" ".claude/agents/browser-uipreview.md"
+  # /web-browse runs in this subagent (context: fork) — Cloak MCP defs never load in main
+  [ "$SEL_SKILLS" -eq 1 ] && install_file "agents/browser-web.md" ".claude/agents/browser-web.md"
 
   if [ "$SEL_DEPLOY" -eq 1 ]; then
     deploy_config_incomplete=0
@@ -652,6 +664,9 @@ migrate_memory_mirror_dir() {
 }
 migrate_memory_mirror_dir
 
+pkg_mentions() { [ -f "$ROUTE_DIR/package.json" ] && grep -qF -- "$1" "$ROUTE_DIR/package.json"; }
+has_git_remote() { git -C "$ROUTE_DIR" remote 2>/dev/null | grep -qx -- "$1"; }
+
 if [ "$SEL_RULES" -eq 1 ]; then
   echo "── rules ──"
   # common/ = invariant guardrails, source-of-truth = templates → always overwrite (sync)
@@ -665,6 +680,13 @@ if [ "$SEL_RULES" -eq 1 ]; then
     [ -e "$f" ] || continue
     b="$(basename "$f")"
     [ "$b" = "sync-template.md" ] && continue # source-repository maintenance only
+    # conditional rules: install only when the target shows the trigger; a skipped rule is
+    # neither written, recorded in the manifest, nor deleted if the project already has it
+    case "$b" in
+      system-ai-gateway.md) pkg_mentions "@acegalaxy/lib-ai-gateway" || continue ;;
+      system-ott.md)        pkg_mentions "@acegalaxy/lib-ott-gateway" || continue ;;
+      fork-isolation.md)    has_git_remote upstream || continue ;;
+    esac
     install_file "rules/project/$b" ".claude/rules/project/$b" preserve
   done
   # project memory mirror index — per-repo content, never overwrite
@@ -879,6 +901,7 @@ if [ "$SEL_GUARD" -eq 1 ] || [ "$SEL_QUALITY" -eq 1 ] || [ "$SEL_PII" -eq 1 ]; t
   fi
   if [ "$SEL_QUALITY" -eq 1 ]; then
     wire_hook PostToolUse 'Edit|Write|MultiEdit' '$CLAUDE_PROJECT_DIR/.claude/hooks/post-edit-advisor.sh' 'Edit|Write Write'
+    wire_hook PreToolUse 'Read|Edit|Write|MultiEdit' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-read-inject-dir-doc.sh'
     wire_hook SessionStart '' '$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh'
     # orchestration recorders — stuck-command detection + merged subagent verdict/ledger
     wire_hook PostToolUse 'Bash' '$CLAUDE_PROJECT_DIR/.claude/hooks/post-bash-stuck-detector.sh'
@@ -981,11 +1004,12 @@ install_env_json() {
     --arg gh "$(yn $SEL_GITHOOKS)" --arg dep "$(yn $SEL_DEPLOY)" --arg pii "$(yn $SEL_PII)" \
     --arg dh "$DEPLOY_SSH_HOST" --arg ds "$DEPLOY_SERVICE" --arg dp "$DEPLOY_PATH" \
     --arg db "${HARNESS_DEPLOY_BRANCH:-}" --arg dr "$DEPLOY_REMOTE" --arg dc "$DEPLOY_HEALTHCHECK" \
+    --arg cloak "$CLOAK_MCP_CMD" \
     '{HARNESS_CORE_DIRS:$core,HARNESS_RISK_DIRS:$risk,HARNESS_PROJECT_SLUG:$slug,HARNESS_BRANCH:$branch,HARNESS_TEST_CMD:$test,
       HARNESS_GROUP_SUBAGENTS:$sub,HARNESS_GROUP_GUARD:$guard,HARNESS_GROUP_QUALITY:$qual,HARNESS_GROUP_COMMANDS:$cmds,
       HARNESS_GROUP_SKILLS:$skills,HARNESS_GROUP_RULES:$rules,HARNESS_GROUP_GITHOOKS:$gh,HARNESS_GROUP_DEPLOY:$dep,HARNESS_GROUP_PII:$pii,
       HARNESS_DEPLOY_SSH_HOST:$dh,HARNESS_DEPLOY_SERVICE:$ds,HARNESS_DEPLOY_PATH:$dp,HARNESS_DEPLOY_BRANCH:$db,
-      HARNESS_DEPLOY_REMOTE:$dr,HARNESS_DEPLOY_HEALTHCHECK:$dc}'
+      HARNESS_DEPLOY_REMOTE:$dr,HARNESS_DEPLOY_HEALTHCHECK:$dc,HARNESS_CLOAK_MCP_CMD:$cloak}'
 }
 write_manifest
 grep -qxF -- "$ROUTE_DIR" "$REGISTRY" 2>/dev/null || printf '%s\n' "$ROUTE_DIR" >> "$REGISTRY"

@@ -46,7 +46,7 @@ dùng-xong-bỏ.
   install. Backup edit local trước khi sync; cơ chế bảo vệ modified-file của
   uninstall không phải chiến lược merge nâng cấp.
 - **Preserve files:** rule project có sẵn dưới `.claude/rules/project/` và
-  `.claude/allowed-hosts.txt` vẫn thuộc project. Template chỉ seed file còn
+  `.claude/allowed-hosts.txt` và `.claude/protected-paths.txt` vẫn thuộc project. Template chỉ seed file còn
   thiếu; sync không ghi đè customization đã có.
 - **Shared configuration:** setting và text không liên quan nằm ngoài block
   `CLAUDE.md` được quản lý thuộc về project. Ownership settings của harness là

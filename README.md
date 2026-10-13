@@ -269,17 +269,17 @@ Delegate wrapper là **bash-only** — Windows cần WSL hoặc Git Bash (không
 | Nhóm | Env override | File cài vào project đích |
 |---|---|---|
 | **subagents + wrappers** | `HARNESS_GROUP_SUBAGENTS` | `.claude/agents/delegate-{deepseek,gemini,codex,sonnet}.md` + `scripts/delegate/*.sh` (`_common`, `run-aider-deepseek`, `run-codex`, `run-gemini`, `doctor` + `lib/`) |
-| **guard hooks** | `HARNESS_GROUP_GUARD` | `.claude/hooks/{pre-edit-orchestrator-gate,pre-bash-orchestrator-gate,pre-edit-secret-scan,pre-edit-service-alert-gate}.sh` (wire `PreToolUse` cho `Edit`/`Write`/`MultiEdit`/`Bash`; service-alert-gate chặn gọi thẳng Telegram Bot API) |
-| **quality hooks** | `HARNESS_GROUP_QUALITY` | `.claude/hooks/post-edit-syntax-check.sh` (wire `PostToolUse`) + `session-start-banner.sh` (wire `SessionStart`) + `pre-commit-deploy-doc.sh` (nhắc `/deploy-doc` khi commit, advisory) |
-| **commands** | `HARNESS_GROUP_COMMANDS` | `.claude/skills/*/SKILL.md` (16 skill, gọi qua `/<name>`) |
-| **skills** | `HARNESS_GROUP_SKILLS` | `.claude/skills/{ace-library,check-hardcode,dep-ladder-check,diagram,fix-ledger,frontend-design,gen-image,orchestrate,research,ui-preview}/SKILL.md` (10 skill; gen-image kèm `gen.py`, frontend-design kèm `LICENSE.txt`; ui-preview chạy trong subagent `.claude/agents/browser-uipreview.md` — Playwright MCP inline, profile `<repo>/.browser-profiles/prj_<slug>_sv_uipreview`, không đụng `.mcp.json`) |
-| **rules** | `HARNESS_GROUP_RULES` | `.claude/rules/common/*.md` (10 invariant guardrail — always overwrite) + `.claude/rules/project/{git-workflow,skill-superpowers,test-parallel,browser-mcp-profiles,processes-layout}.md` (giữ nguyên nếu đã tồn tại) |
+| **guard hooks** | `HARNESS_GROUP_GUARD` | `.claude/protected-paths.txt` (preserve, danh sách path chặn lệnh xoá trong `pre-bash-gate.sh`) + `.claude/hooks/{pre-edit-orchestrator-gate,pre-bash-orchestrator-gate,pre-edit-secret-scan,pre-edit-service-alert-gate}.sh` (wire `PreToolUse` cho `Edit`/`Write`/`MultiEdit`/`Bash`; service-alert-gate chặn gọi thẳng Telegram Bot API) |
+| **quality hooks** | `HARNESS_GROUP_QUALITY` | `.claude/hooks/pre-read-inject-dir-doc.sh` (wire `PreToolUse` cho `Read`/`Edit`/`Write`/`MultiEdit`; im lặng trừ khi `env.HARNESS_DIR_DOC_ROOTS` được set) + `.claude/hooks/post-edit-syntax-check.sh` (wire `PostToolUse`) + `session-start-banner.sh` (wire `SessionStart`) + `pre-commit-deploy-doc.sh` (nhắc `/deploy-doc` khi commit, advisory) |
+| **commands** | `HARNESS_GROUP_COMMANDS` | `.claude/skills/*/SKILL.md` (20 skill, gọi qua `/<name>`; gồm `recap`, `rotate-secret`, `seo`, `audit-presence`) |
+| **skills** | `HARNESS_GROUP_SKILLS` | `.claude/skills/{ace-library,check-hardcode,dep-ladder-check,diagram,fix-ledger,frontend-design,gen-image,orchestrate,research,ui-preview,web-browse}/SKILL.md` (11 skill; gen-image kèm `gen.py`, frontend-design kèm `LICENSE.txt`; ui-preview chạy trong subagent `.claude/agents/browser-uipreview.md` — Playwright MCP inline, profile `<repo>/.browser-profiles/prj_<slug>_sv_uipreview`, không đụng `.mcp.json`; web-browse chạy trong subagent `.claude/agents/browser-web.md` — CloakBrowser MCP inline, lệnh khởi chạy qua `@@CLOAK_MCP_CMD@@` = env `HARNESS_CLOAK_MCP_CMD` → `command -v cloakbrowsermcp` → literal `cloakbrowsermcp`, lưu trong manifest `installEnv`) |
+| **rules** | `HARNESS_GROUP_RULES` | `.claude/rules/common/*.md` (11 invariant guardrail — always overwrite) + `.claude/rules/project/{git-workflow,skill-superpowers,test-parallel,browser-mcp-profiles,processes-layout,module-md,social-posting-safety}.md` (giữ nguyên nếu đã tồn tại) + rule có điều kiện: `system-ai-gateway.md` (chỉ khi `package.json` có `@acegalaxy/lib-ai-gateway`), `system-ott.md` (khi có `@acegalaxy/lib-ott-gateway`), `fork-isolation.md` (khi git remote `upstream` tồn tại) — rule bị bỏ qua không ghi manifest, không xoá file sẵn có |
 | **PII guard (opt-in, mặc định N)** | `HARNESS_GROUP_PII` | `.claude/hooks/{pre-pii-guard.sh,pii-scan.pl,pre-pii-guard.test.sh}` — chặn SĐT/CCCD/email cá nhân/địa chỉ VN/GPS trong edit, bash, mcp, diff push |
 | **git pre-push hook** | `HARNESS_GROUP_GITHOOKS` | `.git/hooks/pre-push` (gitleaks secret scan) — bỏ qua nếu target không phải git repo |
 
 Wiring `.claude/settings.json` dùng `jq` merge **idempotent** — chạy lại không tạo hook trùng lặp. Off-switch không cần gỡ cài: set `env.HARNESS_DELEGATE=0` trong `.claude/settings.json` của project đích.
 
-Template gốc nằm ở `harness/templates/` — installer thay placeholder `@@PROJECT_SLUG@@`/`@@CORE_DIRS_CASE@@`/`@@CORE_DIRS_HUMAN@@`/`@@CORE_DIRS_YAML@@`/`@@BRANCH@@`/`@@TEST_CMD@@` bằng giá trị của project đích trước khi ghi file.
+Template gốc nằm ở `harness/templates/` — installer thay placeholder `@@PROJECT_SLUG@@`/`@@CORE_DIRS_CASE@@`/`@@CORE_DIRS_HUMAN@@`/`@@CORE_DIRS_YAML@@`/`@@BRANCH@@`/`@@TEST_CMD@@`/`@@CLOAK_MCP_CMD@@` bằng giá trị của project đích trước khi ghi file.
 
 Ví dụ chạy interactive (chọn cài vào project đang mở ở terminal, giữ mặc định Y cho mọi câu hỏi):
 
@@ -487,8 +487,8 @@ ccswitch-cli-claude/
 │       ├── agents/delegate-{codex,deepseek,gemini,sonnet}.md
 │       ├── scripts/delegate/               # wrapper script (_common, run-aider-deepseek, run-codex, run-gemini, doctor + lib/)
 │       ├── hooks/{pre-edit-orchestrator-gate,pre-bash-orchestrator-gate,pre-edit-secret-scan,post-edit-syntax-check,session-start-banner}.sh
-│       ├── skills/*/SKILL.md               # 24 skill (gồm 16 skill gọi qua `/<name>`, thay cho slash command cũ)
-│       ├── rules/{common,project}/*.md     # common (10 guardrail) + project (git-workflow, skill-superpowers, test-parallel, browser-mcp-profiles, processes-layout)
+│       ├── skills/*/SKILL.md               # 36 skill (gồm 20 skill gọi qua `/<name>`, thay cho slash command cũ)
+│       ├── rules/{common,project}/*.md     # common (11 guardrail) + project (git-workflow, skill-superpowers, test-parallel, browser-mcp-profiles, processes-layout, module-md, social-posting-safety + có điều kiện system-ai-gateway, system-ott, fork-isolation)
 │       └── git-hooks/pre-push              # gitleaks scan trước push (cài vào .git/hooks/ project đích)
 │
 ├── install-auto-compact.sh       # Phần 3 — set/auto/off/on/status autoCompactWindow, đứng riêng

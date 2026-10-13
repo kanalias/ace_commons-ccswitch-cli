@@ -38,7 +38,9 @@ graph_slug() {
 }
 
 # harness off-switch — set HARNESS_DELEGATE=0 in .claude/settings.local.json to disable
-[ "${HARNESS_DELEGATE:-1}" = "0" ] && exit 0
+# Không exit ngay: protected-path guard (0.5) là data-safety boundary, chạy cả khi off.
+harness_off=0
+[ "${HARNESS_DELEGATE:-1}" = "0" ] && harness_off=1
 
 LOG="${HOME}/.cache/claude-code-ccswitch-cli-claude/orchestrator-gate.log"
 mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
@@ -53,6 +55,75 @@ cmd=$(echo "$payload"      | jq -r '.tool_input.command // empty')
 agent_id=$(echo "$payload" | jq -r '.agent_id // empty')
 
 [ -z "$cmd" ] && exit 0
+
+# ── 0.5) protected-path delete guard (everyone, KHÔNG bypass) ───────────────
+# Chặn lệnh XOÁ (rm/rmdir/shred/truncate, find -delete|-exec rm, git clean,
+# rsync --delete*) chạm chuỗi con path trong <project>/.claude/protected-paths.txt.
+# Chạy cho mọi agent, không bị ORCHESTRATOR_GATE_BYPASS / HARNESS_DELEGATE=0 tắt
+# (đặt TRƯỚC off-switch vì lý do đó). File vắng/không đọc được/không entry → no-op.
+# Heuristic, không phải sandbox. Lỗ đã biết: path động ($(…), $VAR, glob build lúc
+# chạy), script con (`bash x.sh`), `cd dir && rm *` (path tương đối không chứa entry),
+# alias/function; `xargs rm` chỉ xét theo cả lệnh.
+find_protected_list() {
+  local d="$1" parent
+  case "$d" in */.claude/worktrees/*) d="${d%%/.claude/worktrees/*}" ;; esac
+  while [ -n "$d" ] && [ "$d" != "/" ]; do
+    if [ -f "$d/.claude/protected-paths.txt" ]; then printf '%s' "$d/.claude/protected-paths.txt"; return 0; fi
+    [ -e "$d/.git" ] && return 1
+    parent="${d%/*}"; [ "$parent" = "$d" ] && return 1; d="$parent"
+  done
+  return 1
+}
+protected_guard() {
+  local cwd_pg list norm seg entry hit=""
+  cwd_pg=$(printf '%s' "$payload" | jq -r '.cwd // empty')
+  list=""
+  if [ -n "$cwd_pg" ]; then list=$(find_protected_list "$cwd_pg") || list=""; fi
+  if [ -z "$list" ] && [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -f "$CLAUDE_PROJECT_DIR/.claude/protected-paths.txt" ]; then
+    list="$CLAUDE_PROJECT_DIR/.claude/protected-paths.txt"
+  fi
+  { [ -n "$list" ] && [ -r "$list" ]; } || return 0
+  local entries=()
+  while IFS= read -r entry || [ -n "$entry" ]; do
+    entry="${entry%$'\r'}"
+    entry="${entry#"${entry%%[![:space:]]*}"}"; entry="${entry%"${entry##*[![:space:]]}"}"
+    case "$entry" in ""|\#*) continue ;; esac
+    entries+=("$entry")
+  done < "$list"
+  [ "${#entries[@]}" -gt 0 ] || return 0
+  # bỏ quote/backslash (path trong "…"); `\;` của find -exec không tách segment
+  norm=$(printf '%s\n' "$cmd" | sed -e 's/\\;/ /g' -e "s/[\"'\\\\]//g" | tr ';|&()`' '\n\n\n\n\n\n')
+  local V='(^|[[:space:]/{])(rm|rmdir|shred|truncate)([[:space:]]|$)'
+  V="$V|(^|[[:space:]/])find[[:space:]].*(-delete|-exec[[:space:]]+(/[^[:space:]]*/)?rm([[:space:]]|\$))"
+  V="$V|(^|[[:space:]/])git([[:space:]]+-[^[:space:]]+([[:space:]]+[^[:space:]-][^[:space:]]*)?)*[[:space:]]+clean([[:space:]]|\$)"
+  V="$V|(^|[[:space:]/])rsync[[:space:]].*--(delete|remove-source-files)"
+  while IFS= read -r seg; do
+    [ -n "$seg" ] || continue
+    printf '%s' "$seg" | grep -Eq "$V" || continue
+    for entry in "${entries[@]}"; do
+      case "$seg" in *"$entry"*) hit="$entry"; break 2 ;; esac
+    done
+  done <<< "$norm"
+  # `… | xargs rm`: verb và path nằm 2 segment khác nhau → xét cả lệnh
+  if [ -z "$hit" ] && printf '%s' "$cmd" | grep -Eq 'xargs[[:space:]]+(-[^[:space:]]+[[:space:]]+)*(rm|rmdir|shred|truncate)([[:space:]]|$)'; then
+    for entry in "${entries[@]}"; do
+      case "$cmd" in *"$entry"*) hit="$entry"; break ;; esac
+    done
+  fi
+  [ -n "$hit" ] || return 0
+  echo "$(ts) BLOCK protected-path delete (${hit}) agent=${agent_id:-main} → ${cmd:0:120}" >> "$LOG" 2>/dev/null || true
+  cat >&2 << EOF
+🛑 protected-path-guard: lệnh xoá chạm path được bảo vệ "${hit}" (khai báo trong .claude/protected-paths.txt).
+   Command: ${cmd:0:160}
+
+   DỪNG và hỏi user — không tự xoá, không lách bằng cách đổi lệnh. Áp cho mọi agent,
+   không có bypass (ORCHESTRATOR_GATE_BYPASS / HARNESS_DELEGATE=0 đều không tắt được).
+   User thật sự muốn xoá → tự chạy lệnh ngoài Claude Code.
+EOF
+  exit 2
+}
+protected_guard
+[ "$harness_off" = 1 ] && exit 0
 
 # ── 1) git-push gate (everyone) ─────────────────────────────────────────────
 if ! echo "$cmd" | grep -Eq 'GIT_PUSH_GATE_OK=1'; then

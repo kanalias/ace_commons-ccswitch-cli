@@ -52,6 +52,15 @@
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-browser-profile-gate.sh"
           }
         ]
+      },
+      {
+        "matcher": "Read|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-read-inject-dir-doc.sh"
+          }
+        ]
       }
     ],
     "PostToolUse": [

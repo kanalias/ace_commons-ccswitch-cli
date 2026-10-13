@@ -2,7 +2,7 @@
 name: browser-mcp-profiles
 description: Cloak (antidetect browser) + Playwright qua MCP — mỗi service 1 profile prj_xx_sv_yy tách biệt tránh lock session; container luôn là <repo>/.browser-profiles (không override bằng env); MCP đăng ký per-project. LAZY, load khi chạm .mcp.json / playwright / spec.
 status: live
-updated: 2026-10-08
+updated: 2026-10-13
 paths:
   - ".mcp.json"
   - ".claude/rules/project/browser-mcp-profiles.md"
@@ -16,7 +16,7 @@ metadata:
 
 > **CONTAINER PATH (resolve TRƯỚC mọi thao tác profile):** luôn là `<repo>/.browser-profiles/`, với `<repo>` là root checkout chính kể cả khi đang ở worktree.
 >
-> KHÔNG có override bằng env. Biến môi trường trỏ container đi nơi khác (vd export toàn cục trong shell profile) bị **bỏ qua** — một biến toàn cục sẽ dồn profile của mọi project về chung 1 repo.
+> KHÔNG có override bằng env. Biến generic (vd `BROWSER_PROFILES_DIR` export toàn cục) bị **bỏ qua**; biến scope project `<PROJECT>_BROWSER_PROFILES_DIR` chỉ được trống hoặc bằng đúng `<repo>/.browser-profiles` — khác → lib throw `profiles_dir_locked`.
 >
 > Container = folder chứa các profile `prj_<xx>_sv_<yy>/`. Trước mọi `mkdir`, cả `<repo>/.gitignore` và `<repo>/.dockerignore` PHẢI có dòng `/.browser-profiles/`; thiếu guard và không được phép sửa → STOP hỏi user.
 
@@ -32,13 +32,13 @@ Pre-flight bắt buộc — chạy đủ 5 bước theo thứ tự TRƯỚC khi 
 2. **Guard trước khi tạo.** Xác nhận cả `<repo>/.gitignore` và `<repo>/.dockerignore` có `/.browser-profiles/` trước BẤT KỲ `mkdir` nào; thiếu → thêm trước hoặc STOP hỏi user.
 3. **Xác định `(xx, yy)`** = (project, service) của action này. Không suy ra được từ context → STOP hỏi user, KHÔNG tự đặt tên bừa.
 4. **Profile = `prj_<xx>_sv_<yy>`**, validate regex `^prj_[a-z0-9]+_sv_[a-z0-9]+$`. Đã có trong `_registry.md`/container → tái dùng. Chưa có → sau guard bước 2 mới tạo dir + thêm dòng registry TRƯỚC khi dùng.
-5. **Bind profile vào tool**: `--user-data-dir=<container>/prj_<xx>_sv_<yy>` (MCP entry có sẵn → dùng entry đó; chưa có → thêm entry theo snippet dưới). Xong action → cập nhật `last-used`.
+5. **Bind profile đúng theo tool**: Playwright MCP bake `--user-data-dir=<container>/prj_<xx>_sv_<yy>` vào server entry (có sẵn → dùng entry đó; chưa có → thêm theo snippet dưới); Cloak server KHÔNG có flag này — truyền absolute path qua `cloak_launch(user_data_dir=<container>/prj_<xx>_sv_<yy>)` ở MỖI lần launch. Xong action → cập nhật `last-used`.
 
 **Cảnh báo:** `git clean -xfd` xoá cả file ignored, gồm `<repo>/.browser-profiles/`. Preview bằng `git clean -ndx` và exclude container, hoặc backup có chủ đích trước khi cleanup.
 
 **CẤM tuyệt đối** (mọi cái dưới = tạo profile lung tung, mất kiểm soát):
 
-- ❌ Launch Cloak/Playwright **không** `--user-data-dir` (rơi vào default cache ngoài container, không track được).
+- ❌ Launch Playwright thiếu `--user-data-dir`, hoặc gọi `cloak_launch` thiếu `user_data_dir` (rơi vào phiên ephemeral/default cache ngoài container, không track được).
 - ❌ Tạo profile **ngoài** container hoặc tên **không** khớp regex.
 - ❌ 1 profile cho >1 `(xx,yy)`, hoặc 1 action dùng profile của service khác "cho tiện".
 - ❌ Tạo profile mới khi profile đúng `(xx,yy)` đã tồn tại (phải tái dùng).
@@ -47,7 +47,11 @@ Pre-flight bắt buộc — chạy đủ 5 bước theo thứ tự TRƯỚC khi 
 
 Mâu thuẫn / không chắc `(xx,yy)` / container lạ → **STOP hỏi user**, KHÔNG tự đoán rồi tạo.
 
-**Enforce cứng (hook):** `pre-browser-profile-gate.sh` (PreToolUse, matcher MCP browser tools + Bash) chặn `exit 2` khi: MCP server name không khớp `<pw|cloak>_<xx>_<yy>` (server generic `playwright`/`cloak` → block), hoặc Bash launch `@playwright/mcp`/cloak thiếu `--user-data-dir=.../prj_<xx>_sv_<yy>`. Off-switch: `HARNESS_DELEGATE=0`. Hook chỉ chặn được cái đi qua MCP tool / Bash — còn lại vẫn tự giác theo GATE trên.
+**Enforce cứng (hook):** `pre-browser-profile-gate.sh` (PreToolUse, matcher MCP browser tools + Bash) chặn `exit 2` khi: MCP server name không khớp `<pw|cloak>_<xx>_<yy>` (server generic `playwright`/`cloak` → block), `cloak_launch` thiếu `user_data_dir=<container>/prj_<xx>_sv_<yy>` đúng profile của server (tuyệt đối, đúng container), hoặc Bash launch `@playwright/mcp` thiếu `--user-data-dir=.../prj_<xx>_sv_<yy>`. Off-switch: `HARNESS_DELEGATE=0`. Hook chỉ chặn được cái đi qua MCP tool / Bash.
+
+**Audit phủ phần còn lại:** `.claude/hooks/browser-profile-audit.sh` (gọi từ `session-start.sh`, advisory; chạy tay `--strict` → exit 1 khi có lỗi) quét: `--user-data-dir`/`user_data_dir` trong `.claude/agents/*.md` + `.mcp.json` phải đúng `<container>/prj_<xx>_sv_<yy>` và khớp tên server `pw_<xx>_<yy>`; `.gitignore`/`.dockerignore` có `/.browser-profiles/`; dir ↔ `_registry.md` (thiếu/thừa); `.env*` set `*PROFILES_DIR` (chỉ in tên biến); code tự ghép `'.browser-profiles'`/`.cloakbrowser/` thay vì `resolveServiceProfilePath`; profile rơi ở `~/.cloakbrowser/*profile*`.
+
+**Runtime khoá cứng:** `@acegalaxy/lib-browser-crawler` ≥ v0.5.0 — `resolveProfilesBase` luôn `<root>/.browser-profiles`; `<PROJECT>_BROWSER_PROFILES_DIR` chỉ được trống hoặc bằng đúng path đó (Docker `/app/.browser-profiles`), khác → throw `profiles_dir_locked`. Code mới mở browser persistent PHẢI lấy path qua `resolveServiceProfilePath`, KHÔNG thêm env override riêng (`*_PROFILE_DIR`).
 
 ## Naming — `prj_<xx>_sv_<yy>`
 
@@ -55,6 +59,8 @@ Mâu thuẫn / không chắc `(xx,yy)` / container lạ → **STOP hỏi user**,
 - Mỗi profile = 1 dir con: `<container>/prj_<xx>_sv_<yy>/` sau khi resolve override/default.
 - Ví dụ: `prj_myapp_sv_auth`, `prj_shop_sv_checkout`.
 - Tên sai regex → sửa trước khi tạo, KHÔNG tạo dir rác.
+- Service id có dấu gạch ngang giữ nguyên gạch ở mọi nơi (registry, CLI args); chỉ tên DIR profile bỏ gạch — tính bằng helper của lib (`resolveServiceProfilePath`), KHÔNG ghép tay.
+- Đổi quy ước đặt tên làm hỏng profile đang đăng nhập + file lock → cần user quyết định và migrate toàn bộ.
 
 ## Profile isolation (mục tiêu #1)
 
@@ -74,11 +80,15 @@ Cả hai trỏ **CÙNG container + CÙNG naming** → quản lý 1 nơi.
 
 ## MCP registration — per-project (KHÔNG global)
 
-Đăng ký trong `.mcp.json` của repo cần browser, KHÔNG global. Lý do: scope security hẹp theo repo + tiết kiệm token (chỉ repo browser mới nạp tool defs, repo khác không gánh).
+**Mặc định: subagent, KHÔNG `.mcp.json`.** Mỗi profile 1 file `.claude/agents/browser-<yy>.md` khai `mcpServers` **inline** (tham chiếu theo tên `- cloak_x` không chạy khi server vắng trong `.mcp.json`); skill browser dùng `context: fork` + `agent: browser-<yy>`. Tool defs + snapshot chỉ nằm trong subagent, main session 0 token, không cần restart. Harness cài sẵn `browser-uipreview` (Playwright, `/ui-preview`). Chỉ khai `.mcp.json` khi skill phải hỏi user/login tay giữa chừng (subagent không hỏi được).
 
-> **Profile bake lúc launch, KHÔNG chọn per tool-call.** Playwright MCP cố định `user-data-dir` per server instance (flag `--user-data-dir`, hoặc env `PLAYWRIGHT_MCP_USER_DATA_DIR`). Antidetect browser (Cloak) cũng bind profile lúc mở. → **1 profile = 1 server entry**. "Tập trung" đạt qua 1 file config + N entry + 1 container, KHÔNG phải 1 server switch profile.
+**Mọi profile (Cloak, Playwright MCP, Playwright/Cloak trong code runtime) nằm trong `<repo>/.browser-profiles/prj_<xx>_sv_<yy>`** — kể cả `launchPersistentContext` trong service; resolve qua `resolveServiceProfilePath` của `@acegalaxy/lib-browser-crawler` khi project dùng lib. Profile ngoài container (`~/.cloakbrowser/*`, cache Playwright mặc định, `/tmp`) → backup `tar` rồi move vào + thêm dòng registry.
 
-Snippet mẫu — mỗi service 1 entry (server key = `pw|cloak _ <xx> _ <yy>`), `user-data-dir` bake lúc launch. `.mcp.json` là **strict JSON — KHÔNG comment**; copy nguyên rồi điền `<cloak-mcp-cmd>` + path tuyệt đối:
+Đăng ký `.mcp.json` (nếu cần) của repo cần browser, KHÔNG global. Lý do: scope security hẹp theo repo + tiết kiệm token (chỉ repo browser mới nạp tool defs, repo khác không gánh).
+
+> **Binding khác nhau theo server.** Playwright MCP cố định `user-data-dir` per server instance (flag `--user-data-dir`, hoặc env `PLAYWRIGHT_MCP_USER_DATA_DIR`). Cloak server chỉ đăng ký capability; profile được chọn **mỗi lần gọi** `cloak_launch(user_data_dir=<absolute-path>)` — server không có flag/env bind profile, và launch thiếu `user_data_dir` = phiên ephemeral. → **1 profile = 1 server entry** (server key giữ đúng `(xx,yy)`). "Tập trung" đạt qua 1 file config + N entry + 1 container.
+
+Snippet mẫu — mỗi service 1 entry (server key = `pw|cloak _ <xx> _ <yy>`), Playwright bake `--user-data-dir`, Cloak chỉ `--caps all`. `.mcp.json` là **strict JSON — KHÔNG comment**; copy nguyên rồi điền `<cloak-mcp-cmd>` + path tuyệt đối:
 
 ```json
 {
@@ -90,15 +100,16 @@ Snippet mẫu — mỗi service 1 entry (server key = `pw|cloak _ <xx> _ <yy>`),
     },
     "cloak_myapp_auth": {
       "command": "<cloak-mcp-cmd>",
-      "args": ["--user-data-dir=/path/to/repo/.browser-profiles/prj_myapp_sv_auth"]
+      "args": ["--caps", "all"]
     }
   }
 }
 ```
 
-- `.mcp.json` **không expand** biến môi trường (`${HOME}`...) — dùng **path tuyệt đối đã resolve** (`/path/to/repo/.browser-profiles/...`).
+- Với Playwright, `.mcp.json` **không expand** biến môi trường (`${HOME}`...) — dùng **path tuyệt đối đã resolve** (`/path/to/repo/.browser-profiles/...`).
+- Với Cloak, mọi `cloak_launch` trên entry đó phải truyền `user_data_dir` = absolute path của profile tương ứng; không truyền = phiên ephemeral (hook chặn).
 - **Ephemeral + auth replay (nhẹ hơn persistent):** Playwright `--isolated --storage-state=<container>/prj_xx_sv_yy/state.json` — không giữ profile trên disk, chỉ nạp cookie/localStorage. Dùng khi không cần fingerprint bền.
-- KHÔNG nhét >1 profile vào 1 entry (không switch per-call được).
+- KHÔNG dùng 1 entry/profile cho nhiều service.
 
 ## Session persistence — KHÔNG login lại (P0)
 
@@ -106,14 +117,14 @@ Profile nặng + chứa auth → **mọi setup phải giữ được session qua
 
 | Mất session vì | Chặn bằng |
 |---|---|
-| Launch thiếu `--user-data-dir` → rơi default cache | Luôn bake `--user-data-dir=<container>/prj_xx_sv_yy` (hook chặn cứng) |
+| Launch thiếu profile → rơi default/ephemeral | Playwright bake `--user-data-dir`; Cloak truyền `cloak_launch.user_data_dir` mỗi lần (hook chặn cứng) |
 | `git clean -xfd` xoá container repo-root | Preview bằng `git clean -ndx`; exclude container hoặc backup trước khi clean |
 | Profile host macOS dùng trong container Linux → cookie không giải mã | Login 1 lần **trong** container, hoặc chuyển qua `state.json` (xem Migrate) |
 | 2 process cùng 1 profile → lock corrupt | 1 profile = 1 process, đóng cái cũ trước |
 
 ### Case A — Local thuần (không Docker)
 
-Setup mặc định: container `<repo>/.browser-profiles/`, mỗi service 1 profile, mọi launch có `--user-data-dir`.
+Setup mặc định: container `<repo>/.browser-profiles/`, mỗi service 1 profile. Playwright launch bằng server entry đã bake `--user-data-dir`; Cloak launch bằng `user_data_dir` explicit.
 
 Bền qua đổi branch/restart khi giữ nguyên checkout. Vì container nằm trong repo-root và bị ignore, `git clean -xfd` hoặc xoá checkout **sẽ xoá session**; luôn preview/exclude hoặc backup trước. Worktree dùng container root checkout chính, không tạo bản riêng.
 
@@ -156,6 +167,12 @@ const {chromium} = require("playwright");
 ```
 
 `state.json` = cookie + localStorage dạng JSON thuần → **portable mọi OS**. Dùng lại qua `--isolated --storage-state=<container>/prj_xx_sv_yy/state.json` (xem mục MCP registration). Đánh đổi: mất fingerprint bền của profile persistent — site nhạy fingerprint có thể vẫn bắt verify lại.
+
+Invariant khi migrate/copy profile đã auth:
+
+- KHÔNG ghi đè profile đích đang login sẵn (có thể đang dùng thật) — đích đã valid thì bỏ qua.
+- Trước khi ghi, backup cookie store đích bằng bản copy có timestamp (`Cookies.<yyyymmddHHMMSS>.bak`).
+- Copy cookie KHÔNG mang theo session lưu trong IndexedDB — site dựa IndexedDB vẫn có thể đòi login lại.
 
 Ba cách theo tình huống: **cùng OS** → `rsync -a` nguyên profile (đóng browser trước). **Khác OS** → `state.json`. **Cần fingerprint bền thật** → login lại 1 lần ở OS đích, giữ bind mount.
 
@@ -214,6 +231,21 @@ Ba cách theo tình huống: **cùng OS** → `rsync -a` nguyên profile (đóng
 Deploy sang máy khác không mang profile theo Git/image. Backup/migrate riêng rồi đặt lại vào `<repo>/.browser-profiles/` trên máy đích (hoặc bind mount persistent host path vào đúng vị trí đó).
 
 **Worktree:** repo fan-out `.claude/worktrees/<slug>/` vẫn resolve `<repo>` về root checkout chính, nên dùng chung container + registry. Hai task đụng cùng profile phải serialize vì single-writer lock.
+
+## Gặp trang login / checkpoint giữa chừng
+
+- KHÔNG abort ngay, KHÔNG tự nhập credential — không bao giờ gõ password/OTP/backup code thay user.
+- Báo trạng thái chờ (waiting), poll có ngân sách giới hạn (tham số, vd ~10 phút) trong lúc user login tay ở cửa sổ đang mở.
+- Hết ngân sách mà vẫn ở trang sign-in → trả lỗi và dừng, KHÔNG retry.
+- `profile_in_use`/lock → dừng; KHÔNG xoá file lock, KHÔNG kill process.
+- KHÔNG dump cookie ra output.
+
+## Browser contract (skill lái browser)
+
+- Snapshot trước khi click; tìm phần tử theo text hiển thị, không dùng ref cũ.
+- Re-auth tối đa 1 lần rồi dừng.
+- Thoát là đóng browser.
+- Chạy unattended (cron/headless): có danh sách forbidden-actions cố định (không ghi/submit/đổi settings); gặp việc ngoài danh sách cho phép → trả status `blocked` thay vì tự xoay xở.
 
 ## Registry — quản lý tập trung (mục tiêu #2/#3)
 

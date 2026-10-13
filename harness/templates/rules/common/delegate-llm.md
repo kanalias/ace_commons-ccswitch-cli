@@ -24,4 +24,9 @@ Offload work từ main Claude (Opus) → 4 pre-built delegate subagent. **KHÔNG
 
 Routing chi tiết (size S/M/L, fallback chain) + Mandatory + Anti-patterns: [[orchestrator]]. Budget gate: [[token-budget]]. Org push default: [[git-conventions]].
 
+## Fallback — khi nào
+
+- Chỉ fallback sang model/provider kế tiếp khi lỗi **tạm thời, phía runtime/provider** (quota, 429, session lock, auth, thiếu binary, timeout). Lỗi tất định trên cùng input (output không parse được schema, spec sai) sẽ fail y hệt ở model sau → sửa prompt/spec, không đổi model (khớp Loop guard trong [[orchestrator]]).
+- Không dùng chính subscription/session Claude đang orchestrate làm runner chính cho job nền dài — đốt 1 session 2 lần + nguy cơ lock; route job đó sang provider hoặc account khác.
+
 > **Project-specific:** wrapper path (`scripts/delegate/`), persona file khai báo trong repo.

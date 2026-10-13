@@ -58,6 +58,9 @@ Quy tắc chung, áp MỌI supplier (danh sách mở, không giới hạn: Anthr
   Ví dụ: `[MacMini2][Crawler] [⏳ queued] Service nhadathue-tiktok`.
 - `<Env>` = `HOST_LABEL`; `<Project>` + `<service>` tự gợi ý từ tên folder (git root / folder có `package.json`) ở lần dùng đầu rồi lưu `~/.config/acegalaxy/service-alert.json` (lib ≥ v0.9.0; đổi tên: `service-alert init`). `ALERT_PROJECT` / `--project` chỉ để ghi đè (vd container không có `.git`). Status ∈ `ok|fail|warn|info|queued|running`. Tên tự gợi ý > 16 ký tự được lib tự rút gọn (cắt từ dài nhất, giữ từ ngắn); muốn tên đẹp hơn → rút gọn tay nhưng vẫn giữ nguyên ý nghĩa, vd `share-fp2group-fb-personal` → `fp2g-fb-personal`; đặt bằng `service-alert init`.
 - CẤM tự dựng chuỗi header, tự gọi `api.telegram.org`, hoặc fork format trong project. Cần đổi mẫu → sửa trong lib `lib-ott-gateway` + release tag, rồi bump version ở các project dùng.
+- HTML Telegram hay sai: `& < >` thô trong nội dung PHẢI escape (`&amp; &lt; &gt;`) kẻo cả tin lỗi `can't parse entities`; cột căn thẳng đặt trong `<pre>` (block, không dùng `<code>`), pad bằng code thay vì gõ cứng dấu cách; mỗi tin ≤ 4096 ký tự — dài hơn thì tách tin hoặc cắt phần detail.
+- Mỗi project chốt MỘT cặp env bot-token + channel-id chuẩn cho mỗi mục đích, khai báo 1 lần ở rule project / `.env.example` (vd `TELEGRAM_BOT_TOKEN_ALERT` + `TELEGRAM_CHANNEL_ALERT_ID`) — dùng luôn, KHÔNG hỏi user chọn channel; CẤM trộn token của cặp này với chat id của cặp khác.
+- Cặp legacy chỉ còn là fallback lúc đọc ở chỗ đã có (`OLD || NEW`), không thêm chỗ dùng mới. Thiếu biến trong cặp → bỏ qua alert best-effort, log TÊN biến (không log giá trị), không làm fail luồng chính.
 
 ## Lib `@acegalaxy/*` — cài từ git tag, KHÔNG qua npm registry (BẮT BUỘC)
 
