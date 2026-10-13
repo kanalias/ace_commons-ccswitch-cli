@@ -33,8 +33,25 @@ STUB
   export PATH="$dir:$PATH"
 }
 
+# stub_security_none — fake macOS `security` that never finds a keychain item, so the OAuth
+# credential check is decided only by the fake $HOME (never the real keychain of the test machine).
+stub_security_none() {
+  local dir="$BATS_TEST_TMPDIR/stubbin"
+  mkdir -p "$dir"
+  printf '#!/usr/bin/env bash\nexit 44\n' > "$dir/security"
+  chmod +x "$dir/security"
+  export PATH="$dir:$PATH"
+}
+
+# fake_oauth_cred — this machine HAS a Claude Code OAuth login (linux-style credential file).
+fake_oauth_cred() {
+  mkdir -p "$HOME/.claude"
+  echo '{"claudeAiOauth":{"subscriptionType":"max"}}' > "$HOME/.claude/.credentials.json"
+}
+
 setup() {
   setup_fake_home
+  stub_security_none
   ROOT="$(repo_root)"
   CC="$ROOT/ai-proxy/ccswitch.sh"
   CHECK_ROUTER="$ROOT/ai-proxy/hooks/check-router.sh"
@@ -75,6 +92,7 @@ setup() {
 }
 
 @test "fallback on active router + dead stub (000) drops to subscription and marks it" {
+  fake_oauth_cred
   echo '{}' > "$HOME/.claude/settings.json"
   "$CC" claude >/dev/null
   stub_curl 000
@@ -116,6 +134,7 @@ setup() {
 }
 
 @test "check-router.sh: router active in settings.json + dead stub auto-switches to subscription" {
+  fake_oauth_cred
   echo '{}' > "$HOME/.claude/settings.json"
   "$CC" claude >/dev/null
   stub_curl 000
@@ -125,6 +144,48 @@ setup() {
   [ "$has_env" = "false" ]
   marker=$(cat "$HOME/.claude/.ccswitch-target")
   [ "$marker" = "subscription" ]
+}
+
+# Incident 2026-10-12 (MacMini2): router restarted for ~2 min, a `claude` spawn hit the
+# SessionStart hook, fallback dropped to subscription on a machine with NO OAuth login ->
+# every later `claude` said "Not logged in" for 16h (fallback never promotes back).
+
+@test "fallback on active router + dead stub but NO OAuth credential keeps the router (no dead harbor)" {
+  echo '{}' > "$HOME/.claude/settings.json"
+  "$CC" claude >/dev/null
+  before=$(cat "$HOME/.claude/settings.json")
+  stub_curl 000
+  run "$CC" fallback
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"NO OAuth credential"* ]]
+  after=$(cat "$HOME/.claude/settings.json")
+  [ "$before" = "$after" ]
+  marker=$(cat "$HOME/.claude/.ccswitch-target")
+  [ "$marker" = "claude" ]
+}
+
+@test "check-router.sh: dead router + NO OAuth credential -> no mutation, no restart hint" {
+  echo '{}' > "$HOME/.claude/settings.json"
+  "$CC" claude >/dev/null
+  before=$(cat "$HOME/.claude/settings.json")
+  stub_curl 000
+  run env -u ANTHROPIC_BASE_URL -u ANTHROPIC_DEFAULT_OPUS_MODEL HOME="$HOME" bash "$CHECK_ROUTER"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"NO OAuth credential"* ]]
+  [[ "$output" != *"để nạp endpoint mới"* ]]
+  after=$(cat "$HOME/.claude/settings.json")
+  [ "$before" = "$after" ]
+  marker=$(cat "$HOME/.claude/.ccswitch-target")
+  [ "$marker" = "claude" ]
+}
+
+@test "ccswitch subscription (manual) still works without an OAuth credential" {
+  echo '{}' > "$HOME/.claude/settings.json"
+  "$CC" claude >/dev/null
+  run "$CC" subscription
+  [ "$status" -eq 0 ]
+  has_env=$(jq 'has("env")' "$HOME/.claude/settings.json")
+  [ "$has_env" = "false" ]
 }
 
 # Custom-host regression: real installs route through a router host that is NOT the repo's
@@ -149,6 +210,7 @@ setup() {
 }
 
 @test "check-router.sh: custom router host active + dead stub still auto-switches to subscription" {
+  fake_oauth_cred
   local custom="https://router.custom.test/v1"
   for p in claude codex deepseek kimi; do
     tmp=$(mktemp)

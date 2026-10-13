@@ -132,6 +132,7 @@ ccswitch subscription   # → gỡ env block, dùng OAuth subscription login
 ccswitch spawn <target> # → mở 1 instance RIÊNG ghim target đó (settings.json không đổi)
 ccswitch check          # probe health các profile + verify subscription OAuth
 ccswitch fallback       # giữ target đang active nếu router healthy; router chết → subscription
+                        #   (chỉ khi máy có OAuth login; không có → giữ nguyên router)
 ccswitch set-key [t]    # nhập key mới (ẩn) cho target t (default claude) rồi apply
 ccswitch set-host <url> [t]  # ghi base URL vào profile t (default claude) rồi apply
 ccswitch update [src]   # đồng bộ host+key từ profile src (default claude) sang các profile còn lại — hỏi [y/N] từng cái
