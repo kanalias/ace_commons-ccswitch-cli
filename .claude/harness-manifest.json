@@ -96,7 +96,7 @@
     },
     {
       "path": ".claude/rules/common/general.md",
-      "sha256": "603216333ea5f597ff02edff3bc34371e23042ab3913f6e40d6a1b40ee2601e4"
+      "sha256": "2a41e32e091d3545e2c5ed156c6e0d8ed66e74ee7036a6abf1c4695a19eca797"
     },
     {
       "path": ".claude/rules/common/git-conventions.md",
