@@ -650,6 +650,51 @@ run_install_deploy() {
   [ -f "$TARGET/.claude/rules/project/system-ott.md" ]
 }
 
+@test "conditional rules: lib as package's own name only -> neither rule installed" {
+  printf '{"name":"@acegalaxy/lib-ai-gateway"}\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  printf '{"name":"@acegalaxy/lib-ott-gateway"}\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  [ ! -e "$TARGET/.claude/rules/project/system-ai-gateway.md" ]
+  [ ! -e "$TARGET/.claude/rules/project/system-ott.md" ]
+}
+
+@test "conditional rules: lib under devDependencies installs the rule" {
+  printf '{"devDependencies":{"@acegalaxy/lib-ott-gateway":"x"}}\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  [ -f "$TARGET/.claude/rules/project/system-ott.md" ]
+}
+
+@test "conditional rules: lib only in scripts string or repository.url -> not installed" {
+  printf '{"scripts":{"x":"npm i @acegalaxy/lib-ai-gateway"},"repository":{"url":"git+ssh://github.com/acegalaxy-co/@acegalaxy/lib-ott-gateway.git"}}\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  [ ! -e "$TARGET/.claude/rules/project/system-ai-gateway.md" ]
+  [ ! -e "$TARGET/.claude/rules/project/system-ott.md" ]
+}
+
+@test "conditional rules: invalid package.json -> warn, rules skipped, install exits 0" {
+  printf '{ not json @acegalaxy/lib-ai-gateway\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"package.json not valid JSON"* ]]
+  [ ! -e "$TARGET/.claude/rules/project/system-ai-gateway.md" ]
+}
+
+@test "conditional rules: trigger gone after install -> file kept, notice printed" {
+  printf '{"dependencies":{"@acegalaxy/lib-ai-gateway":"x"}}\n' > "$TARGET/package.json"
+  run_install
+  [ -f "$TARGET/.claude/rules/project/system-ai-gateway.md" ]
+  printf '{"name":"@acegalaxy/lib-ai-gateway"}\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  [ -f "$TARGET/.claude/rules/project/system-ai-gateway.md" ]
+  [[ "$output" == *"no longer applies"* ]]
+}
+
 @test "conditional rules: git remote 'upstream' triggers fork-isolation; other remote names do not" {
   git -C "$TARGET" remote add origin https://example.com/o/r.git
   run_install

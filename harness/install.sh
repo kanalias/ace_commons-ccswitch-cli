@@ -664,7 +664,27 @@ migrate_memory_mirror_dir() {
 }
 migrate_memory_mirror_dir
 
-pkg_mentions() { [ -f "$ROUTE_DIR/package.json" ] && grep -qF -- "$1" "$ROUTE_DIR/package.json"; }
+# pkg_mentions <pkg>: true only when <pkg> is a KEY of (dev|peer|optional)dependencies in the root
+# package.json — own "name", repository URL, scripts etc. do not count. Invalid JSON → warn, not a consumer.
+PKG_WARNED=0
+pkg_mentions() {
+  [ -f "$ROUTE_DIR/package.json" ] || return 1
+  local rc=0
+  jq -e --arg p "$1" '[.dependencies, .devDependencies, .peerDependencies, .optionalDependencies] | map(select(type == "object") | has($p)) | any' "$ROUTE_DIR/package.json" >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -gt 1 ]; then
+    if [ "$PKG_WARNED" -eq 0 ]; then echo "WARN: package.json not valid JSON — conditional rules skipped"; PKG_WARNED=1; fi
+    return 1
+  fi
+  [ "$rc" -eq 0 ]
+}
+# Conditional rules are "preserve" files (no checksum in manifest), so a stale one cannot be proven
+# unmodified → never deleted; just notify when the previous manifest says we installed it.
+note_stale_conditional() {
+  local rel=".claude/rules/project/$1"
+  [ -f "$ROUTE_DIR/$rel" ] || return 0
+  [ -f "$PREVIOUS_MANIFEST" ] && jq -e --arg p "$rel" '.preservePaths | index($p)' "$PREVIOUS_MANIFEST" >/dev/null 2>&1 || return 0
+  echo "NOTE: $rel no longer applies (trigger gone) — kept, delete by hand if unwanted"
+}
 has_git_remote() { git -C "$ROUTE_DIR" remote 2>/dev/null | grep -qx -- "$1"; }
 
 if [ "$SEL_RULES" -eq 1 ]; then
@@ -683,9 +703,9 @@ if [ "$SEL_RULES" -eq 1 ]; then
     # conditional rules: install only when the target shows the trigger; a skipped rule is
     # neither written, recorded in the manifest, nor deleted if the project already has it
     case "$b" in
-      system-ai-gateway.md) pkg_mentions "@acegalaxy/lib-ai-gateway" || continue ;;
-      system-ott.md)        pkg_mentions "@acegalaxy/lib-ott-gateway" || continue ;;
-      fork-isolation.md)    has_git_remote upstream || continue ;;
+      system-ai-gateway.md) pkg_mentions "@acegalaxy/lib-ai-gateway" || { note_stale_conditional "$b"; continue; } ;;
+      system-ott.md)        pkg_mentions "@acegalaxy/lib-ott-gateway" || { note_stale_conditional "$b"; continue; } ;;
+      fork-isolation.md)    has_git_remote upstream || { note_stale_conditional "$b"; continue; } ;;
     esac
     install_file "rules/project/$b" ".claude/rules/project/$b" preserve
   done
