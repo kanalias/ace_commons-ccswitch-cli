@@ -57,6 +57,37 @@ msg_block() {
 EOF
 }
 
+# launches_playwright_mcp <cmd> → 0 nếu có segment THỰC SỰ chạy Playwright MCP.
+# Tách command theo ; | & ( ) ` newline; mỗi segment bỏ prefix (env VAR=, sudo, env,
+# exec, nohup, time, command) rồi xét từ đầu: launcher (npx/bunx/pnpx/node/deno,
+# npm exec, pnpm dlx|exec, yarn dlx, bun x|run, binary playwright-mcp /
+# mcp-server-playwright) hoặc shell wrapper (bash/sh/zsh/eval/xargs — mơ hồ → giữ
+# strict) VÀ segment chứa @playwright/mcp | playwright.*mcp. Text-only (grep, cat,
+# git commit -m, jq, npm ls/install...) chỉ nhắc tên → không phải launch → pass.
+launches_playwright_mcp() {
+  local seg w1 w2 word
+  local -a toks
+  while IFS= read -r seg; do
+    echo "$seg" | grep -Eq '@playwright/mcp|playwright.*mcp|mcp.*playwright' || continue
+    read -ra toks <<< "$seg" || true
+    w1=""; w2=""
+    for word in "${toks[@]+"${toks[@]}"}"; do
+      case "$word" in
+        [A-Za-z_]*=*|sudo|env|exec|nohup|time|command) continue ;;
+      esac
+      if [ -z "$w1" ]; then w1="${word##*/}"; else w2="$word"; break; fi
+    done
+    case "$w1" in
+      npx|bunx|pnpx|node|deno|docker|podman|uvx|pipx|python|python3|playwright-mcp|mcp-server-playwright|bash|sh|zsh|dash|eval|xargs) return 0 ;;
+      npm)  [ "$w2" = exec ] && return 0 ;;
+      pnpm) { [ "$w2" = dlx ] || [ "$w2" = exec ]; } && return 0 ;;
+      yarn) [ "$w2" = dlx ] && return 0 ;;
+      bun)  { [ "$w2" = x ] || [ "$w2" = run ]; } && return 0 ;;
+    esac
+  done < <(printf '%s\n' "$1" | sed -E 's/[;|&()`]/\n/g')
+  return 1
+}
+
 # verdict <tool_name> <cmd> <user_data_dir> → ALLOW hoặc "BLOCK:<reason>"
 verdict() {
   local tool="$1" cmd="${2:-}" user_data_dir="${3:-}" server expected
@@ -93,7 +124,7 @@ verdict() {
   # ── Bash launch Playwright MCP ──────────────────────────────────────
   # Cloak không bind profile qua CLI; gate nó tại tool cloak_launch ở trên.
   if [ "$tool" = "Bash" ] && [ -n "$cmd" ]; then
-    if echo "$cmd" | grep -Eq '@playwright/mcp|playwright.*mcp'; then
+    if launches_playwright_mcp "$cmd"; then
       # phải có --user-data-dir=...prj_<xx>_sv_<yy>
       if [[ "$cmd" =~ --user-data-dir=([^[:space:]]+) ]] && valid_profile_dir "${BASH_REMATCH[1]}" "${BASH_REMATCH[1]##*/}" && [[ "${BASH_REMATCH[1]##*/}" =~ ^$RE_PROFILE$ ]]; then
         echo ALLOW
@@ -141,7 +172,10 @@ if [ "${1:-}" = "--self-test" ]; then
   check BLOCK  "Bash" "npx -y @playwright/mcp --headless"
   check BLOCK  "Bash" "npx -y @playwright/mcp --user-data-dir=/tmp/scratch"  # tên không phải prj_
   check ALLOW  "Bash" "git commit -m 'configure cloak per repo'" # không phải browser launch
-  check ALLOW  "Bash" "ls -la"                      # bash thường
+  check ALLOW  "Bash" "grep -rn playwright ."       # chỉ nhắc tên
+  check ALLOW  "Bash" "git commit -m 'playwright mcp notes'"
+  check BLOCK  "Bash" "FOO=1 npx @playwright/mcp"
+  check ALLOW  "Bash" "ls -la"                    # bash thường
   [ "$fail" = 0 ] && echo "self-test PASS" || { echo "self-test FAIL"; exit 1; }
   exit 0
 fi
