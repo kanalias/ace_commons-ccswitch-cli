@@ -25,6 +25,8 @@ metadata:
 2. **Phát hiện secret đã lỡ in ra** (do lệnh trước đó, hoặc user tự paste vào chat): dừng lại, cảnh báo rõ với user là secret đã lộ trong conversation/log, khuyến nghị rotate — không lặp lại secret đó thêm lần nào nữa trong response tiếp theo.
 3. **Cần xác nhận secret tồn tại/đúng định dạng** mà không cần xem giá trị: dùng cách kiểm tra gián tiếp — độ dài (`wc -c`), prefix/pattern (`grep -oE '^sk-[a-z0-9]{6}'`), exit code của lệnh test kết nối — không `cat` toàn bộ giá trị.
 4. **Khi user hỏi "key này có dùng ở đâu không?"**: search theo pattern/hash, chỉ báo TÌM THẤY hay KHÔNG + vị trí file (path, tên biến), không in lại giá trị đầy đủ trong câu trả lời.
+5. **Lệnh cần token từ file env**: dùng trong subshell — source file, gọi lệnh, chỉ in field success/error, `unset` — để giá trị không nằm trong command line được echo lại hay trong output.
+6. **Trước MỖI lần gửi dữ liệu xác thực** (QR đăng nhập, OTP, magic link) vào chat/channel: kiểm lại đích vẫn private; fail closed — membership đổi thì dừng gửi, xoá tin vừa gửi, báo user.
 
 ## Áp dụng cho
 
@@ -52,5 +54,6 @@ Data nhạy cảm: bảng lương/thu nhập, thông tin cá nhân nhân sự/kh
 - ❌ "Chỉ đang debug thôi, redact sau" — redact NGAY tại lệnh in ra, không có bước "sau".
 - ❌ Dùng `sed`/`awk` redact nhưng để lỗi cú pháp khiến lệnh in nguyên văn — verify redact pattern trước khi chạy trên file thật chứa secret (test trên chuỗi giả lập trước nếu không chắc regex).
 - ❌ Nhắc lại secret user paste vào chat "để xác nhận" — xác nhận bằng cách mô tả (độ dài, prefix, vị trí tìm thấy), không lặp lại giá trị.
+- ❌ Đọc trang web/API response hiển thị secret (service token, client secret) rồi in text ra, kể cả qua regex redact — secret không luôn khớp hex/pattern quen; parse trong script, ghi thẳng file `umask 077`, chỉ in `SAVED`/bool/độ dài.
 
 Liên quan: [[vault-no-mcp]] (vault CRUD riêng, không qua MCP), [[feature-redflags]] (red-flag rationalization nói chung).

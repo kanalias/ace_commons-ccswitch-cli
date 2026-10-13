@@ -29,4 +29,11 @@ metadata:
 - Schema discovery: `GET /v1/databases/{id}` qua curl, không MCP fetch.
 - Non-secret row trong vault DB: vẫn áp rule — vault DB = boundary, không phân loại row-by-row.
 
+## Script sync vault → .env (contract)
+
+- Schema call trước để lấy tên cột thật; fail closed tới khi map đủ mọi field cần — không đoán tên cột.
+- Chỉ in TÊN field + OK/FAIL, không bao giờ in value.
+- Từ chối row thuộc project khác (check cột owner/project trước khi ghi).
+- Ghi file env idempotent, giữ mode 0600.
+
 > **Project-specific:** env var name (`<PROJECT>_NOTION_VAULT_DB_ID`, bootstrap token name), vault DB id khai báo trong repo `.claude/rules/` + `.env`. Xem `.claude/rules/vault-<project>.md` nếu có.

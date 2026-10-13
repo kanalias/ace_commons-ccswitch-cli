@@ -1,0 +1,7 @@
+# Path được bảo vệ khỏi lệnh XOÁ qua Bash (hook pre-bash-gate.sh, áp cho MỌI agent).
+# Format: 1 chuỗi con path/dòng; dòng trống và dòng bắt đầu bằng # bị bỏ qua.
+# Lệnh chứa động từ xoá (rm, rmdir, shred, truncate, find -delete/-exec rm,
+# git clean, rsync --delete) VÀ chuỗi con trong danh sách → exit 2, agent phải dừng hỏi user.
+# Đọc/liệt kê/copy TỪ path này (ls, cat, grep, cp) không bị chặn. Không có bypass.
+# Mặc định không có entry nào → guard no-op. Bỏ comment và sửa dòng dưới để bật:
+# data/backup

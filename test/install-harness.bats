@@ -143,6 +143,7 @@ run_install() {
   [ ! -e "$TARGET/.claude/skills/production-cleanup" ]
   [ ! -e "$TARGET/.claude/skills/production-reboot" ]
   [ ! -e "$TARGET/.claude/skills/deploy-doc" ]
+  [ ! -e "$TARGET/.claude/skills/production-deploy-rsync" ]
 
   # commands group (default Y) — every former slash-command now ships ONLY as a
   # same-name skill; .claude/commands must never be created
@@ -253,6 +254,7 @@ run_install() {
   [ -f "$TARGET/.claude/skills/production-cleanup/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/production-reboot/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/deploy-doc/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/production-deploy-rsync/SKILL.md" ]
 }
 
 run_install_deploy() {
@@ -394,8 +396,8 @@ run_install_deploy() {
   events_len=$(jq '.hooks.PreToolUse | length' "$TARGET/.claude/settings.json")
 
   [ "$first_len" -eq "$second_len" ]
-  # Edit|Write|MultiEdit|NotebookEdit + Bash + Task + mcp-browser gate = 4 matchers; no legacy Edit|Write orphan
-  [ "$events_len" -eq 4 ]
+  # Edit|Write|MultiEdit|NotebookEdit + Bash + Task + mcp-browser gate + Read|Edit|Write|MultiEdit (dir-doc inject) = 5 matchers; no legacy Edit|Write orphan
+  [ "$events_len" -eq 5 ]
   [ "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Edit|Write")] | length' "$TARGET/.claude/settings.json")" -eq 0 ]
 }
 
@@ -575,4 +577,170 @@ run_install_deploy() {
   HARNESS_ROUTE_DIR="$TARGET" HARNESS_CONFIRM_UNINSTALL=y run bash "$ROOT/harness/install.sh" uninstall </dev/null
   [ "$status" -eq 0 ]
   ! grep -qxF "$real" "$HARNESS_REGISTRY"
+}
+
+# ── wave 2: cherry-picked templates ─────────────────────────────────────────
+
+@test "new skills and browser-web agent land by default; production-deploy-rsync stays deploy-gated" {
+  run_install
+  [ "$status" -eq 0 ]
+  for sk in web-browse recap rotate-secret seo audit-presence; do
+    [ -f "$TARGET/.claude/skills/$sk/SKILL.md" ]
+  done
+  [ -f "$TARGET/.claude/agents/browser-web.md" ]
+  [ ! -e "$TARGET/.claude/skills/production-deploy-rsync" ]
+}
+
+@test "@@CLOAK_MCP_CMD@@: HARNESS_CLOAK_MCP_CMD override is baked into browser-web and persisted in installEnv" {
+  HARNESS_CLOAK_MCP_CMD="/opt/cloak/bin/cloakmcp-custom" run_install
+  [ "$status" -eq 0 ]
+  grep -q 'command: /opt/cloak/bin/cloakmcp-custom' "$TARGET/.claude/agents/browser-web.md"
+  ! grep -q '@@' "$TARGET/.claude/agents/browser-web.md" || false
+  [ "$(jq -r '.installEnv.HARNESS_CLOAK_MCP_CMD' "$TARGET/.claude/harness-manifest.json")" = "/opt/cloak/bin/cloakmcp-custom" ]
+}
+
+@test "@@CLOAK_MCP_CMD@@: literal fallback, PATH lookup, and update-all replays the persisted value" {
+  # minimal PATH without cloakbrowsermcp → literal fallback
+  bindir="$BATS_TEST_TMPDIR/bin"; mkdir -p "$bindir"
+  for t in bash env jq git awk sed grep cat mkdir mv rm cp chmod mktemp dirname basename tr cut sort tail head wc find shasum sha256sum stat date uniq printf ln rmdir; do
+    p="$(command -v "$t" 2>/dev/null || true)"; [ -n "$p" ] && ln -sf "$p" "$bindir/$t"
+  done
+  PATH="$bindir" run_install
+  [ "$status" -eq 0 ]
+  grep -q 'command: cloakbrowsermcp$' "$TARGET/.claude/agents/browser-web.md"
+
+  # command -v hit: a fake binary on PATH is picked up
+  fakebin="$BATS_TEST_TMPDIR/fakebin"; mkdir -p "$fakebin"
+  printf '#!/bin/sh\n' > "$fakebin/cloakbrowsermcp"; chmod +x "$fakebin/cloakbrowsermcp"
+  PATH="$fakebin:$bindir" run_install
+  [ "$status" -eq 0 ]
+  grep -qF "command: $fakebin/cloakbrowsermcp" "$TARGET/.claude/agents/browser-web.md"
+
+  # update-all replays the persisted value with the original PATH (no fake bin, no env var)
+  export HARNESS_REGISTRY="$BATS_TEST_TMPDIR/registry"
+  printf '%s\n' "$(cd "$TARGET" && pwd -P)" > "$HARNESS_REGISTRY"
+  run env -u HARNESS_CLOAK_MCP_CMD bash "$ROOT/harness/install.sh" update-all </dev/null
+  [ "$status" -eq 0 ]
+  grep -qF "command: $fakebin/cloakbrowsermcp" "$TARGET/.claude/agents/browser-web.md"
+}
+
+@test "conditional rules: skipped without trigger, never recorded in manifest" {
+  run_install
+  [ "$status" -eq 0 ]
+  for r in system-ai-gateway system-ott fork-isolation; do
+    [ ! -e "$TARGET/.claude/rules/project/$r.md" ]
+    [ "$(jq --arg p ".claude/rules/project/$r.md" '[.preservePaths[], .syncFiles[].path] | map(select(. == $p)) | length' "$TARGET/.claude/harness-manifest.json")" -eq 0 ]
+  done
+  # unconditional lazy rules install everywhere
+  [ -f "$TARGET/.claude/rules/project/social-posting-safety.md" ]
+  [ -f "$TARGET/.claude/rules/project/module-md.md" ]
+}
+
+@test "conditional rules: package.json deps trigger system-ai-gateway / system-ott independently" {
+  printf '{"dependencies":{"@acegalaxy/lib-ai-gateway":"github:acegalaxy-co/lib-ai-gateway#v1.0.0"}}\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  [ -f "$TARGET/.claude/rules/project/system-ai-gateway.md" ]
+  [ ! -e "$TARGET/.claude/rules/project/system-ott.md" ]
+  jq -e '.preservePaths | index(".claude/rules/project/system-ai-gateway.md")' "$TARGET/.claude/harness-manifest.json" >/dev/null
+
+  printf '{"dependencies":{"@acegalaxy/lib-ott-gateway":"github:acegalaxy-co/lib-ott-gateway#v1.0.0"}}\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  [ -f "$TARGET/.claude/rules/project/system-ott.md" ]
+}
+
+@test "conditional rules: lib as package's own name only -> neither rule installed" {
+  printf '{"name":"@acegalaxy/lib-ai-gateway"}\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  printf '{"name":"@acegalaxy/lib-ott-gateway"}\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  [ ! -e "$TARGET/.claude/rules/project/system-ai-gateway.md" ]
+  [ ! -e "$TARGET/.claude/rules/project/system-ott.md" ]
+}
+
+@test "conditional rules: lib under devDependencies installs the rule" {
+  printf '{"devDependencies":{"@acegalaxy/lib-ott-gateway":"x"}}\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  [ -f "$TARGET/.claude/rules/project/system-ott.md" ]
+}
+
+@test "conditional rules: lib only in scripts string or repository.url -> not installed" {
+  printf '{"scripts":{"x":"npm i @acegalaxy/lib-ai-gateway"},"repository":{"url":"git+ssh://github.com/acegalaxy-co/@acegalaxy/lib-ott-gateway.git"}}\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  [ ! -e "$TARGET/.claude/rules/project/system-ai-gateway.md" ]
+  [ ! -e "$TARGET/.claude/rules/project/system-ott.md" ]
+}
+
+@test "conditional rules: invalid package.json -> warn, rules skipped, install exits 0" {
+  printf '{ not json @acegalaxy/lib-ai-gateway\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"package.json not valid JSON"* ]]
+  [ ! -e "$TARGET/.claude/rules/project/system-ai-gateway.md" ]
+}
+
+@test "conditional rules: trigger gone after install -> file kept, notice printed" {
+  printf '{"dependencies":{"@acegalaxy/lib-ai-gateway":"x"}}\n' > "$TARGET/package.json"
+  run_install
+  [ -f "$TARGET/.claude/rules/project/system-ai-gateway.md" ]
+  printf '{"name":"@acegalaxy/lib-ai-gateway"}\n' > "$TARGET/package.json"
+  run_install
+  [ "$status" -eq 0 ]
+  [ -f "$TARGET/.claude/rules/project/system-ai-gateway.md" ]
+  [[ "$output" == *"no longer applies"* ]]
+}
+
+@test "conditional rules: git remote 'upstream' triggers fork-isolation; other remote names do not" {
+  git -C "$TARGET" remote add origin https://example.com/o/r.git
+  run_install
+  [ "$status" -eq 0 ]
+  [ ! -e "$TARGET/.claude/rules/project/fork-isolation.md" ]
+  git -C "$TARGET" remote add upstream https://example.com/u/r.git
+  run_install
+  [ "$status" -eq 0 ]
+  [ -f "$TARGET/.claude/rules/project/fork-isolation.md" ]
+}
+
+@test "conditional rules: skipped rule leaves an existing project file untouched" {
+  mkdir -p "$TARGET/.claude/rules/project"
+  printf 'mine\n' > "$TARGET/.claude/rules/project/system-ott.md"
+  run_install
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TARGET/.claude/rules/project/system-ott.md")" = "mine" ]
+  [ "$(jq '[.preservePaths[], .syncFiles[].path] | map(select(. == ".claude/rules/project/system-ott.md")) | length' "$TARGET/.claude/harness-manifest.json")" -eq 0 ]
+}
+
+@test "protected-paths.txt: seeded, preserved across reinstall, kept on uninstall" {
+  run_install
+  [ "$status" -eq 0 ]
+  [ -f "$TARGET/.claude/protected-paths.txt" ]
+  printf 'data/backup\n' >> "$TARGET/.claude/protected-paths.txt"
+  run_install
+  [ "$status" -eq 0 ]
+  grep -qx 'data/backup' "$TARGET/.claude/protected-paths.txt"
+  jq -e '.preservePaths | index(".claude/protected-paths.txt")' "$TARGET/.claude/harness-manifest.json" >/dev/null
+  [ "$(jq '[.syncFiles[] | select(.path == ".claude/protected-paths.txt")] | length' "$TARGET/.claude/harness-manifest.json")" -eq 0 ]
+
+  HARNESS_ROUTE_DIR="$TARGET" HARNESS_ASSUME_YES=1 run bash "$ROOT/harness/install.sh" uninstall </dev/null
+  [ "$status" -eq 0 ]
+  grep -qx 'data/backup' "$TARGET/.claude/protected-paths.txt"
+}
+
+@test "pre-read-inject-dir-doc hook is wired under PreToolUse Read|Edit|Write|MultiEdit, once, without default env" {
+  run_install
+  [ "$status" -eq 0 ]
+  [ -x "$TARGET/.claude/hooks/pre-read-inject-dir-doc.sh" ]
+  run_install
+  [ "$status" -eq 0 ]
+  [ "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Read|Edit|Write|MultiEdit") | .hooks[] | select(.command | endswith("pre-read-inject-dir-doc.sh"))] | length' "$TARGET/.claude/settings.json")" -eq 1 ]
+  [ "$(jq -r '.env.HARNESS_DIR_DOC_ROOTS // "unset"' "$TARGET/.claude/settings.json")" = "unset" ]
+  # existing gates still wired
+  for h in pre-bash-gate pre-edit-orchestrator-gate pre-task-dispatch-gate; do
+    jq -e --arg h "$h.sh" '[.. | .command? // empty | select(endswith($h))] | length > 0' "$TARGET/.claude/settings.json" >/dev/null
+  done
 }

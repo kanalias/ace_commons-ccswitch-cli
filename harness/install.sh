@@ -32,17 +32,25 @@
 #   HARNESS_GROUP_GUARD          y/n — guard hooks, no prompt        (default: Y)
 #   HARNESS_GROUP_QUALITY        y/n — quality hooks, no prompt      (default: Y)
 #   HARNESS_GROUP_COMMANDS       y/n — audit-claude-md + audit-context-memory + audit-dependency + audit-vietnamese + clean-up-project + doctor-memory + git-cleanup-branch + git-commit + git-commit-describe + git-force-snapshot + git-push-safety + task-loop-feature + update-claude + update-codex + update-gemini + update-deepseek workflow skills (slash-invocable /<name>), no prompt (default: Y)
-#   HARNESS_GROUP_SKILLS         y/n — ace-library + check-hardcode + dep-ladder-check + diagram + fix-ledger + frontend-design + gen-image + orchestrate + research + ui-preview skills, no prompt (default: Y)
-#   HARNESS_GROUP_RULES          y/n — rules: common/ (11 invariant guardrails, always overwrite) + project/ (git-workflow, skill-superpowers, test-parallel, browser-mcp-profiles, processes-layout — kept if exist), no prompt (default: Y)
+#   HARNESS_GROUP_SKILLS         y/n — ace-library + check-hardcode + dep-ladder-check + diagram + fix-ledger + frontend-design + gen-image + orchestrate + research + ui-preview + web-browse skills (+ browser-uipreview/browser-web subagents), no prompt (default: Y)
+#   HARNESS_GROUP_RULES          y/n — rules: common/ (11 invariant guardrails, always overwrite) + project/ (git-workflow, browser-mcp-profiles, module-md, social-posting-safety, ... — kept if exist; system-ai-gateway/system-ott/fork-isolation only when their trigger is present in the target) , no prompt (default: Y)
 #   HARNESS_GROUP_GITHOOKS       y/n — git pre-push hook (gitleaks secret scan) into .git/hooks/, no prompt (default: Y; skipped if target not a git repo)
 #   HARNESS_GROUP_PII            y/n — OPT-IN pre-pii-guard hook (blocks VN phone/CCCD/personal email/address/GPS in edits, bash, mcp, push diff) + pii-scan.pl + self-test, no prompt (default: N)
-#   HARNESS_GROUP_DEPLOY        y/n — production-deploy/-cleanup/-reboot + deploy-doc skills (slash-invocable /production-*, /deploy-doc), no prompt (default: N — opt-in, most repos don't deploy to a prod host)
+#   HARNESS_GROUP_DEPLOY        y/n — production-deploy/-cleanup/-reboot/-rsync + deploy-doc skills (slash-invocable /production-*, /deploy-doc), no prompt (default: N — opt-in, most repos don't deploy to a prod host)
 #   HARNESS_DEPLOY_SSH_HOST      ssh alias of the prod host                (default: <deploy-ssh-host>)
 #   HARNESS_DEPLOY_SERVICE       target container/compose service name    (default: <service-name>)
 #   HARNESS_DEPLOY_PATH          repo path on the host                    (default: <remote-repo-path>)
 #   HARNESS_DEPLOY_BRANCH        branch to deploy                         (default: same as HARNESS_BRANCH)
 #   HARNESS_DEPLOY_REMOTE        git remote the host pulls from           (default: origin)
 #   HARNESS_DEPLOY_HEALTHCHECK   healthcheck command/URL                  (default: <healthcheck-cmd>)
+#   HARNESS_CLOAK_MCP_CMD        command that launches the CloakBrowser MCP server, baked into agents/browser-web.md as @@CLOAK_MCP_CMD@@
+#                                (default: `command -v cloakbrowsermcp`, else the literal `cloakbrowsermcp`)
+#   HARNESS_ADOPT_FILES          CSV of project-relative paths (e.g. .claude/agents/browser-web.md) to take from the harness even though
+#                                the project owns them. On UPDATE (previous manifest exists), an existing file NOT in the previous
+#                                manifest's syncFiles (or listed in preservePaths) is project-owned: kept, recorded in preservePaths,
+#                                NOTE printed. First install (no manifest) is unchanged (HARNESS_OVERWRITE decides). Alternative: delete the file.
+#   Delegate model defaults (gemini/codex/deepseek): HARNESS_<X>_MODEL_DEFAULT > harness .env (main checkout's .env when run from a linked
+#                                worktree) > model recorded in the target's manifest (modelDefaults) > built-in literal.
 #   HARNESS_OVERWRITE            forced to "all" once HARNESS_INSTALL_ALL confirms (per-file overwrite prompt removed)
 set -euo pipefail
 
@@ -100,15 +108,43 @@ sha256_file() {
 # target project won't have this .env, so templates can't read it at runtime.
 # _common.sh:load_env_chain() only exports names matching ^[A-Za-z_][A-Za-z0-9_]*=,
 # so read directly here instead of sourcing that parser.
-read_dotenv_var() { # read_dotenv_var <VAR_NAME> <default>
-  local name="$1" default="$2" f="$HARNESS_DIR/../.env" val
-  [ -f "$f" ] || { printf '%s' "$default"; return; }
+# .env lookup: harness repo root first; a linked git worktree has no .env (gitignored)
+# → fall back to the main checkout's .env (git common dir's parent). Values never printed.
+dotenv_file() {
+  local f="$HARNESS_DIR/../.env" common
+  if [ ! -f "$f" ] && common="$(cd "$HARNESS_DIR" && cd "$(git rev-parse --git-common-dir 2>/dev/null)" 2>/dev/null && pwd -P)" && [ -n "$common" ]; then
+    f="$(dirname "$common")/.env"
+  fi
+  [ -f "$f" ] && printf '%s' "$f"
+  return 0
+}
+read_dotenv_var() { # read_dotenv_var <VAR_NAME> <default> — default if file/key missing or empty
+  local name="$1" default="$2" f val
+  f="$(dotenv_file)"
+  [ -n "$f" ] || { printf '%s' "$default"; return; }
   val="$(grep -E "^${name}=" "$f" | tail -n1 | cut -d= -f2-)"
   printf '%s' "${val:-$default}"
 }
-GEMINI_MODEL_DEFAULT="${HARNESS_GEMINI_MODEL_DEFAULT:-$(read_dotenv_var GEMINI_MODEL gemini-3.5-flash)}"
-CODEX_MODEL_DEFAULT="${HARNESS_CODEX_MODEL_DEFAULT:-$(read_dotenv_var CODEX_MODEL gpt-5.6-luna)}"
-DEEPSEEK_MODEL_DEFAULT="${HARNESS_DEEPSEEK_MODEL_DEFAULT:-$(read_dotenv_var DEEPSEEK_MODEL openai/ds/deepseek-v4-pro)}"
+# resolve_model <key> <HARNESS_ env override name> <.env var> <built-in literal>
+# precedence: env override > .env key > model recorded in target's previous manifest (modelDefaults) > literal
+model_from_manifest() { # model_from_manifest <key> → recorded value or empty
+  [ -f "$PREVIOUS_MANIFEST" ] || return 0
+  jq -r --arg k "$1" '.modelDefaults[$k] // empty' "$PREVIOUS_MANIFEST" 2>/dev/null || true
+}
+resolve_model() {
+  local key="$1" override="${!2:-}" val prev
+  [ -n "$override" ] && { printf '%s' "$override"; return; }
+  val="$(read_dotenv_var "$3" "")"
+  [ -n "$val" ] && { printf '%s' "$val"; return; }
+  prev="$(model_from_manifest "$key")"
+  [ -n "$prev" ] && { printf '%s' "$prev"; return; }
+  printf '%s' "$4"
+}
+note_model_kept() { # note_model_kept <key> <HARNESS_ env override name> <.env var> <resolved value>
+  [ -z "${!2:-}" ] && [ -z "$(read_dotenv_var "$3" "")" ] && [ -n "$(model_from_manifest "$1")" ] \
+    && echo "NOTE: $1 model default kept from target's previous install (no $2 / .env $3 found)" >&2
+  return 0
+}
 
 command -v jq >/dev/null 2>&1 || { echo "❌ 'jq' required. Install: brew install jq (mac) / apt install jq (linux)"; exit 1; }
 command -v git >/dev/null 2>&1 || echo "⚠️ 'git' not found — recommended (delegate wrappers need worktrees to run, though installer itself will still work)."
@@ -262,6 +298,9 @@ DEPLOY_PATH="${HARNESS_DEPLOY_PATH:-<remote-repo-path>}"
 DEPLOY_BRANCH="${HARNESS_DEPLOY_BRANCH:-$BRANCH}"
 DEPLOY_REMOTE="${HARNESS_DEPLOY_REMOTE:-origin}"
 DEPLOY_HEALTHCHECK="${HARNESS_DEPLOY_HEALTHCHECK:-<healthcheck-cmd>}"
+# CloakBrowser MCP launcher for agents/browser-web.md: env → PATH lookup → literal
+CLOAK_MCP_CMD="${HARNESS_CLOAK_MCP_CMD:-$(command -v cloakbrowsermcp 2>/dev/null || true)}"
+CLOAK_MCP_CMD="${CLOAK_MCP_CMD:-cloakbrowsermcp}"
 
 resolve_primary_remote() { # resolve_primary_remote <dir> → remote name or empty
   local dir="$1" current upstream remotes count
@@ -415,11 +454,15 @@ substitute_file() {
     line="${line//@@DEPLOY_BRANCH@@/$DEPLOY_BRANCH}"
     line="${line//@@DEPLOY_REMOTE@@/$DEPLOY_REMOTE}"
     line="${line//@@DEPLOY_HEALTHCHECK@@/$DEPLOY_HEALTHCHECK}"
+    line="${line//@@CLOAK_MCP_CMD@@/$CLOAK_MCP_CMD}"
     printf '%s\n' "$line" >> "$tmp"
   done < "$src"
   mv "$tmp" "$dest"
 }
 
+adopt_requested() { # HARNESS_ADOPT_FILES = CSV of dest paths (relative to project root) to take from harness
+  case ",${HARNESS_ADOPT_FILES:-}," in *",$1,"*) return 0 ;; *) return 1 ;; esac
+}
 WRITTEN=()
 SYNC_WRITTEN=()
 PRESERVE_PATHS=()
@@ -435,6 +478,19 @@ install_file() { # install_file <src-rel-under-templates/> <dest-rel-under-route
     PRESERVE_PATHS+=("$dest_rel")
     echo "  • $dest_rel (kept existing)"
     return 0
+  fi
+  # project-owned guard: only with a previous manifest (first install can't tell ours from theirs —
+  # there should_overwrite/HARNESS_OVERWRITE decide). Existing file that harness never wrote
+  # (not in previous syncFiles) or already chose to keep (previous preservePaths) is kept.
+  # rules/common is exempt: guardrails are always overwritten (source-of-truth wins).
+  if [ "$HAVE_PREV" -eq 1 ] && [ "$mode" != "preserve" ] && [ -e "$dest" ] \
+     && [[ "$dest_rel" != .claude/rules/common/* ]] && ! adopt_requested "$dest_rel"; then
+    if ! printf '%s\n' "$PREV_SYNC" | grep -qxF -- "$dest_rel" || printf '%s\n' "$PREV_PRESERVE" | grep -qxF -- "$dest_rel"; then
+      PRESERVE_PATHS+=("$dest_rel")
+      echo "  • $dest_rel (kept — project-owned)"
+      echo "NOTE: $dest_rel exists and is not harness-managed — kept. To adopt the harness version: HARNESS_ADOPT_FILES=$dest_rel (or delete the file) and re-run install.sh" >&2
+      return 0
+    fi
   fi
   if [ "$mode" != "sync" ] && [ -e "$dest" ] && ! should_overwrite "$dest_rel"; then
     PRESERVE_PATHS+=("$dest_rel")
@@ -453,6 +509,21 @@ echo "▶ Cài harness vào $ROUTE_DIR"
 # Read here (before we write anything) so migration checks below and the
 # hooks/deny/env ownership carry-forward further down can both use it.
 PREVIOUS_MANIFEST="$ROUTE_DIR/$MANIFEST_REL"
+
+GEMINI_MODEL_DEFAULT="$(resolve_model gemini HARNESS_GEMINI_MODEL_DEFAULT GEMINI_MODEL gemini-3.5-flash)"
+CODEX_MODEL_DEFAULT="$(resolve_model codex HARNESS_CODEX_MODEL_DEFAULT CODEX_MODEL gpt-5.6-luna)"
+DEEPSEEK_MODEL_DEFAULT="$(resolve_model deepseek HARNESS_DEEPSEEK_MODEL_DEFAULT DEEPSEEK_MODEL openai/ds/deepseek-v4-pro)"
+note_model_kept gemini HARNESS_GEMINI_MODEL_DEFAULT GEMINI_MODEL
+note_model_kept codex HARNESS_CODEX_MODEL_DEFAULT CODEX_MODEL
+note_model_kept deepseek HARNESS_DEEPSEEK_MODEL_DEFAULT DEEPSEEK_MODEL
+
+# Ownership of existing files (see install_file): paths harness wrote last time vs paths it only kept.
+PREV_SYNC=""; PREV_PRESERVE=""; HAVE_PREV=0
+if [ -f "$PREVIOUS_MANIFEST" ] && jq -e '.syncFiles | type == "array"' "$PREVIOUS_MANIFEST" >/dev/null 2>&1; then
+  HAVE_PREV=1
+  PREV_SYNC="$(jq -r '.syncFiles[]?.path' "$PREVIOUS_MANIFEST")"
+  PREV_PRESERVE="$(jq -r '.preservePaths[]?' "$PREVIOUS_MANIFEST" 2>/dev/null || true)"
+fi
 
 if [ "$SEL_SUBAGENTS" -eq 1 ]; then
   echo "── delegate subagents + wrappers ──"
@@ -475,6 +546,8 @@ if [ "$SEL_GUARD" -eq 1 ]; then
   install_file "hooks/pre-edit-content-scan.sh"       ".claude/hooks/pre-edit-content-scan.sh"
   # allowlist for content-scan hook — per-repo customizable → keep existing edits
   install_file "allowed-hosts.txt"                    ".claude/allowed-hosts.txt" preserve
+  # path denylist for delete commands in pre-bash-gate.sh — per-repo customizable → preserve
+  install_file "protected-paths.txt"                  ".claude/protected-paths.txt" preserve
   # orchestration gate — block under-specified Task dispatch
   install_file "hooks/pre-task-dispatch-gate.sh"      ".claude/hooks/pre-task-dispatch-gate.sh"
   # browser profile gate — force Cloak/Playwright qua profile prj_<xx>_sv_<yy>
@@ -499,6 +572,8 @@ if [ "$SEL_QUALITY" -eq 1 ]; then
   install_file "hooks/session-start.sh"           ".claude/hooks/session-start.sh"
   # browser profile audit — called by session-start.sh (advisory) or manually with --strict
   install_file "hooks/browser-profile-audit.sh"   ".claude/hooks/browser-profile-audit.sh"
+  # inject per-directory doc (MODULE.md) on Read/Edit/Write — silent unless env.HARNESS_DIR_DOC_ROOTS is set
+  install_file "hooks/pre-read-inject-dir-doc.sh" ".claude/hooks/pre-read-inject-dir-doc.sh"
   # review/security subagents (independent second opinion — not delegate personas)
   install_file "agents/code-reviewer.md"  ".claude/agents/code-reviewer.md"
   install_file "agents/secret-scanner.md" ".claude/agents/secret-scanner.md"
@@ -520,7 +595,7 @@ fi
 # Group membership is derived from the skill's own name (no separate list to
 # keep in sync):
 #   production-* / deploy-doc                              → SEL_DEPLOY
-#   ace-library / check-hardcode / dep-ladder-check / diagram / fix-ledger / frontend-design / gen-image / orchestrate / research / ui-preview → SEL_SKILLS (skill-only, never had a command;
+#   ace-library / check-hardcode / dep-ladder-check / diagram / fix-ledger / frontend-design / gen-image / orchestrate / research / ui-preview / web-browse → SEL_SKILLS (skill-only, never had a command;
 #                                                                               orchestrate also covers resume-orchestration)
 #   everything else (former slash-commands)                → SEL_COMMANDS
 if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -eq 1 ] || [ "$SEL_DEPLOY" -eq 1 ]; then
@@ -530,7 +605,7 @@ if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -e
     group_flag=0
     case "$skill_name" in
       production-*|deploy-doc) group_flag="$SEL_DEPLOY" ;;
-      ace-library|check-hardcode|dep-ladder-check|diagram|fix-ledger|frontend-design|gen-image|orchestrate|research|ui-preview) group_flag="$SEL_SKILLS" ;;
+      ace-library|check-hardcode|dep-ladder-check|diagram|fix-ledger|frontend-design|gen-image|orchestrate|research|ui-preview|web-browse) group_flag="$SEL_SKILLS" ;;
       *) group_flag="$SEL_COMMANDS" ;;
     esac
     [ "$group_flag" -eq 1 ] || continue
@@ -541,6 +616,8 @@ if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -e
   done < <(find "$TEMPLATES_DIR/skills" -mindepth 1 -maxdepth 1 -type d | sort)
   # /ui-preview runs in this subagent (context: fork) — MCP tool defs never load in main
   [ "$SEL_SKILLS" -eq 1 ] && install_file "agents/browser-uipreview.md" ".claude/agents/browser-uipreview.md"
+  # /web-browse runs in this subagent (context: fork) — Cloak MCP defs never load in main
+  [ "$SEL_SKILLS" -eq 1 ] && install_file "agents/browser-web.md" ".claude/agents/browser-web.md"
 
   if [ "$SEL_DEPLOY" -eq 1 ]; then
     deploy_config_incomplete=0
@@ -652,6 +729,29 @@ migrate_memory_mirror_dir() {
 }
 migrate_memory_mirror_dir
 
+# pkg_mentions <pkg>: true only when <pkg> is a KEY of (dev|peer|optional)dependencies in the root
+# package.json — own "name", repository URL, scripts etc. do not count. Invalid JSON → warn, not a consumer.
+PKG_WARNED=0
+pkg_mentions() {
+  [ -f "$ROUTE_DIR/package.json" ] || return 1
+  local rc=0
+  jq -e --arg p "$1" '[.dependencies, .devDependencies, .peerDependencies, .optionalDependencies] | map(select(type == "object") | has($p)) | any' "$ROUTE_DIR/package.json" >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -gt 1 ]; then
+    if [ "$PKG_WARNED" -eq 0 ]; then echo "WARN: package.json not valid JSON — conditional rules skipped"; PKG_WARNED=1; fi
+    return 1
+  fi
+  [ "$rc" -eq 0 ]
+}
+# Conditional rules are "preserve" files (no checksum in manifest), so a stale one cannot be proven
+# unmodified → never deleted; just notify when the previous manifest says we installed it.
+note_stale_conditional() {
+  local rel=".claude/rules/project/$1"
+  [ -f "$ROUTE_DIR/$rel" ] || return 0
+  [ -f "$PREVIOUS_MANIFEST" ] && jq -e --arg p "$rel" '.preservePaths | index($p)' "$PREVIOUS_MANIFEST" >/dev/null 2>&1 || return 0
+  echo "NOTE: $rel no longer applies (trigger gone) — kept, delete by hand if unwanted"
+}
+has_git_remote() { git -C "$ROUTE_DIR" remote 2>/dev/null | grep -qx -- "$1"; }
+
 if [ "$SEL_RULES" -eq 1 ]; then
   echo "── rules ──"
   # common/ = invariant guardrails, source-of-truth = templates → always overwrite (sync)
@@ -665,6 +765,13 @@ if [ "$SEL_RULES" -eq 1 ]; then
     [ -e "$f" ] || continue
     b="$(basename "$f")"
     [ "$b" = "sync-template.md" ] && continue # source-repository maintenance only
+    # conditional rules: install only when the target shows the trigger; a skipped rule is
+    # neither written, recorded in the manifest, nor deleted if the project already has it
+    case "$b" in
+      system-ai-gateway.md) pkg_mentions "@acegalaxy/lib-ai-gateway" || { note_stale_conditional "$b"; continue; } ;;
+      system-ott.md)        pkg_mentions "@acegalaxy/lib-ott-gateway" || { note_stale_conditional "$b"; continue; } ;;
+      fork-isolation.md)    has_git_remote upstream || { note_stale_conditional "$b"; continue; } ;;
+    esac
     install_file "rules/project/$b" ".claude/rules/project/$b" preserve
   done
   # project memory mirror index — per-repo content, never overwrite
@@ -879,6 +986,7 @@ if [ "$SEL_GUARD" -eq 1 ] || [ "$SEL_QUALITY" -eq 1 ] || [ "$SEL_PII" -eq 1 ]; t
   fi
   if [ "$SEL_QUALITY" -eq 1 ]; then
     wire_hook PostToolUse 'Edit|Write|MultiEdit' '$CLAUDE_PROJECT_DIR/.claude/hooks/post-edit-advisor.sh' 'Edit|Write Write'
+    wire_hook PreToolUse 'Read|Edit|Write|MultiEdit' '$CLAUDE_PROJECT_DIR/.claude/hooks/pre-read-inject-dir-doc.sh'
     wire_hook SessionStart '' '$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh'
     # orchestration recorders — stuck-command detection + merged subagent verdict/ledger
     wire_hook PostToolUse 'Bash' '$CLAUDE_PROJECT_DIR/.claude/hooks/post-bash-stuck-detector.sh'
@@ -967,7 +1075,8 @@ write_manifest() {
     --argjson files "$files_json" --argjson preserve "$preserve_json" \
     --argjson hooks "$hooks_json" --argjson deny "$deny_json" --argjson env "$env_json" \
     --arg status "$OWNED_STATUSLINE" --argjson install "$(install_env_json)" \
-    '{schemaVersion:1,harnessVersion:$hv,syncFiles:$files,preservePaths:$preserve,installEnv:$install,settings:{hooks:$hooks,deny:$deny,env:$env,statusLineCommand:(if $status=="" then null else $status end)}}' > "$tmp"
+    --arg mg "$GEMINI_MODEL_DEFAULT" --arg mc "$CODEX_MODEL_DEFAULT" --arg md "$DEEPSEEK_MODEL_DEFAULT" \
+    '{schemaVersion:1,harnessVersion:$hv,syncFiles:$files,preservePaths:$preserve,installEnv:$install,modelDefaults:{gemini:$mg,codex:$mc,deepseek:$md},settings:{hooks:$hooks,deny:$deny,env:$env,statusLineCommand:(if $status=="" then null else $status end)}}' > "$tmp"
   mv "$tmp" "$manifest"
   echo "  ✓ $MANIFEST_REL"
 }
@@ -981,11 +1090,12 @@ install_env_json() {
     --arg gh "$(yn $SEL_GITHOOKS)" --arg dep "$(yn $SEL_DEPLOY)" --arg pii "$(yn $SEL_PII)" \
     --arg dh "$DEPLOY_SSH_HOST" --arg ds "$DEPLOY_SERVICE" --arg dp "$DEPLOY_PATH" \
     --arg db "${HARNESS_DEPLOY_BRANCH:-}" --arg dr "$DEPLOY_REMOTE" --arg dc "$DEPLOY_HEALTHCHECK" \
+    --arg cloak "$CLOAK_MCP_CMD" \
     '{HARNESS_CORE_DIRS:$core,HARNESS_RISK_DIRS:$risk,HARNESS_PROJECT_SLUG:$slug,HARNESS_BRANCH:$branch,HARNESS_TEST_CMD:$test,
       HARNESS_GROUP_SUBAGENTS:$sub,HARNESS_GROUP_GUARD:$guard,HARNESS_GROUP_QUALITY:$qual,HARNESS_GROUP_COMMANDS:$cmds,
       HARNESS_GROUP_SKILLS:$skills,HARNESS_GROUP_RULES:$rules,HARNESS_GROUP_GITHOOKS:$gh,HARNESS_GROUP_DEPLOY:$dep,HARNESS_GROUP_PII:$pii,
       HARNESS_DEPLOY_SSH_HOST:$dh,HARNESS_DEPLOY_SERVICE:$ds,HARNESS_DEPLOY_PATH:$dp,HARNESS_DEPLOY_BRANCH:$db,
-      HARNESS_DEPLOY_REMOTE:$dr,HARNESS_DEPLOY_HEALTHCHECK:$dc}'
+      HARNESS_DEPLOY_REMOTE:$dr,HARNESS_DEPLOY_HEALTHCHECK:$dc,HARNESS_CLOAK_MCP_CMD:$cloak}'
 }
 write_manifest
 grep -qxF -- "$ROUTE_DIR" "$REGISTRY" 2>/dev/null || printf '%s\n' "$ROUTE_DIR" >> "$REGISTRY"

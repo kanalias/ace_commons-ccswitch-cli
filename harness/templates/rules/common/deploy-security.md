@@ -2,7 +2,7 @@
 name: deploy-security
 description: P0 khi deploy/publish — web root/image/package CHỈ chứa file public (allowlist), web server chặn dotfile + file nhạy cảm, probe live sau deploy; 200 có nội dung thật = FAIL + rollback
 status: live
-updated: 2026-10-08
+updated: 2026-10-13
 paths:
   - ".gitlab-ci.yml"
   - ".github/workflows/**"
@@ -51,6 +51,7 @@ location ~* /(package(-lock)?\.json|composer\.(json|lock)|Dockerfile|docker-comp
 Site cần serve `.json`/`.zip`/`.map` thật → whitelist path cụ thể trước block trên, không bỏ block. Caddy/Express tương đương: `respond 404` / middleware chặn `^/\.` + extension.
 
 Service nội bộ (DB, redis, admin, metrics): bind `127.0.0.1` hoặc network nội bộ, KHÔNG `0.0.0.0` / `ports: "5432:5432"` ra public.
+- KHÔNG publish hostname (DNS record + restart service) cho service nội bộ TRƯỚC khi access policy giới hạn nó đã active và verify được: request chưa xác thực phải trả `401` hoặc redirect về trang login.
 
 ## 3. Probe live SAU deploy (bắt buộc)
 
@@ -86,6 +87,12 @@ done; rm -f /tmp/probe.$$
 - Nhiều instance/host → mỗi lệnh deploy chỉ đụng đúng 1 instance, không restart/wipe chéo.
 - Lệnh SSH/deploy bị deny hoặc host unreachable → in lệnh cho user chạy tay, KHÔNG force.
 
-## 6. Khi review/thêm deploy mới
+## 6. Docker & CI/CD — hỏi trước khi sửa
+
+- File hạ tầng: `Dockerfile*`, `docker-compose*`/`compose*`, `.dockerignore`, config workflow CI, script bootstrap/deploy → mặc định **KHÔNG đụng**.
+- Cần thay đổi → hỏi user trước, nêu rõ: **Scope** (file nào), **Thay đổi** (sửa/thêm/xoá gì), **Ảnh hưởng** (build/deploy/runtime, rollback ra sao).
+- Thêm file / đổi cấu trúc project → kiểm tra ảnh hưởng tới Docker build context + healthcheck.
+
+## 7. Khi review/thêm deploy mới
 
 Checklist 1 dòng mỗi mục trong báo cáo deploy: allowlist ✓ · web-server block ✓ · port nội bộ không public ✓ · probe sạch ✓ · nội dung public đã scan ✓ (nếu có site public). Thiếu mục nào → nêu rõ, không claim "deploy an toàn".

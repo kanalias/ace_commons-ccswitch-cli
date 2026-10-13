@@ -45,6 +45,13 @@ KHÔNG giả định stack — suy convention từ rule và code xung quanh, kh�
 - Tin header do client cung cấp (`X-Forwarded-For`, auth header) ngoài trusted boundary
 - Thiếu rate limit / auth trên endpoint inbound
 - Token/secret trong code hoặc comment
+- Spawn process: dùng args array, không bao giờ shell string; không `shell: true` (hoặc tương đương ở ngôn ngữ khác)
+- Default phải là lựa chọn an toàn, không phải lựa chọn tiện (deny-by-default, opt-in cho hành vi rủi ro)
+- Check access/authorization xảy ra TRƯỚC mọi side effect (ghi, gửi, xoá, gọi ngoài)
+- Env var mới phải có trong `.env.example` (tên + comment, KHÔNG giá trị thật)
+- File mới chứa secret hoặc audit data phải tạo với mode hạn chế (0600), không dùng umask mặc định
+- Text do user kiểm soát phải escape theo ngữ cảnh output (HTML, shell, SQL, path)
+- Anti-pattern của chính reviewer: KHÔNG block vì suy đoán ngoài diff, trừ khi diff làm tình trạng đó tệ hơn
 
 ### 4. Test coverage
 

@@ -39,6 +39,16 @@ Nhiều session mở cùng repo dir = chung working tree + chung `HEAD`/index �
   - Số commit + tóm tắt 1 dòng mỗi commit (`git log origin/<protected>..<protected> --oneline`)
   - Loại thay đổi: code/runtime / docs / config / mix
   - Tác động: cần restart service? có downtime?
+- **Mẫu confirm deploy (mọi skill deploy dùng chung):** liệt kê tính năng sẽ ship, mỗi commit 1 dòng `<sha> <type>: <tóm tắt tính năng>`; commit không do session này tạo → thêm `(do session khác tạo)`:
+  ```text
+  Xác nhận deploy: main → <protected>
+  3 commit:
+
+  a1b2c3d feat: thêm bộ lọc theo ngày ở trang danh sách
+  e4f5a6b fix: sửa lỗi phân trang khi danh sách rỗng (do session khác tạo)
+  c7d8e9f chore: cập nhật tài liệu cấu hình
+  ```
+  Sau danh sách: loại thay đổi + tác động như trên. Deploy rsync không qua branch → liệt kê commit chạm path ship (`git log <range> --oneline -- <paths>`) + file dirty.
 - **Worktree bắt buộc** khi merge `main` → protected branch: dùng `.claude/worktrees/<protected>-deploy/` để giữ working tree ở `main`. Push xong → `git worktree remove`.
 
 ## Worktree (task song song)
