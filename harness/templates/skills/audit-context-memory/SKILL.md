@@ -38,7 +38,7 @@ Không phải file nào audit được cũng sửa được tại chỗ. 3 vùng
 
 `CLAUDE.md` NGOÀI block → sửa live bình thường. Repo không có `harness/templates/` (project đã cài harness từ nơi khác) → `common/` và block CLAUDE.md thành **read-only**: chỉ flag ở report, hướng user sửa upstream ở harness repo.
 
-Sửa bất kỳ harness surface LIVE nào → mirror vào template cùng commit: [[sync-template]].
+Sửa bất kỳ harness surface LIVE nào → mirror vào template cùng commit (quy trình chi tiết: rule `sync-template`, chỉ có ở repo harness gốc).
 
 ## Bước 1 — Liệt kê file load tĩnh
 
