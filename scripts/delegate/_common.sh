@@ -161,7 +161,9 @@ run_logged() {
   # below — belt-and-suspenders against an orphaned heartbeat subshell.
   trap 'kill "$hb_pid" 2>/dev/null; wait "$hb_pid" 2>/dev/null' RETURN
 
-  "$@" 2>&1 | tee -a "$log"
+  # </dev/null: delegate CLIs are non-interactive; one that reads a non-TTY stdin
+  # would block forever on the never-closing pipe Claude Code hands to Bash.
+  "$@" </dev/null 2>&1 | tee -a "$log"
   local status="${PIPESTATUS[0]}"
 
   kill "$hb_pid" 2>/dev/null || true

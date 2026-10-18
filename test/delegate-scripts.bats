@@ -342,6 +342,16 @@ EOF
   [[ "$output" == *"STATUS=1"* ]]
 }
 
+@test "_common.sh run_logged: delegate CLI never reads the caller's stdin" {
+  # Claude Code's Bash hands commands a pipe that never closes; a CLI that
+  # reads stdin when it isn't a TTY (OpenAI CLI exec mode) then waits forever.
+  # The wrapper must detach stdin so a run can't hang or swallow piped input.
+  run bash -c "echo LEAK | bash -c 'cd \"$STAGE\" && source scripts/delegate/_common.sh && run_logged deepseek feat cat; echo STATUS=\$?'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"STATUS=0"* ]]
+  [[ "$output" != *"LEAK"* ]]
+}
+
 @test "_common.sh run_logged: heartbeat subshell does not survive the call" {
   run bash -c "
     cd '$STAGE' && source scripts/delegate/_common.sh
