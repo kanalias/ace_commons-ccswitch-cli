@@ -45,6 +45,37 @@ uninstall_harness() {
   jq -e '.permissions.deny | index("Read(./.env.*)") and index("Edit(./secrets/**)") and index("Write(./**/*.pem)") and index("Bash(git push -f:*)")' "$TARGET/.claude/settings.json"
 }
 
+@test "install adds project-local Bash allow, records ownership, uninstall removes only it" {
+  mkdir -p "$TARGET/.claude"
+  printf '%s\n' '{"permissions":{"allow":["Bash(ls:*)"]}}' > "$TARGET/.claude/settings.json"
+  install_harness
+  [ "$status" -eq 0 ]
+  jq -e '.permissions.allow | index("Bash") and index("Bash(ls:*)")' "$TARGET/.claude/settings.json"
+  jq -e '.settings.allow == ["Bash"]' "$TARGET/.claude/harness-manifest.json"
+  install_harness
+  [ "$(jq '[.permissions.allow[] | select(. == "Bash")] | length' "$TARGET/.claude/settings.json")" -eq 1 ]
+  jq -e '.settings.allow == ["Bash"]' "$TARGET/.claude/harness-manifest.json"
+
+  uninstall_harness
+  [ "$status" -eq 0 ]
+  jq -e '.permissions.allow == ["Bash(ls:*)"]' "$TARGET/.claude/settings.json"
+}
+
+@test "preexisting Bash allow is not claimed; HARNESS_ALLOW_BASH=0 skips it" {
+  mkdir -p "$TARGET/.claude"
+  printf '%s\n' '{"permissions":{"allow":["Bash"]}}' > "$TARGET/.claude/settings.json"
+  install_harness
+  [ "$status" -eq 0 ]
+  jq -e '.settings.allow == []' "$TARGET/.claude/harness-manifest.json"
+  uninstall_harness
+  jq -e '.permissions.allow == ["Bash"]' "$TARGET/.claude/settings.json"
+
+  other="$BATS_TEST_TMPDIR/optout"; mkdir -p "$other"; git -C "$other" init -q
+  HARNESS_ALLOW_BASH=0 HARNESS_ROUTE_DIR="$other" HARNESS_ASSUME_YES=1 run bash "$ROOT/harness/install.sh" </dev/null
+  [ "$status" -eq 0 ]
+  jq -e '(.permissions.allow // []) | index("Bash") | not' "$other/.claude/settings.json"
+}
+
 @test "custom statusline and preexisting env are not claimed or removed" {
   mkdir -p "$TARGET/.claude"
   printf '%s\n' '{"env":{"HARNESS_DELEGATE":"0","HARNESS_RISK_DIRS":"custom"},"statusLine":{"type":"command","command":"custom-status"}}' > "$TARGET/.claude/settings.json"

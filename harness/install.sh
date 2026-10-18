@@ -25,6 +25,7 @@
 #   HARNESS_INSTALL_ALL          y/n — install everything + overwrite all existing files (default: Y); "n" aborts the install
 #   HARNESS_CORE_DIRS            CSV of core source dirs, read directly (no prompt) (default: src)
 #   HARNESS_RISK_DIRS            CSV of risk-sensitive dirs (auth/payment/wallet/...), read directly (no prompt) (default: empty = risk-path denylist disabled)
+#   HARNESS_ALLOW_BASH           1|0 — add project-local permissions.allow "Bash" (default: 1)
 #   HARNESS_PROJECT_SLUG         project slug, read directly (no prompt) (default: basename of route dir)
 #   HARNESS_BRANCH               working branch override (default: target HEAD branch, or main)
 #   HARNESS_TEST_CMD             test command, or "none", read directly (no prompt) (default: none)
@@ -258,6 +259,9 @@ uninstall_harness() {
       | reduce $o.deny[] as $d (.;
           if .permissions.deny then .permissions.deny |= map(select(. != $d)) else . end)
       | if .permissions.deny == [] then del(.permissions.deny) else . end
+      | reduce ($o.allow // [])[] as $a (.;
+          if .permissions.allow then .permissions.allow |= map(select(. != $a)) else . end)
+      | if .permissions.allow == [] then del(.permissions.allow) else . end
       | if .permissions == {} then del(.permissions) else . end
       | reduce ($o.env | to_entries[]) as $e (.;
           if .env[$e.key] == $e.value then del(.env[$e.key]) else . end)
@@ -881,11 +885,13 @@ ensure_claude_md
 HOOKS_WIRED=()
 OWNED_HOOKS=()
 OWNED_DENY=()
+OWNED_ALLOW=()
 OWNED_ENV_KEYS=()
 OWNED_STATUSLINE=""
 if [ -f "$PREVIOUS_MANIFEST" ] && jq -e '.schemaVersion == 1' "$PREVIOUS_MANIFEST" >/dev/null 2>&1; then
   while IFS=$'\t' read -r event matcher command; do OWNED_HOOKS+=("$event" "$matcher" "$command"); done < <(jq -r '.settings.hooks[]? | [.event,.matcher,.command] | @tsv' "$PREVIOUS_MANIFEST")
   while IFS= read -r deny; do OWNED_DENY+=("$deny"); done < <(jq -r '.settings.deny[]?' "$PREVIOUS_MANIFEST")
+  while IFS= read -r allow; do OWNED_ALLOW+=("$allow"); done < <(jq -r '.settings.allow[]?' "$PREVIOUS_MANIFEST")
   while IFS= read -r key; do OWNED_ENV_KEYS+=("$key"); done < <(jq -r '.settings.env | keys[]?' "$PREVIOUS_MANIFEST")
   OWNED_STATUSLINE="$(jq -r '.settings.statusLineCommand // empty' "$PREVIOUS_MANIFEST")"
 fi
@@ -1028,6 +1034,17 @@ if [ "$SEL_GUARD" -eq 1 ] || [ "$SEL_QUALITY" -eq 1 ] || [ "$SEL_PII" -eq 1 ]; t
     if [ "$deny_existed" -eq 0 ] || { [ "${#OWNED_DENY[@]}" -gt 0 ] && array_contains "$deny" "${OWNED_DENY[@]}"; }; then OWNED_DENY+=("$deny"); fi
   done
 
+  # Project-local Bash allow (per project, not global) — deny entries above + PreToolUse
+  # hooks still win. Opt out: HARNESS_ALLOW_BASH=0. Same ownership rule as deny.
+  if [ "${HARNESS_ALLOW_BASH:-1}" = "1" ]; then
+    for allow in 'Bash'; do
+      allow_existed="$(jq --arg a "$allow" '[.permissions.allow[]? | select(. == $a)] | length' "$SETTINGS")"
+      tmp="$(mktemp)"
+      jq --arg a "$allow" '.permissions //= {} | .permissions.allow //= [] | if (.permissions.allow | index($a)) then . else .permissions.allow += [$a] end' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
+      if [ "$allow_existed" -eq 0 ] || { [ "${#OWNED_ALLOW[@]}" -gt 0 ] && array_contains "$allow" "${OWNED_ALLOW[@]}"; }; then OWNED_ALLOW+=("$allow"); fi
+    done
+  fi
+
   # statusline — set once if absent, never clobber a user's own statusLine override
   if [ "$SEL_QUALITY" -eq 1 ]; then
     status_before="$(jq -r '.statusLine.command // empty' "$SETTINGS")"
@@ -1062,6 +1079,10 @@ write_manifest() {
   if [ "${#OWNED_DENY[@]}" -gt 0 ]; then
     deny_json="$(printf '%s\n' "${OWNED_DENY[@]}" | jq -Rsc 'split("\n") | map(select(length > 0)) | unique')"
   fi
+  allow_json='[]'
+  if [ "${#OWNED_ALLOW[@]}" -gt 0 ]; then
+    allow_json="$(printf '%s\n' "${OWNED_ALLOW[@]}" | jq -Rsc 'split("\n") | map(select(length > 0)) | unique')"
+  fi
   env_json='{}'
   if [ -f "$ROUTE_DIR/.claude/settings.json" ] && [ "${#OWNED_ENV_KEYS[@]}" -gt 0 ]; then
     for key in "${OWNED_ENV_KEYS[@]}"; do
@@ -1073,10 +1094,10 @@ write_manifest() {
   tmp="$(mktemp "${manifest}.XXXXXX")"
   jq -n --arg hv "$HARNESS_VERSION" \
     --argjson files "$files_json" --argjson preserve "$preserve_json" \
-    --argjson hooks "$hooks_json" --argjson deny "$deny_json" --argjson env "$env_json" \
+    --argjson hooks "$hooks_json" --argjson deny "$deny_json" --argjson allow "$allow_json" --argjson env "$env_json" \
     --arg status "$OWNED_STATUSLINE" --argjson install "$(install_env_json)" \
     --arg mg "$GEMINI_MODEL_DEFAULT" --arg mc "$CODEX_MODEL_DEFAULT" --arg md "$DEEPSEEK_MODEL_DEFAULT" \
-    '{schemaVersion:1,harnessVersion:$hv,syncFiles:$files,preservePaths:$preserve,installEnv:$install,modelDefaults:{gemini:$mg,codex:$mc,deepseek:$md},settings:{hooks:$hooks,deny:$deny,env:$env,statusLineCommand:(if $status=="" then null else $status end)}}' > "$tmp"
+    '{schemaVersion:1,harnessVersion:$hv,syncFiles:$files,preservePaths:$preserve,installEnv:$install,modelDefaults:{gemini:$mg,codex:$mc,deepseek:$md},settings:{hooks:$hooks,deny:$deny,allow:$allow,env:$env,statusLineCommand:(if $status=="" then null else $status end)}}' > "$tmp"
   mv "$tmp" "$manifest"
   echo "  ✓ $MANIFEST_REL"
 }
