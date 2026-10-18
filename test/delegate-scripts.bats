@@ -141,7 +141,19 @@ EOF
   [ "$status" -eq 0 ]
   [[ "$output" == *"mode: edit"* ]]
   [[ "$output" == *"WORKTREE="* ]]
-  grep -q -- "ARG: --full-auto" "$CALLLOG"
+  grep -q -- "ARG: --sandbox" "$CALLLOG"
+  grep -q "ARG: workspace-write" "$CALLLOG"
+  # Codex >= 0.163 bỏ --full-auto — truyền vào là exit 2
+  ! grep -q -- "ARG: --full-auto" "$CALLLOG"
+}
+
+@test "run-codex.sh: OpenAI-direct path forces built-in openai provider (ignore global config.toml provider)" {
+  write_stub codex
+  run env OPENAI_API_KEY=fake-openai-key bash -c "cd '$STAGE' && bash scripts/delegate/run-codex.sh feat task review"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"endpoint: OpenAI gốc"* ]]
+  grep -q 'model_provider="openai"' "$CALLLOG"
+  ! grep -q 'model_provider="nexus9r"' "$CALLLOG"
 }
 
 @test "run-codex.sh: OpenAI-direct path errors clearly when no OPENAI_API_KEY and no codex login auth.json" {
