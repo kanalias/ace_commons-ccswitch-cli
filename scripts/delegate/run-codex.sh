@@ -59,7 +59,8 @@ else
   fi
   CODEX_MODEL="${CODEX_MODEL:-gpt-5.6-terra}"
   CODEX_REASONING_EFFORT="${CODEX_REASONING_EFFORT:-high}"
-  CODEX_PROVIDER_ARGS=(-m "$CODEX_MODEL" -c "model_reasoning_effort=\"${CODEX_REASONING_EFFORT}\"")
+  # Ép provider built-in "openai": config.toml global có thể đặt model_provider khác (vd 9router local).
+  CODEX_PROVIDER_ARGS=(-c 'model_provider="openai"' -m "$CODEX_MODEL" -c "model_reasoning_effort=\"${CODEX_REASONING_EFFORT}\"")
   delegate_log codex "endpoint: OpenAI gốc (codex login / OPENAI_API_KEY), model=$CODEX_MODEL"
 fi
 
@@ -79,7 +80,7 @@ if [[ "$MODE" == "edit" ]]; then
   _HEAD_BEFORE="$(git -C "$WT" rev-parse HEAD 2>/dev/null || echo "")"
   _START_EPOCH="$(date +%s)"
   set +e
-  run_logged codex "$FEAT" with_timeout "$DELEGATE_TIMEOUT_SECS" codex exec ${CODEX_PROVIDER_ARGS[@]+"${CODEX_PROVIDER_ARGS[@]}"} --full-auto "$TASK"
+  run_logged codex "$FEAT" with_timeout "$DELEGATE_TIMEOUT_SECS" codex exec ${CODEX_PROVIDER_ARGS[@]+"${CODEX_PROVIDER_ARGS[@]}"} --sandbox workspace-write "$TASK"
   _CODEX_STATUS=$?
   set -e
   delegate_log codex "diff summary:"
