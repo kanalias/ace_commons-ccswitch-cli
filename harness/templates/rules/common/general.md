@@ -11,7 +11,7 @@
 
 ## Cách làm việc
 
-- **Chạy liền mạch.** User nói "tiếp tục" / "làm hết" / "làm lần lượt" / "tự làm, đã có quyền" → làm hết các bước còn lại, không dừng hỏi giữa chừng. Vẫn dừng hỏi trước deploy, push, xoá, ghi data nhạy cảm.
+- **Chạy liền mạch.** User nói "tiếp tục" / "làm hết" / "làm lần lượt" / "tự làm, đã có quyền" → làm hết các bước còn lại, không dừng hỏi giữa chừng. Vẫn dừng hỏi trước deploy, push, xoá, ghi data nhạy cảm — trừ push sau merge + cleanup (tự động, [[git-conventions]]) và deploy khi prompt đã cho phép rõ (vd "làm xong thì merge push và deploy").
 - **Báo "xong" kèm bằng chứng.** Nêu đã verify gì trên môi trường thật (trang live, log, Telegram, output test) — không chỉ "code đã sửa". Task nhiều bước → 1 tóm tắt ngắn cuối, không rải nhiều báo cáo dài.
 - **Tự ghi memory.** Gặp quyết định / cấu hình / quy ước mới user chốt → tự ghi memory ngay, không đợi user nói "ghi nhớ".
 - **Đổi tên → sweep 1 lần.** Đổi tên host / service / profile / env → grep + sửa hết repo, skill, docs, memory, Notion trong cùng lượt; báo danh sách chỗ đã đổi. Không sửa rải rác theo từng lần user nhắc.

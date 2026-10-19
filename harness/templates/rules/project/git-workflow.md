@@ -88,6 +88,8 @@ Branch tạm (`feat/`, `fix/`, `hotfix/`, `chore/`, `refactor/`) sau merge vào 
 2. **Local branch** — `git branch -d feat/<slug>` (safe delete). Git từ chối (unmerged) → dừng, báo user. KHÔNG `-D` force.
 3. **Remote branch** — `git push <remote> --delete feat/<slug>` (best-effort). Lỗi → log warning, không fail flow. CHỈ trên remote chính (`<remote>`).
 
+Cleanup xong → **auto-push** `main` + `@@BRANCH@@` qua `/git-push-safety`, theo [[git-conventions]] mục "Auto-push sau merge + cleanup".
+
 **Whitelist cleanup**: `feat/`, `fix/`, `hotfix/`, `chore/`, `refactor/`.
 **Protected (HARD BLOCK)**: `@@BRANCH@@` + mọi protected/release branch khác.
 
