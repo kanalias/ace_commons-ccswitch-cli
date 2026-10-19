@@ -1,6 +1,6 @@
 ---
 name: app-backup
-description: Chuẩn backup data app (DB/state/config) cho mọi project — job launchd hằng ngày trên macmini2, snapshot nhất quán + retention, mirror macmini1, bản mã hoá AES-256-GCM lên Google Drive qua rclone, Telegram service-alert mỗi lần chạy
+description: Chuẩn backup data app (DB/state/config/secret) cho mọi project — dùng lib @acegalaxy/lib-backup-ace-db, khai báo manifest JSON, 1 runner launchd chạy tuần tự trên macmini2, mã hoá AES-256-GCM, rclone Drive giới hạn băng thông, mirror macmini1, Telegram ok/fail
 status: live
 updated: 2026-10-19
 paths:
@@ -14,32 +14,24 @@ metadata:
 
 # App backup — chuẩn dùng chung (cross-project)
 
-Thêm backup cho app/DB mới → làm theo cơ chế này, KHÔNG tự chế lịch/đích/alert riêng. Mẫu tham chiếu đang chạy: `soak/monitor/dbbackup.mjs` + `dbbackup-install.sh` trong repo BotControl (`acegalaxy-co/ace_ace_island-bot-player`) — copy rồi đổi nguồn dữ liệu.
+Thêm backup cho app/DB mới → **khai báo manifest cho lib `@acegalaxy/lib-backup-ace-db`** (repo private `acegalaxy-co/lib-backup-ace-db`, cài từ git tag). KHÔNG viết script/launchd/alert backup riêng trong project.
 
-## Chạy ở đâu
+## Cơ chế
 
-- **Host chạy job: macmini2** (máy 24/7), launchd LaunchAgent `co.acegalaxy.<app>-backup`, `StartCalendarInterval` 1 lần/ngày giờ thấp tải (vd 03:30, lệch giờ giữa các app), `Nice 15`, `Umask 63`. Máy ngủ lỡ giờ → launchd chạy bù khi thức.
-- Script backup **self-contained** (chỉ import `node:`/stdlib), rsync riêng vào `~/apps/<app>-backup/` — không chạy từ source app (deploy app không làm vỡ backup).
-- Installer có **dry-run mặc định**, `--apply` mới ghi; `--run-now` chạy thật 1 lần để verify sau cài.
+- **1 runner duy nhất trên macmini2**: launchd `co.acegalaxy.ace-backup` (`ace-backup install-launchd`), chạy 1 lần/đêm trong khung thấp tải, **các app nối tiếp nhau** (không song song), lock toàn cục. `ProcessType Background`, `Nice 15`, `LowPriorityIO`, child process bọc `nice` + `taskpolicy -b`.
+- **Host config** `~/.config/acegalaxy/backup-host.json` (workDir, keyFile, remote rclone + `bwlimit`, mirror, alert). **Manifest mỗi app** `~/.config/acegalaxy/backup.d/<app>.json` (hoặc `backup.json` trong repo app nếu host config trỏ tới). Bản gốc host config + manifest version trong repo lib `hosts/<host>/`.
+- Manifest: `app`, `folder` (folder Drive, mặc định = app), `priority` P1/P2/P3, `retention` {local, remote, mirror} (days ≥ 1; `null` = không prune), `sources[]`.
+- Source types: `sqlite` (online backup 1 bước / `VACUUM INTO`, chạy trong worker, `quick_check`), `files` (tar giữ layout tuyệt đối, `exclude`, profile trình duyệt đang mở → `lockedPolicy: copy` + `sqliteInside` cho Cookies/Login Data), `redis` (BGSAVE → `docker cp` RDB), `pgdump` (`-Fc`, password qua env), `command` (escape hatch). Source `required` rỗng/thiếu → fail, không pack, không prune.
 
-## Bản backup
+## Bắt buộc
 
-1. **Snapshot nhất quán**, không copy file đang ghi: SQLite → `VACUUM INTO` + `PRAGMA integrity_check`; Postgres → `pg_dump`; file JSON → đọc rồi ghi tmp + rename. Mở nguồn read-only.
-2. Output `~/apps/<app>-backup/backups/<YYYY-MM-DD>/`, dir `0700`, file `0600`, gzip. Chạy lại trong ngày → ghi đè ngày đó (idempotent).
-3. **Retention local:** giữ 30 ngày + bản đầu tháng 12 tháng. Lịch sử thay đổi quan trọng (đổi tên, xoá…) → `history/*.jsonl` append-only, không bao giờ prune.
+1. **Mã hoá trước khi rời máy**: tar → zstd → AES-256-GCM streaming (`ACB1` + IV + ct + tag), verify decrypt-to-hash trước khi ghi đè bản cùng ngày. Key 1 file 64 hex `0600` trên host, **sao lưu key ra máy local + vault** (mất key = mất mọi bản). Restore: `ace-backup decrypt` vào dir `0700`, xoá plaintext sau dùng.
+2. **Upload chậm, không tranh tài nguyên**: rclone `--bwlimit` nhỏ (timetable ngày/đêm), `--transfers 1 --checkers 1`; rsync mirror `--bwlimit`. Không đặt lịch trùng job nặng khác của host.
+3. **Mỗi app 1 folder Drive** ngang hàng trong folder backup cha của org (account + folder id ghi trong memory/config private, KHÔNG ghi vào rule/repo public).
+4. **Telegram mỗi lần chạy** qua `service-alert` (service `<app>-backup`, [[general]] mục Telegram service alert): `ok` / `fail` (source bắt buộc, pack/verify, upload lỗi) / `warn` (source tuỳ chọn, mirror, prune lỗi). Không tìm thấy manifest nào → fail.
+5. **Secret không bao giờ vào argv/log/alert** ([[secrets-no-printout]]); OAuth rclone: `rclone authorize drive` trên máy có browser, ghi token thẳng file `umask 077`, pipe vào `rclone.conf` host, xoá file tạm.
+6. Thêm app mới: viết manifest → `ace-backup run --dry-run --app <app>` → chạy thật `--app <app> --alert` 1 lần, kiểm file trên Drive + tin Telegram → commit manifest vào repo lib `hosts/<host>/backup.d/`.
 
-## Bản off-host (chỉ khi mọi bản local OK)
+## Không backup
 
-- **Mirror macmini1:** `rsync -a` (KHÔNG `--delete`, không prune) sang `macmini1:apps/<app>-backup-mirror/macmini2/`.
-- **Google Drive qua rclone** (không dùng Google Drive app — cần GUI/admin, dễ ngừng sync):
-  - rclone binary `~/.local/bin/rclone` trên macmini2, config `~/.config/rclone/rclone.conf` (0600). Remote dùng chung `gdrive-fleet-backup:` (root = folder backup của org; account + folder id ghi trong memory project, KHÔNG ghi vào rule/repo). App mới → subfolder riêng `gdrive-fleet-backup:<app>/`.
-  - Login OAuth: chạy `rclone authorize drive` trên máy có browser, ghi output thẳng file `umask 077`, parse token trong script rồi pipe qua ssh vào `rclone.conf` — KHÔNG in token ([[secrets-no-printout]]). Xoá file token tạm sau khi ghi.
-  - **Luôn mã hoá trước khi upload** (data có secret/PII): tar.gz bản ngày + `history/` → AES-256-GCM (`node:crypto`; layout `FDB1` + IV 12B + tag 16B + ciphertext). Key 32 byte hex tạo 1 lần trên host (`openssl rand -hex 32`, `0600`), không in ra; **sao lưu key** ra máy local + vault (mất key = mất mọi bản Drive).
-  - Verify: decrypt lại file tmp so sha256 trước upload; `rclone copyto` rồi `rclone lsjson` so size. Không prune trên Drive.
-  - Có lệnh restore (`--decrypt FILE --to OUT`) + ghi bước restore ở header script.
-
-## Báo cáo
-
-- **Mỗi lần chạy gửi 1 tin Telegram** qua `service-alert` (service `<app>-backup`, [[general]] mục Telegram service alert): `ok` khi tất cả OK; `fail` khi DB/snapshot lỗi HOẶC upload Drive lỗi; `warn` khi chỉ mirror lỗi. Field: số bản ghi, dung lượng, số ngày đang giữ, trạng thái mirror/Drive. Gửi best-effort, timeout, không làm job crash.
-- Log 1 dòng JSON/lần vào `~/apps/<app>-backup/logs/` (không chứa secret); exit ≠ 0 khi có lỗi.
-- Test bắt buộc: happy + DB lỗi + đích off-host lỗi (fake rclone/rsync) — không gọi Drive thật trong test.
+Dữ liệu tạo lại được (node_modules, build, image, cache trình duyệt, log), mirror phái sinh từ DB đã backup, kho đã tự có bản sao ngoài host (vd git mirror có remote dự phòng) — chỉ backup secret/state của chúng.
