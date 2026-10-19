@@ -889,7 +889,8 @@ OWNED_ALLOW=()
 OWNED_ENV_KEYS=()
 OWNED_STATUSLINE=""
 if [ -f "$PREVIOUS_MANIFEST" ] && jq -e '.schemaVersion == 1' "$PREVIOUS_MANIFEST" >/dev/null 2>&1; then
-  while IFS=$'\t' read -r event matcher command; do OWNED_HOOKS+=("$event" "$matcher" "$command"); done < <(jq -r '.settings.hooks[]? | [.event,.matcher,.command] | @tsv' "$PREVIOUS_MANIFEST")
+  # \x1f, not \t: tab is IFS-whitespace, so `read` would collapse an empty matcher field
+  while IFS=$'\x1f' read -r event matcher command; do OWNED_HOOKS+=("$event" "$matcher" "$command"); done < <(jq -r '.settings.hooks[]? | select((.command // "") != "") | [.event,.matcher,.command] | join("\u001f")' "$PREVIOUS_MANIFEST")
   while IFS= read -r deny; do OWNED_DENY+=("$deny"); done < <(jq -r '.settings.deny[]?' "$PREVIOUS_MANIFEST")
   while IFS= read -r allow; do OWNED_ALLOW+=("$allow"); done < <(jq -r '.settings.allow[]?' "$PREVIOUS_MANIFEST")
   while IFS= read -r key; do OWNED_ENV_KEYS+=("$key"); done < <(jq -r '.settings.env | keys[]?' "$PREVIOUS_MANIFEST")

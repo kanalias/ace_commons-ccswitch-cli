@@ -145,3 +145,26 @@ M() { echo "$TARGET/.claude/harness-manifest.json"; }
   ! grep -qx "local edit" "$f"
   jq -e '.syncFiles | map(.path) | index(".claude/rules/common/general.md")' "$m"
 }
+
+# --- Bug 3: owned hooks with empty matcher survive a re-install -----------
+# IFS=$'\t' is IFS-whitespace: bash `read` collapsed the empty matcher field, so
+# {SessionStart,"",cmd} came back as {SessionStart,cmd,""} and was re-recorded.
+
+@test "re-install keeps empty-matcher owned hooks intact in the manifest" {
+  inst "$HCOPY/harness/install.sh"; [ "$status" -eq 0 ]
+  inst "$HCOPY/harness/install.sh"; [ "$status" -eq 0 ]
+  inst "$HCOPY/harness/install.sh"; [ "$status" -eq 0 ]
+  run jq '[.settings.hooks[] | select(.command == "")] | length' "$(M)"
+  [ "$output" = "0" ]
+  run jq '[.settings.hooks[] | select(.matcher | test("\\.sh$"))] | length' "$(M)"
+  [ "$output" = "0" ]
+  jq -e '.settings.hooks[] | select(.event=="SessionStart" and .matcher=="" and (.command|endswith("session-start.sh")))' "$(M)" >/dev/null
+}
+
+@test "re-install drops already-corrupted owned hook entries (empty command)" {
+  inst "$HCOPY/harness/install.sh"; [ "$status" -eq 0 ]
+  jq '.settings.hooks += [{event:"SessionStart",matcher:"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh",command:""}]' "$(M)" > "$BATS_TEST_TMPDIR/m.json" && mv "$BATS_TEST_TMPDIR/m.json" "$(M)"
+  inst "$HCOPY/harness/install.sh"; [ "$status" -eq 0 ]
+  run jq '[.settings.hooks[] | select(.command == "")] | length' "$(M)"
+  [ "$output" = "0" ]
+}
