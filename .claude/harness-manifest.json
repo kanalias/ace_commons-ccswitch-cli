@@ -148,7 +148,7 @@
     },
     {
       "path": ".claude/skills/ace-library/SKILL.md",
-      "sha256": "0ab32c4ac43e552cb5cdf7b9e23f591c2fdb2b168fdc9ce08f60df2f335d44e1"
+      "sha256": "c9596b0beddbbb255c587e8572122589662e1fd1c20e5d0203457cab051a7315"
     },
     {
       "path": ".claude/skills/ace-notion-rbac/SKILL.md",
@@ -362,6 +362,7 @@
     ".claude/rules/project/skill-superpowers.md",
     ".claude/rules/project/social-posting-safety.md",
     ".claude/rules/project/test-parallel.md",
+    ".claude/skills/ace-ai-explain/SKILL.md",
     "CLAUDE.md"
   ],
   "installEnv": {
