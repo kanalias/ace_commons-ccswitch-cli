@@ -183,6 +183,14 @@
       "sha256": "a5a652a15c7c9081081ecff791d8e9ee3aded4709163e5d2361d1ddf5036f1ea"
     },
     {
+      "path": ".claude/skills/cloudflare/SKILL.md",
+      "sha256": "f9e1d86b897fd3516ee4b513bfe0ff26dda684a4aad015e3ec4b69dd91f65292"
+    },
+    {
+      "path": ".claude/skills/copy-data-cmd/SKILL.md",
+      "sha256": "dec5440897b8b95ba09c0d1130ebb3501156afa4f435403f16a2901969643cf0"
+    },
+    {
       "path": ".claude/skills/dep-ladder-check/SKILL.md",
       "sha256": "81464896921356df2e0d00b6ac89a297f21b68e162732a13b467f3f0453d9b46"
     },
@@ -223,12 +231,16 @@
       "sha256": "f42291b264619c57cc1337a484babcf2024ac68851bfc2921faff2a9629d293c"
     },
     {
+      "path": ".claude/skills/git-commit-auto/SKILL.md",
+      "sha256": "4fb1c032d3be1613cde93344da06a73b843569677a2abc9e823285f0212e45ae"
+    },
+    {
       "path": ".claude/skills/git-commit-describe/SKILL.md",
       "sha256": "ced3c4b41af6ee888c5f396c7545842d296830dcb8e1ed4dc3e84531bf1e0ab0"
     },
     {
       "path": ".claude/skills/git-commit/SKILL.md",
-      "sha256": "f021840c48a12526f48d72cc759f5bd9fdea3c2a27c6703920f8264d23da8fef"
+      "sha256": "67ade5ab146d09fcb82addb7fc8aba32a3a79e46df79889ddba6c451b07190bd"
     },
     {
       "path": ".claude/skills/git-force-snapshot/SKILL.md",
@@ -277,6 +289,10 @@
     {
       "path": ".claude/skills/task-loop-feature/SKILL.md",
       "sha256": "3135a3db9902f159e21260854f13f33c667093a161058676f13e590ec28b5c37"
+    },
+    {
+      "path": ".claude/skills/telegram-alert-test/SKILL.md",
+      "sha256": "d1e9f9f28e58b486d8715d9b161a7f43258acad9b65be5496087d375d8ab48e6"
     },
     {
       "path": ".claude/skills/ui-preview/SKILL.md",
