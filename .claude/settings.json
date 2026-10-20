@@ -140,6 +140,9 @@
       "Bash(rm -rf .git:*)",
       "Bash(git push --force:*)",
       "Bash(git push -f:*)"
+    ],
+    "allow": [
+      "Bash"
     ]
   },
   "autoCompactWindow": 300000

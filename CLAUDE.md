@@ -22,8 +22,8 @@ BẮT BUỘC route qua 1 trong **5 surfaces** dưới đây. KHÔNG add ad-hoc s
 |---|---|---|
 | **Skill (slash)** | `.claude/skills/<name>/SKILL.md` (gọi `/<name>`) | Workflow lặp lại user gõ `/<name>` |
 | **Hook** | `.claude/hooks/<name>.sh` + wire `.claude/settings.json` (vd `protect-backup.sh`, `session-start.sh`) | Auto-action khi event (Pre/Post/SessionStart/Stop/SubagentStop) |
-| **Subagent** | `.claude/agents/<name>.md` (vd `smoke-tester`) | Persona isolated context |
-| **MCP server** | `mcp-servers/<name>/` + `.mcp.json` ở root project | External tool / structured I/O |
+| **Subagent** | `.claude/agents/<name>.md` (vd `code-reviewer`, `delegate-sonnet`) | Persona isolated context |
+| **MCP server** | `mcp-servers/<name>/` + `.mcp.json` ở root project (tạo khi cần) | External tool / structured I/O |
 | **Permission deny** | `.claude/settings.json` `permissions.deny` | Hard guardrail (push prod, rm backup, edit `secrets/`, edit `.env`) |
 
 **Quy trình thêm feature:**

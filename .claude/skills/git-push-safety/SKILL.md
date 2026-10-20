@@ -122,8 +122,12 @@ xác nhận sửa README (cùng commit hoặc commit riêng) rồi mới push.
 ## 4. Push
 
 Chỉ khi bước 1-3 đều pass: hiện cho user chính xác cái gì sắp được push
+(kèm SHA đã scan). Ngay trước lệnh push, kiểm `git rev-parse HEAD` vẫn = SHA đã
+scan (session khác / commit thêm trong lúc chờ confirm → scan lại); push đúng SHA đó
 (`git status`, branch hiện tại, remote) và hỏi xác nhận rõ ràng
-trước khi push. Không bao giờ force-push như một phần của command
+trước khi push. Ngoại lệ: luồng auto-push sau merge + cleanup ([[git-conventions]]
+mục "Auto-push sau merge + cleanup") đã được user xác nhận sẵn → không hỏi lại,
+chỉ in ra rồi push. Không bao giờ force-push như một phần của command
 này trừ khi request của user trong conversation này yêu cầu rõ ràng force
 push.
 

@@ -11,10 +11,12 @@
 
 ## Cách làm việc
 
-- **Chạy liền mạch.** User nói "tiếp tục" / "làm hết" / "làm lần lượt" / "tự làm, đã có quyền" → làm hết các bước còn lại, không dừng hỏi giữa chừng. Vẫn dừng hỏi trước deploy, push, xoá, ghi data nhạy cảm.
+- **Chạy liền mạch.** User nói "tiếp tục" / "làm hết" / "làm lần lượt" / "tự làm, đã có quyền" → làm hết các bước còn lại, không dừng hỏi giữa chừng. Vẫn dừng hỏi trước deploy, push, xoá, ghi data nhạy cảm — trừ push sau merge + cleanup (tự động, [[git-conventions]]) và deploy khi prompt đã cho phép rõ (vd "làm xong thì merge push và deploy").
 - **Báo "xong" kèm bằng chứng.** Nêu đã verify gì trên môi trường thật (trang live, log, Telegram, output test) — không chỉ "code đã sửa". Task nhiều bước → 1 tóm tắt ngắn cuối, không rải nhiều báo cáo dài.
 - **Tự ghi memory.** Gặp quyết định / cấu hình / quy ước mới user chốt → tự ghi memory ngay, không đợi user nói "ghi nhớ".
 - **Đổi tên → sweep 1 lần.** Đổi tên host / service / profile / env → grep + sửa hết repo, skill, docs, memory, Notion trong cùng lượt; báo danh sách chỗ đã đổi. Không sửa rải rác theo từng lần user nhắc.
+- **KHÔNG xoá/wipe DB khi chưa có lệnh rõ.** `DROP`/`TRUNCATE`/`DELETE` không `WHERE`/xoá file DB/clear collection — local lẫn prod — chỉ khi user ra lệnh rõ trong prompt hiện tại; cần dọn data test → dùng DB/schema riêng.
+- **MCP server khai per-project.** Thêm MCP → `.mcp.json` ở root repo, KHÔNG `~/.claude.json` global (tool defs nạp vào mọi session).
 - **Không hardcode.** Path, model, profile, ID, URL không gắn cứng trong code — lấy từ env / Notion config / convention (vd `resolveServiceProfilePath`). Secret xem [[secrets-no-printout]].
 
 ## Tên biến `.env` / config — PREFIX = supplier (BẮT BUỘC)
@@ -22,7 +24,7 @@
 Quy tắc chung, áp MỌI supplier (danh sách mở, không giới hạn: Anthropic/Claude, OpenAI, Google, Facebook/Meta, Cloudflare, Notion, Telegram, AWS, GitHub, TikTok, Zalo…).
 
 - Format: `<SUPPLIER>_<LOẠI>_<MỤC_ĐÍCH>`, viết HOA, `_` ngăn cách. Mọi biến trong `.env*` và config (JSON/YAML, Notion config) PHẢI có PREFIX supplier.
-  - Đúng: `NOTION_TOKEN_VAULT`, `NOTION_PAGE_CONFIG_ID`, `TELEGRAM_BOT_TOKEN_ALERT`, `TELEGRAM_CHANNEL_ALERT_ID`, `ANTHROPIC_API_KEY`, `CLOUDFLARE_API_TOKEN_DNS`, `GOOGLE_OAUTH_CLIENT_ID`, `FACEBOOK_PAGE_TOKEN_SHOP`.
+  - Đúng: `NOTION_TOKEN_VAULT`, `NOTION_PAGE_CONFIG_ID`, `TELEGRAM_BOT_TOKEN_ALERT`, `TELEGRAM_CHAT_ALERT_ID`, `ANTHROPIC_API_KEY`, `CLOUDFLARE_API_TOKEN_DNS`, `GOOGLE_OAUTH_CLIENT_ID`, `FACEBOOK_PAGE_TOKEN_SHOP`.
   - Sai: `TOKEN`, `BOT_TOKEN`, `CHAT_ID`, `PAGE_ID`, `API_KEY`, `VAULT_TOKEN` (không rõ supplier).
 - **Tự detect supplier** khi thêm biến — không hỏi user: suy từ SDK/package import, domain URL gọi tới (`api.cloudflare.com` → `CLOUDFLARE_`), docs vendor. Supplier có tên env chuẩn chính thức (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `CLOUDFLARE_API_TOKEN`, `GITHUB_TOKEN`) → dùng đúng tên đó để SDK tự đọc.
 - **Dò trước, tạo sau:** grep `.env.example` + code xem supplier đã có prefix chưa → có thì dùng lại đúng prefix đó (không tạo biến thể `CF_` khi repo đã dùng `CLOUDFLARE_`); chưa có → tạo prefix mới theo tên supplier đầy đủ, phổ biến nhất.
@@ -60,7 +62,7 @@ Quy tắc chung, áp MỌI supplier (danh sách mở, không giới hạn: Anthr
 - `<Env>` = `HOST_LABEL`; `<Project>` + `<service>` tự gợi ý từ tên folder (git root / folder có `package.json`) ở lần dùng đầu rồi lưu `~/.config/acegalaxy/service-alert.json` (lib ≥ v0.9.0; đổi tên: `service-alert init`). `ALERT_PROJECT` / `--project` chỉ để ghi đè (vd container không có `.git`). Status ∈ `ok|fail|warn|info|queued|running`. Tên tự gợi ý > 16 ký tự được lib tự rút gọn (cắt từ dài nhất, giữ từ ngắn); muốn tên đẹp hơn → rút gọn tay nhưng vẫn giữ nguyên ý nghĩa, vd `share-fp2group-fb-personal` → `fp2g-fb-personal`; đặt bằng `service-alert init`.
 - CẤM tự dựng chuỗi header, tự gọi `api.telegram.org`, hoặc fork format trong project. Cần đổi mẫu → sửa trong lib `lib-ott-gateway` + release tag, rồi bump version ở các project dùng.
 - HTML Telegram hay sai: `& < >` thô trong nội dung PHẢI escape (`&amp; &lt; &gt;`) kẻo cả tin lỗi `can't parse entities`; cột căn thẳng đặt trong `<pre>` (block, không dùng `<code>`), pad bằng code thay vì gõ cứng dấu cách; mỗi tin ≤ 4096 ký tự — dài hơn thì tách tin hoặc cắt phần detail.
-- Mỗi project chốt MỘT cặp env bot-token + channel-id chuẩn cho mỗi mục đích, khai báo 1 lần ở rule project / `.env.example` (vd `TELEGRAM_BOT_TOKEN_ALERT` + `TELEGRAM_CHANNEL_ALERT_ID`) — dùng luôn, KHÔNG hỏi user chọn channel; CẤM trộn token của cặp này với chat id của cặp khác.
+- Mỗi project chốt MỘT cặp env bot-token + channel-id chuẩn cho mỗi mục đích, khai báo 1 lần ở rule project / `.env.example` (chuẩn = tên lib đọc: `TELEGRAM_BOT_TOKEN_ALERT` + `TELEGRAM_CHAT_ALERT_ID`; lib ≥ v0.13.0 thiếu chat id → tự gửi kênh alert mặc định của org) — dùng luôn, KHÔNG hỏi user chọn channel; CẤM trộn token của cặp này với chat id của cặp khác.
 - Cặp legacy chỉ còn là fallback lúc đọc ở chỗ đã có (`OLD || NEW`), không thêm chỗ dùng mới. Thiếu biến trong cặp → bỏ qua alert best-effort, log TÊN biến (không log giá trị), không làm fail luồng chính.
 
 ## Lib `@acegalaxy/*` — cài từ git tag, KHÔNG qua npm registry (BẮT BUỘC)
