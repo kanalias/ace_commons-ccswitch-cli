@@ -89,10 +89,11 @@ tool-call TRƯỚC confirm. Tuần tự bắt buộc: 0 → (1 ‖ 2) → 3 (ch�
    - Chạy `verify command` trong target file; hoặc `pm2 ls` + `pm2 logs <name> --nostream --lines 20` và khớp `log pattern`. KHÔNG in file log chứa audit/secret ra chat — lọc theo pattern.
    - **Crash loop** (restart count tăng liên tục, status `errored`/`waiting restart`, log lặp lỗi khởi động) → `pm2 stop <name>` NGAY (chỉ process đó), rồi mới chẩn đoán; không để loop chạy tiếp.
    - Diff `pm2 ls`/`docker compose ps` với baseline bước 2: app KHÁC phải không đổi (uptime/restart count). Có thay đổi ngoài ý muốn → cảnh báo lớn.
+   - **RBAC Scan** (bắt buộc nếu app có RBAC): đọc `.claude/rules/common/rbac-security.md`, chạy mục 1 (detect) + 3 (probe route admin/API không cookie). Có `OPEN` → coi như verify fail.
    - Verify fail → làm theo `rollback note` trong target file (khôi phục bản trước, vẫn đảm bảo chỉ một nơi chạy), rồi verify lại. Không có rollback note → STOP và báo user, không tự bịa.
 
 8. **Báo cáo.** Target · commit đã ship (`<sha> <type>: <summary>`) · số file rsync/xoá · kết quả env check (chỉ tên + ok/MISSING) · pre-restart check ·
-   process đã restart + trạng thái trước/sau · app khác có đổi không · verify · rollback (nếu có).
+   process đã restart + trạng thái trước/sau · app khác có đổi không · verify · RBAC Scan (nếu có RBAC) · rollback (nếu có).
 
 ## Mẫu target file
 

@@ -119,6 +119,8 @@ không tự suy diễn từ CI xanh cũ.
    mọi domain vừa deploy; thêm `ssh <deploy-ssh-host> 'ss -tlnp'` kiểm DB/redis/admin không bind `0.0.0.0`.
    Có `LEAK` hoặc port nội bộ public → coi như smoke fail, chuyển bước 7 (rollback) + báo path lộ.
 
+5c. **RBAC Scan (bắt buộc nếu app có RBAC, theo [[rbac-security]] mục 1 + 3).** Đọc `.claude/rules/common/rbac-security.md`, detect RBAC; có → probe route admin/API không cookie trên mọi domain vừa deploy. Có `OPEN` → coi như smoke fail, chuyển bước 7 (rollback) + báo route lộ.
+
 6. **Verify multi-service (kiểm tra regression lan sang service khác).** Chạy lại `docker ps` trên host và diff với
    snapshot ở bước 3 — mọi service KHÁC phải vẫn `Up`/healthy với cùng container id
    (không bị recreate). Bất kỳ hàng xóm nào bị regress hoặc restart → cảnh báo lớn, đây chính xác là failure

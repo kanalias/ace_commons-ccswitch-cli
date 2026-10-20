@@ -101,6 +101,10 @@ kết luận pass.
 
 Áp [[deploy-security]] mục 1, 2, 4: web root/static không trỏ repo checkout, `.dockerignore` loại `.env*`/`.git`/`.claude`/`CLAUDE.md`, npm lib có `files`, không file nhạy cảm tracked. Vi phạm → STOP trước push.
 
+## 3.7. RBAC Scan (nếu repo có RBAC)
+
+Đọc `.claude/rules/common/rbac-security.md`, chạy mục 1 (detect); có RBAC → mục 2 trên range sắp push. Fail → STOP trước push. In bảng mục 4.
+
 ## 3.5. README drift check (nếu repo có README ở root)
 
 Chỉ chạy khi diff sắp push (bước 3) chạm tới thứ README mô tả:
