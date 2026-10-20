@@ -28,7 +28,7 @@ Nguồn API duy nhất: `node_modules/@acegalaxy/lib-notion-rbac/README.md` (đ�
 Không bọc Node sidecar, không gate bằng proxy khi app tự kiểm quyền được. Viết bản port tối thiểu ngay trong project:
 
 1. **Tìm port sẵn cùng ngôn ngữ trước** — có thì copy + đổi prefix, KHÔNG viết lại. Port đã có:
-   - Java: `ace_ace_matching-service` → `mm-director/src/main/java/co/acegalaxy/mm/director/security/NotionRbac.java` + `NotionRbacTest.java` (access + verify ticket, Login Center song song user/pass cũ).
+   - Java: `ace_ace_matching-service` → `mm-director/src/main/java/co/acegalaxy/mm/director/security/` `NotionRbac.java` (access) + `AceLoginTicket.java` (verify ticket), test cùng tên `*Test.java`; Login Center chạy song song user/pass cũ.
 2. **Clone lib đúng tag** làm nguồn sự thật (không cài vào project): `git clone --depth 1 --branch vX.Y.Z git@github.com:acegalaxy-co/lib-notion-rbac.git /tmp/lib-notion-rbac`. Đọc `README.md` (mục Permission rules), `index.js` (`access`), `login.js` (`verifyTicket`, cookie phiên).
 3. **Chỉ port phần app dùng**, mặc định 2 phần:
    - `access(email)` → `{ found, kind, perms, banned }`: HR Working (mọi email trong `emailProps`) hoặc Guest Authen; Default role chỉ cho staff; Map Roles `Active` + `ExpiresAt` trống/còn hạn; Role/Permission `Active` tắt → không tính; `Ban` thắng hết. Đọc Notion mỗi request (chỉ cache id bảng), lỗi Notion → throw, caller từ chối (fail closed).
