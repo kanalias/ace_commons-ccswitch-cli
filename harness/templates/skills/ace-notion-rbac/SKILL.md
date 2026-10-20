@@ -20,6 +20,7 @@ Nguồn API duy nhất: `node_modules/@acegalaxy/lib-notion-rbac/README.md` (đ�
    ```
    User đồng ý → chạy lại thêm `--apply` (ghi Notion = outward, hỏi trước). Chạy lại an toàn.
 6. **Code** (hỏi user cần phần nào): `createRbac` kiểm quyền (`access(email)`), `./login` (Login Center — đăng ký callback trong `ACE_LOGIN_APPS`), `./admin` (console gán role/guest/log). Theo README lib; mỗi phần ≥ 1 test happy + 1 test từ chối (không quyền / ban).
+   - **App đã có login khác** (password, OAuth, magic link, SSO…) → GIỮ NGUYÊN, Login Center chỉ THÊM 1 lựa chọn (nút/route riêng). KHÔNG xoá/thay route, session, middleware, user store cũ; mọi cách login cùng ra session cũ của app. Test: login cũ vẫn chạy sau khi tích hợp.
 
 ## Lưu ý
 
