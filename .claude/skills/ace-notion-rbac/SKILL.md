@@ -1,6 +1,6 @@
 ---
 name: ace-notion-rbac
-description: Tích hợp phân quyền Notion (`@acegalaxy/lib-notion-rbac`) vào project ACE Galaxy — cài lib theo tag, rbac.json tối thiểu chỉ cần prefix, env chuẩn, dựng bảng trong 1 page container Notion (dry-run → --apply), gán owner mặc định lanhnk@acegalaxy.co + lanhnk@suga.vn + contact@acegalaxy.co, tuỳ chọn nối Login Center + trang admin (admin bắt buộc có tab Tài liệu + nút AI giải thích qua /ace-ai-explain). App không phải JS (Java, Go, Python…) → tự viết bản port access + verify ticket theo ngôn ngữ project. Dùng /ace-notion-rbac [prefix], hoặc khi user nói "thêm phân quyền", "tích hợp rbac", "notion rbac", "phân quyền cho app".
+description: Tích hợp phân quyền Notion (`@acegalaxy/lib-notion-rbac`) vào project ACE Galaxy — cài lib theo tag, rbac.json tối thiểu chỉ cần prefix, env chuẩn, dựng bảng trong 1 page container Notion (dry-run → --apply), gán owner mặc định lanhnk@acegalaxy.co + lanhnk@suga.vn + contact@acegalaxy.co, tuỳ chọn nối Login Center + trang admin (admin bắt buộc có tab Tài liệu + nút AI giải thích qua /ace-ai-explain), bắt buộc Audit Scan (leak + chặn quyền) trước push/deploy. App không phải JS (Java, Go, Python…) → tự viết bản port access + verify ticket theo ngôn ngữ project. Dùng /ace-notion-rbac [prefix], hoặc khi user nói "thêm phân quyền", "tích hợp rbac", "notion rbac", "phân quyền cho app".
 user-invocable: true
 ---
 
@@ -44,6 +44,13 @@ Nguồn API duy nhất: `node_modules/@acegalaxy/lib-notion-rbac/README.md` (đ�
    - **Tab/trang "Tài liệu"** (Document) cho user đọc: tổng quan hệ thống, từng tính năng/tab admin (làm gì, cách dùng, quyền cần), luồng chính, thuật ngữ. Dùng theme app như trên. Đã có trang docs → bổ sung mục còn thiếu (gồm mục Phân quyền: role, quyền, ai gán), không tạo trang thứ 2.
    - **Nút "AI giải thích"** → chạy skill `/ace-ai-explain` (theo contract của skill đó). Registry `docs` của AI trỏ vào chính các mục trong trang Tài liệu — tài liệu là nguồn chung cho cả user lẫn AI, không viết docs riêng cho AI. Nút AI cần login; quyền bấm theo câu trả lời bước 0 của `/ace-ai-explain`.
    - Thêm tính năng admin mới → cập nhật Tài liệu + registry AI cùng commit.
+8. **Audit Scan TRƯỚC push/deploy (BẮT BUỘC, không skip)** — RBAC chạm login, session, admin, data nhân sự → lộ thông tin là rủi ro chính. Chạy trên toàn bộ diff tích hợp (`git diff <base>..HEAD`), bước nào fail → DỪNG, sửa, chạy lại; KHÔNG push/deploy:
+   - `/audit-git-leak` (gitleaks + sensitive scan) + `/check-hardcode` + subagent `secret-scanner` trên range commit.
+   - Không commit: `.env*`, token, id page/DB Notion thật (chỉ qua env), output dry-run/`--apply` của setup.js, dump HR/email nhân sự (ngoài 3 email owner cố định).
+   - Chặn quyền: mọi route `./admin`, API admin, `/api/ai/explain`, trang chỉ xem → không login/không quyền/`ban` phải ra 401/403/redirect, kể cả gọi API trực tiếp (không chỉ ẩn nút). Có test từ chối tương ứng (bước 6).
+   - Không lộ qua response: trang lỗi/JSON lỗi không trả stack, token, id Notion, email người khác; cookie phiên không chứa quyền; log không in token/ticket. Staff chỉ thấy phần cơ bản ([[staff-view-no-sensitive]]).
+   - Login cũ vẫn chạy (bước 6); lỗi Notion → fail closed (từ chối), không mở quyền.
+   - Sau deploy: probe live bằng `curl` không cookie vào route admin/API → phải bị chặn; theo [[deploy-security]]. In bảng kết quả audit (mục / PASS-FAIL / bằng chứng) cho user trước khi push.
 
 ## App không phải JS — tự viết bản port theo ngôn ngữ project
 
