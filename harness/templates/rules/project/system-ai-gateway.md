@@ -107,6 +107,7 @@ Chỉnh `src/` theo thư mục source thực tế của project. Match (ngoài p
 
 - Service gọi LLM qua 9router bằng `AI_9ROUTER_BASE_URL` + `AI_9ROUTER_TOKEN` (tên lib đọc). Key theo project, KHÔNG dùng key provider trực tiếp trong service. `AI_9ROUTER_API_KEY` = tên cũ → chỉ đọc fallback ở chỗ đã có, không thêm chỗ dùng mới.
 - Thêm service dùng LLM → khai 2 biến trên vào `.env.example` (không value).
+- Nút "Hỏi AI / AI giải thích" trên web admin → skill `/ace-ai-explain` (contract API + prompt + UI chung, Node lẫn Java).
 
 ## Runtime env model override
 
