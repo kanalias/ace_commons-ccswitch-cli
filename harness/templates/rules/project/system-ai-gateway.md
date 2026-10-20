@@ -103,6 +103,11 @@ grep -rn "spawn.*['\"]claude['\"]\|spawn.*['\"]gemini['\"]" \
 
 Chỉnh `src/` theo thư mục source thực tế của project. Match (ngoài path exempt) → fix hoặc dừng hỏi user.
 
+## 9router — gateway LLM dùng chung
+
+- Service gọi LLM qua 9router bằng `AI_9ROUTER_BASE_URL` + `AI_9ROUTER_TOKEN` (tên lib đọc). Key theo project, KHÔNG dùng key provider trực tiếp trong service. `AI_9ROUTER_API_KEY` = tên cũ → chỉ đọc fallback ở chỗ đã có, không thêm chỗ dùng mới.
+- Thêm service dùng LLM → khai 2 biến trên vào `.env.example` (không value).
+
 ## Runtime env model override
 
 Ngoài `modelOverride` param, operator chọn model tại runtime **KHÔNG cần đổi code**.

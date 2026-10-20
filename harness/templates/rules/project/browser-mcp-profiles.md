@@ -240,6 +240,12 @@ Deploy sang máy khác không mang profile theo Git/image. Backup/migrate riêng
 - `profile_in_use`/lock → dừng; KHÔNG xoá file lock, KHÔNG kill process.
 - KHÔNG dump cookie ra output.
 
+## Sự cố thường gặp (browser ĐÃ đóng hẳn mới sửa)
+
+- **Mất session / crash SIGTRAP khi mở profile** → thường do `Default/Sync Data` hỏng hoặc có dir `.bak` lồng trong profile: đổi tên (KHÔNG xoá) `Sync Data` → `Sync Data.broken-<date>` rồi mở lại; vẫn hỏng → báo user, không tạo profile mới đè.
+- **Profile mới** → tắt thông báo web ngay khi tạo (`Preferences` → `profile.default_content_setting_values.notifications = 2`) để popup không chặn automation.
+- **Debug trên account thật** → mở browser 1 lần, giữ mở suốt phiên debug; KHÔNG đóng/mở liên tục (dễ dính lock + checkpoint đăng nhập).
+
 ## Browser contract (skill lái browser)
 
 - Snapshot trước khi click; tìm phần tử theo text hiển thị, không dùng ref cũ.

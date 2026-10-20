@@ -15,6 +15,10 @@ metadata:
 feat|fix|refactor|chore|docs: <mô tả>
 ```
 
+## GitHub org mặc định
+
+Repo mới / push GitHub → tạo dưới org `acegalaxy-co`, KHÔNG dưới username cá nhân (trừ khi user nói rõ). Lib: `acegalaxy-co/lib-<name>`.
+
 ## Branch cleanup sau merge (BẮT BUỘC)
 
 Xong tính năng → merge vào `@@BRANCH@@` → cleanup worktree + branch NGAY trong cùng session, KHÔNG để rác qua session. Quy trình đầy đủ (3 bước, whitelist prefix, confirm trước xoá, ngoại lệ): [[git-workflow]] mục "Cleanup sau merge".

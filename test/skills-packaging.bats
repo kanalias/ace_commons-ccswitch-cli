@@ -234,8 +234,8 @@ violations = []
 for path in files:
     for lineno, line in enumerate(path.read_text().splitlines(), 1):
         for label, pattern in patterns:
-            # ace-library is org-specific by design; its libs are public
-            if label == 'acegalaxy' and path.parent.name == 'ace-library':
+            # ace-* skills are org-specific by design; they wire @acegalaxy libs
+            if label == 'acegalaxy' and path.parent.name in ('ace-library', 'ace-notion-rbac'):
                 continue
             if pattern.search(line):
                 violations.append(f'{path}:{lineno}: {label}: {line.strip()}')

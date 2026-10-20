@@ -61,7 +61,8 @@ Nút Post biến mất ≠ đã đăng. Sau mỗi bài phải kiểm tra bài th
 1. Dừng NGAY mọi automation trên tài khoản đó; KHÔNG retry, KHÔNG đổi proxy/fingerprint để vượt.
 2. User tự xác minh qua giao diện chính thức (browser headed, tay người).
 3. Nghỉ automation ≥48h (Facebook) / ≥7 ngày (LinkedIn); những ngày đầu chỉ lướt xem, thao tác tay mức thấp.
-4. Báo user + ghi memory trạng thái tài khoản.
+4. Báo user + ghi memory trạng thái tài khoản. Project có DB tài khoản (Notion) → đặt Status `Require Verify` để worker bỏ qua tài khoản đó tới khi user xác minh xong.
+5. Checkpoint dạng mới chưa gặp → research cách xử lý chính thức trước, KHÔNG thử nghiệm trên tài khoản thật.
 
 ## Hành động công khai không đảo ngược
 
