@@ -148,11 +148,11 @@
     },
     {
       "path": ".claude/skills/ace-library/SKILL.md",
-      "sha256": "9e0a76239c29d162e4db186d65036a0ab93c5228ae28fa401dc65b810c19589e"
+      "sha256": "0ab32c4ac43e552cb5cdf7b9e23f591c2fdb2b168fdc9ce08f60df2f335d44e1"
     },
     {
       "path": ".claude/skills/ace-notion-rbac/SKILL.md",
-      "sha256": "c23dca4c32127de166cd2280f09756abecdfaee645818a4bc0c11cb4d2d4fc59"
+      "sha256": "c420bd66ae0c2ab766cda1a227ef688d85a5565b765d698bc5e9ece463faa382"
     },
     {
       "path": ".claude/skills/audit-claude-md/SKILL.md",

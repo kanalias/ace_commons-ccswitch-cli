@@ -1,6 +1,6 @@
 ---
 name: ace-library
-description: Cập nhật + discovery thư viện nội bộ @acegalaxy/lib-* (acegalaxy-co) trong project ACE Galaxy. Không tham số → check lib đang dùng + nâng cấp nếu tương thích, rồi quét lib-* chưa dùng và đánh giá lib đáng tích hợp. Có yêu cầu → tìm lib cho tính năng đó. Dùng /ace-library [yêu cầu], "dùng ace library", "update ace library".
+description: Cập nhật + discovery thư viện nội bộ @acegalaxy/lib-* (acegalaxy-co) trong project ACE Galaxy. Không tham số → check lib đang dùng + nâng cấp nếu tương thích, rồi quét lib-* chưa dùng và đánh giá lib đáng tích hợp. Có yêu cầu → tìm lib cho tính năng đó. Project không phải JS (Java, Go, Python…) → port lib sang ngôn ngữ project. Dùng /ace-library [yêu cầu], "dùng ace library", "update ace library".
 user-invocable: true
 ---
 
@@ -14,6 +14,7 @@ Input: yêu cầu tính năng (`$ARGUMENTS`, có thể rỗng) + source/deps/loc
   1. **A** — kiểm tra lib `lib-*` đang dùng, nâng cấp nếu tương thích.
   2. **C** — quét toàn bộ `acegalaxy-co/lib-*` chưa dùng, đánh giá lib nào đáng tích hợp.
 - **Có yêu cầu** → **A** rồi **B** (discovery cho tính năng đó).
+- Stack project không chạy được lib JS → A/B/C vẫn áp, phần cài/nâng cấp thay bằng **D** (port).
 
 Thứ tự ưu tiên: **code sẵn trong project → thư viện ACE Galaxy → thư viện ngoài
 (qua [/dep-ladder-check](../dep-ladder-check/SKILL.md)) → tự viết phần còn thiếu.**
@@ -49,7 +50,8 @@ Bảng chỉ để khoanh vùng. Khả năng thật phải xác minh từ source
 ## A. Cập nhật lib đã dùng
 
 1. **Kiểm kê:** grep `@acegalaxy/` trong mọi `package.json` (kể cả workspace) → danh sách
-   `<package> → <repo>#<tag hiện tại>`. Không có → bỏ qua A.
+   `<package> → <repo>#<tag hiện tại>`; project non-JS → grep -rE `port từ .*lib-` trong
+   source (tag ghi trong comment, nâng = cập nhật port theo D). Không có → bỏ qua A.
 2. **Tag mới nhất:** `git ls-remote --tags --refs git@github.com:acegalaxy-co/<repo>.git | sort -V`
    (bỏ tag pre-release `-rc/-beta` trừ khi project đang pin pre-release). Đang pin branch/commit
    thay vì tag → báo, không tự đổi.
@@ -69,7 +71,7 @@ Bảng chỉ để khoanh vùng. Khả năng thật phải xác minh từ source
 
 1. **Danh sách lib:** `gh repo list acegalaxy-co --limit 1000 --json name,description,updatedAt,isArchived`
    lọc `lib-*`, bỏ archived, bỏ lib đã dùng (từ A). `gh` lỗi → dùng bảng danh mục, ghi **chưa xác minh**.
-2. **Khoanh ứng viên:** so mô tả lib với project — stack (Node/ESM/TS), module hiện có
+2. **Khoanh ứng viên:** so mô tả lib với project — stack (Node/ESM/TS; non-JS → tính thêm công port D), module hiện có
    (grep logic tương tự: lock file, rate-limit, audit, gọi LLM, Notion, Telegram, cron, `.env` loader...).
    Không có điểm chạm → loại ngay, ghi 1 dòng lý do.
 3. **Đánh giá sâu** chỉ ứng viên có điểm chạm: đọc README + public exports + `package.json` lib
@@ -98,10 +100,33 @@ Bảng chỉ để khoanh vùng. Khả năng thật phải xác minh từ source
    - Đáp ứng đủ → tích hợp.
    - Một phần → dùng phần hợp, viết adapter/logic thiếu **trong project**.
    - Không hợp → nói rõ điểm thiếu, sang thư viện ngoài / tự viết.
+   - Hợp về tính năng nhưng stack không chạy được lib → **D** (port), KHÔNG đổi stack, KHÔNG bọc Node sidecar.
 5. **Tích hợp:** dùng đúng package manager + lockfile của project (npm/pnpm/yarn/bun),
    pin tag như consumer khác. Chỉ thêm package có call site cụ thể. KHÔNG nâng cấp dep
    không liên quan, KHÔNG đổi stack, KHÔNG viết lại thứ lib đã làm.
 6. **Verify:** chạy build / typecheck / test liên quan; báo kết quả thật (fail → dán output).
+
+## D. Project không phải JS — port lib theo ngôn ngữ project
+
+Lib `@acegalaxy/*` là Node/JS. Project Java/Kotlin/Go/Python/PHP… (hoặc runtime JS không nạp được lib)
+→ không cài, viết bản port tối thiểu ngay trong project. Không bọc Node sidecar/proxy khi app tự làm được.
+
+1. **Port sẵn cùng ngôn ngữ trước:** grep -rE `port từ .*lib-<name>` trong các clone ở
+   `~/Data/Local/Working/projects_repos/` → có thì copy + đổi config, KHÔNG viết lại. Port đã biết:
+   `lib-notion-rbac` Java → xem skill [ace-notion-rbac](../ace-notion-rbac/SKILL.md) mục "App không phải JS".
+2. **Clone lib đúng tag** làm nguồn sự thật (không cài vào project):
+   `git clone --depth 1 --branch vX.Y.Z git@github.com:acegalaxy-co/lib-<name>.git /tmp/lib-<name>`.
+   Đọc README + source API cần + `test/`.
+3. **Chỉ port API project dùng, giữ nguyên contract:** input/output, luật nghiệp vụ, fail closed/fallback,
+   format output (vd header alert), tên env. KHÔNG đổi hành vi "cho hợp ngôn ngữ". Dùng stdlib/dep sẵn có;
+   dep mới → [/dep-ladder-check](../dep-ladder-check/SKILL.md).
+4. **CLI/setup chạy 1 lần** (`setup.js`, CLI `service-alert`…) → chạy từ bản clone bằng `node`, không port.
+5. **Test:** port case trong `test/` của lib sang test framework sẵn có của project, HTTP fake (không gọi thật):
+   ≥ 1 happy + ≥ 1 từ chối/lỗi.
+6. **Đầu file port** ghi comment: `port từ @acegalaxy/lib-<name> vX.Y.Z — port: <API>; bỏ: <phần>`.
+   Lib bump tag đổi luật/API đã port → cập nhật port + test (mục A).
+7. Port dùng lại được → ghi **Đề xuất cải tiến**: thêm vào danh sách port đã biết ở bước 1, hoặc tách lib
+   riêng ngôn ngữ đó.
 
 ## Cấm
 
@@ -118,7 +143,7 @@ Cập nhật: <package> <tag cũ> → <tag mới> (nâng | giữ: <lý do>) — 
 Đánh giá (mode mặc định): <lib> — Nên tích hợp|Cân nhắc|Không — <lợi/chi phí 1 dòng, chỗ thay trong project>
 Kết luận: <lib nào> — đáp ứng <phần nào>; thiếu <gì> → <xử lý>
 Bằng chứng: <repo>@<tag|commit> — <file/API đã đọc>
-Tích hợp: <file đổi, dep thêm>
+Tích hợp: <file đổi, dep thêm> | port: <file port> ← <lib>@<tag>
 Verify: <lệnh> → <pass/fail>
 Đề xuất cải tiến: <danh sách, hoặc "không có">
 ```
