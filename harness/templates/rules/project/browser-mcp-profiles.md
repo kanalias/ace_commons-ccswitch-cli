@@ -71,10 +71,12 @@ Mâu thuẫn / không chắc `(xx,yy)` / container lạ → **STOP hỏi user**,
 
 ## Cloak vs Playwright — dùng cái nào
 
+**Mặc định: Cloak cho MỌI browser automation** (scrape, login, session, cookie, form, screenshot site bên ngoài) — user chốt: stock Playwright bị fingerprint + anti-bot kill session.
+
 | Tool | Khi nào | Không dùng cho |
 |---|---|---|
-| **Cloak** | Session thật cần antidetect / fingerprint bền: login site nhạy fingerprint, giữ session lâu | E2E test xác định |
-| **Playwright** | Automation / E2E test xác định, không cần antidetect | Session người-thật nhạy fingerprint |
+| **Cloak** (mặc định) | Mọi tác vụ chạm site bên ngoài / account thật | — |
+| **Playwright** | CHỈ app của chính mình trên localhost/staging: E2E test xác định, `/ui-preview` | Bất kỳ site/account bên ngoài |
 
 Cả hai trỏ **CÙNG container + CÙNG naming** → quản lý 1 nơi.
 

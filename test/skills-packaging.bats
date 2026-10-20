@@ -197,7 +197,7 @@ import os, re
 from pathlib import Path
 root = Path(os.environ['TEMPLATE_ROOT'])
 destructive = ('clean-up-project', 'doctor-memory', 'git-cleanup-branch', 'git-force-snapshot',
-               'git-push-safety', 'production-cleanup', 'production-deploy', 'production-reboot')
+               'git-push-safety', 'production-cleanup', 'production-deploy', 'production-reboot', 'cloudflare')
 for name in destructive:
     path = root / 'skills' / name / 'SKILL.md'
     assert path.is_file(), f'Missing workflow: {path}'

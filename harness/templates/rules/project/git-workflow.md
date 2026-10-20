@@ -102,6 +102,7 @@ Cleanup xong → **auto-push** `main` + `@@BRANCH@@` qua `/git-push-safety`, the
 - Branch chưa merge thật (`git branch --merged <current>`).
 - Branch ngoài 5 prefix whitelist (`release/`, `experiment/` → user tự quyết).
 - Commit cuối < 24h.
+- **Project có bước deploy** (site, worker, service) mà thay đổi của branch **chưa deploy** → giữ branch/worktree làm điểm rollback; sau merge báo danh sách chờ, cleanup ngay sau khi deploy xong. Project không deploy (lib, tool local) → cleanup ngay sau merge như trên.
 
 ## Env files — KHÔNG push remote
 

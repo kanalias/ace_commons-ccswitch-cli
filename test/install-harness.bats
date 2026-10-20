@@ -135,7 +135,7 @@ run_install() {
   [ ! -e "$TARGET/.claude/skills/auto-commit" ]
   [ -f "$TARGET/.claude/skills/check-hardcode/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/fix-ledger/SKILL.md" ]
-  # merged into audit-context-memory / git-commit --auto / git-push-safety --scan-only
+  # merged into audit-context-memory / git-push-safety --scan-only
   [ ! -e "$TARGET/.claude/skills/audit-git-leak" ]
 
   # production-* skills are deploy-group opt-in (default N) — must NOT land
@@ -155,6 +155,10 @@ run_install() {
   [ -f "$TARGET/.claude/skills/update-deepseek/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/doctor-memory/SKILL.md" ]
   [ -f "$TARGET/.claude/skills/git-commit/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/git-commit-auto/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/copy-data-cmd/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/telegram-alert-test/SKILL.md" ]
+  [ -f "$TARGET/.claude/skills/cloudflare/SKILL.md" ]
   # resume-orchestration was merged into the orchestrate skill — must NOT land
   [ ! -e "$TARGET/.claude/skills/resume-orchestration" ]
   [ -f "$TARGET/.claude/skills/orchestrate/SKILL.md" ]

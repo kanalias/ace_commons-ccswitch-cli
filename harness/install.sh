@@ -682,7 +682,7 @@ migrate_legacy_commands
 LEGACY_SKILL_NAMES=(auto-commit audit-git-leak lazy-load-health resume-orchestration)
 legacy_skill_target() {
   case "$1" in
-    auto-commit) echo "git-commit" ;;
+    auto-commit) echo "git-commit-auto" ;;
     audit-git-leak) echo "git-push-safety" ;;
     lazy-load-health) echo "audit-context-memory" ;;
     resume-orchestration) echo "orchestrate" ;;
