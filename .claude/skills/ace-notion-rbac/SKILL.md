@@ -54,7 +54,7 @@ Không bọc Node sidecar, không gate bằng proxy khi app tự kiểm quyền 
 3. **Chỉ port phần app dùng**, mặc định 2 phần:
    - `access(email)` → `{ found, kind, perms, banned }`: HR Working (mọi email trong `emailProps`) hoặc Guest Authen; Default role chỉ cho staff; Map Roles `Active` + `ExpiresAt` trống/còn hạn; Role/Permission `Active` tắt → không tính; `Ban` thắng hết. Đọc Notion mỗi request (chỉ cache id bảng), lỗi Notion → throw, caller từ chối (fail closed).
    - `verifyTicket` (nếu dùng Login Center): Ed25519 trên `p`, `v=1`, `iss=ace-login`, `aud=appId`, `exp > now`, `iat ≤ now+30s`, `kind ∈ staff|guest`, `sub` có `@`, `nonce` UUIDv4 chưa dùng (giữ ~2 phút). Phiên = cookie HMAC chứa email + hạn, KHÔNG nhét quyền vào cookie.
-   - Console admin (`./admin`) KHÔNG port — sửa role/guest thẳng trên Notion. Cần UI thật → hỏi user trước.
+   - Console admin (`./admin`) KHÔNG port — sửa role/guest thẳng trên Notion (tối thiểu có link "Mở trên Notion ↗" ở trang admin, bước 6). Cần UI thật → hỏi user trước.
 4. **Dựng bảng vẫn bằng setup.js của lib** (bước 2–5b ở trên, chạy từ bản clone): `node --env-file=.env /tmp/lib-notion-rbac/setup.js rbac.json` → dry-run, user đồng ý → `--apply` → owner mặc định (5b).
 5. **Test** — port lại các case trong `test/rbac.test.js` + `test/login-admin.test.js` của lib bằng test framework sẵn có của project, HTTP Notion fake (không gọi thật): staff Default có quyền, map Active cộng quyền, Ban → rỗng, người lạ/nghỉ việc → rỗng, map hết hạn bị bỏ, lỗi Notion → throw; ticket sai chữ ký / sai `aud` / hết hạn / replay → từ chối.
 6. **Đầu file port** ghi comment: port từ `lib-notion-rbac vX.Y.Z`, phần nào port, phần nào bỏ. Lib bump tag đổi luật quyền → cập nhật port + test theo.
