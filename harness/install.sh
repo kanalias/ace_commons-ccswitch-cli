@@ -33,7 +33,7 @@
 #   HARNESS_GROUP_GUARD          y/n — guard hooks, no prompt        (default: Y)
 #   HARNESS_GROUP_QUALITY        y/n — quality hooks, no prompt      (default: Y)
 #   HARNESS_GROUP_COMMANDS       y/n — audit-claude-md + audit-context-memory + audit-dependency + audit-vietnamese + clean-up-project + doctor-memory + git-cleanup-branch + git-commit + git-commit-describe + git-force-snapshot + git-push-safety + task-loop-feature + update-claude + update-codex + update-gemini + update-deepseek workflow skills (slash-invocable /<name>), no prompt (default: Y)
-#   HARNESS_GROUP_SKILLS         y/n — ace-library + ace-ai-explain + ace-notion-rbac + check-hardcode + dep-ladder-check + diagram + fix-ledger + frontend-design + gen-image + orchestrate + research + ui-preview + web-browse skills (+ browser-uipreview/browser-web subagents), no prompt (default: Y)
+#   HARNESS_GROUP_SKILLS         y/n — ace-library + ace-ai-explain + ace-notion-rbac + check-hardcode + dep-ladder-check + diagram + fix-ledger + frontend-design + ace-gen-image + orchestrate + research + ui-preview + web-browse skills (+ browser-uipreview/browser-web subagents), no prompt (default: Y)
 #   HARNESS_GROUP_RULES          y/n — rules: common/ (11 invariant guardrails, always overwrite) + project/ (git-workflow, browser-mcp-profiles, module-md, social-posting-safety, ... — kept if exist; system-ai-gateway/system-ott/fork-isolation only when their trigger is present in the target) , no prompt (default: Y)
 #   HARNESS_GROUP_GITHOOKS       y/n — git pre-push hook (gitleaks secret scan) into .git/hooks/, no prompt (default: Y; skipped if target not a git repo)
 #   HARNESS_GROUP_PII            y/n — OPT-IN pre-pii-guard hook (blocks VN phone/CCCD/personal email/address/GPS in edits, bash, mcp, push diff) + pii-scan.pl + self-test, no prompt (default: N)
@@ -599,7 +599,7 @@ fi
 # Group membership is derived from the skill's own name (no separate list to
 # keep in sync):
 #   production-* / deploy-doc                              → SEL_DEPLOY
-#   ace-library / ace-ai-explain / ace-notion-rbac / check-hardcode / dep-ladder-check / diagram / fix-ledger / frontend-design / gen-image / orchestrate / research / ui-preview / web-browse → SEL_SKILLS (skill-only, never had a command;
+#   ace-library / ace-ai-explain / ace-notion-rbac / check-hardcode / dep-ladder-check / diagram / fix-ledger / frontend-design / ace-gen-image / orchestrate / research / ui-preview / web-browse → SEL_SKILLS (skill-only, never had a command;
 #                                                                               orchestrate also covers resume-orchestration)
 #   everything else (former slash-commands)                → SEL_COMMANDS
 if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -eq 1 ] || [ "$SEL_DEPLOY" -eq 1 ]; then
@@ -609,7 +609,7 @@ if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -e
     group_flag=0
     case "$skill_name" in
       production-*|deploy-doc) group_flag="$SEL_DEPLOY" ;;
-      ace-library|ace-ai-explain|ace-notion-rbac|check-hardcode|dep-ladder-check|diagram|fix-ledger|frontend-design|gen-image|orchestrate|research|ui-preview|web-browse) group_flag="$SEL_SKILLS" ;;
+      ace-library|ace-ai-explain|ace-notion-rbac|check-hardcode|dep-ladder-check|diagram|fix-ledger|frontend-design|ace-gen-image|orchestrate|research|ui-preview|web-browse) group_flag="$SEL_SKILLS" ;;
       *) group_flag="$SEL_COMMANDS" ;;
     esac
     [ "$group_flag" -eq 1 ] || continue
@@ -679,41 +679,45 @@ migrate_legacy_commands
 # Same hash-based ownership check as migrate_legacy_commands above: remove
 # only if the file is still exactly what WE installed last time (per previous
 # manifest); keep + warn if the user modified it or we can't prove ownership.
-LEGACY_SKILL_NAMES=(auto-commit audit-git-leak lazy-load-health resume-orchestration)
+LEGACY_SKILL_NAMES=(auto-commit audit-git-leak lazy-load-health resume-orchestration gen-image)
 legacy_skill_target() {
   case "$1" in
     auto-commit) echo "git-commit-auto" ;;
     audit-git-leak) echo "git-push-safety" ;;
     lazy-load-health) echo "audit-context-memory" ;;
     resume-orchestration) echo "orchestrate" ;;
+    gen-image) echo "ace-gen-image" ;;  # renamed 2026-10-24
   esac
 }
+# Every file in the legacy dir (SKILL.md + helpers like gen.py) must match the
+# previous manifest hash; any untracked/modified file → keep the whole dir.
 migrate_legacy_skills() {
-  local name dir f rel expected actual target
+  local name dir f rel expected target ok
   for name in "${LEGACY_SKILL_NAMES[@]}"; do
     dir="$ROUTE_DIR/.claude/skills/$name"
-    f="$dir/SKILL.md"
-    [ -f "$f" ] || continue
-    rel=".claude/skills/$name/SKILL.md"
+    [ -f "$dir/SKILL.md" ] || continue
     target="$(legacy_skill_target "$name")"
-    expected=""
-    if [ -f "$PREVIOUS_MANIFEST" ]; then
-      expected="$(jq -r --arg p "$rel" '.syncFiles[]? | select(.path==$p) | .sha256' "$PREVIOUS_MANIFEST" 2>/dev/null)"
-    fi
-    if [ -z "$expected" ]; then
-      echo "WARN: legacy skill $rel not in previous manifest — kept"
-      continue
-    fi
-    actual="$(sha256_file "$f")"
-    if [ "$actual" != "$expected" ]; then
-      echo "WARN: legacy skill $rel modified — kept"
-      continue
-    fi
-    rm -f "$f"
-    echo "  🗑  $rel (removed — merged into $target)"
-    if [ -d "$dir" ] && ! rmdir "$dir" 2>/dev/null; then
-      echo "WARN: legacy skill dir .claude/skills/$name/ has extra files — kept"
-    fi
+    rm -f "$dir/.DS_Store"
+    ok=1
+    while IFS= read -r f; do
+      rel="${f#"$ROUTE_DIR"/}"
+      expected=""
+      if [ -f "$PREVIOUS_MANIFEST" ]; then
+        expected="$(jq -r --arg p "$rel" '.syncFiles[]? | select(.path==$p) | .sha256' "$PREVIOUS_MANIFEST" 2>/dev/null)"
+      fi
+      if [ -z "$expected" ]; then
+        echo "WARN: legacy skill $rel not in previous manifest — kept .claude/skills/$name/"
+        ok=0; break
+      fi
+      if [ "$(sha256_file "$f")" != "$expected" ]; then
+        echo "WARN: legacy skill $rel modified — kept .claude/skills/$name/"
+        ok=0; break
+      fi
+    done < <(find "$dir" -type f)
+    [ "$ok" = 1 ] || continue
+    find "$dir" -type f -delete
+    find "$dir" -depth -type d -empty -delete
+    echo "  🗑  .claude/skills/$name/ (removed — replaced by $target)"
   done
 }
 migrate_legacy_skills
