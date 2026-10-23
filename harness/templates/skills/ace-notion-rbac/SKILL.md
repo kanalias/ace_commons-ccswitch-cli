@@ -20,7 +20,7 @@ Nguồn API duy nhất: `node_modules/@acegalaxy/lib-notion-rbac/README.md` (đ�
    node --env-file=.env node_modules/@acegalaxy/lib-notion-rbac/setup.js rbac.json
    ```
    User đồng ý → chạy lại thêm `--apply` (ghi Notion = outward, hỏi trước). Chạy lại an toàn.
-5b. **Owner mặc định** — ngay sau `--apply`, gán role `owner` (role giữ `manage_roles`) cho **`lanhnk@acegalaxy.co`, `lanhnk@suga.vn`, `contact@acegalaxy.co`** (cố định mọi app, không hỏi lại). Email không có trong HR Working → thêm vào Guest Authen trước. Idempotent (`assign` bật lại dòng cũ, không tạo trùng):
+5b. **Owner mặc định** — ngay sau `--apply`, gán role `owner` (role giữ `manage_roles`) cho **`lanhnk@acegalaxy.co`, `lanhnk@suga.vn`, `contact@acegalaxy.co`** (cố định mọi app, không hỏi lại) + role `basic` cho account automation **`kane.automation@gmail.com`** (Gmail, không có trong HR → Guest). Email không có trong HR Working → thêm vào Guest Authen trước. Idempotent (`assign` bật lại dòng cũ, không tạo trùng):
    ```bash
    node --env-file=.env --input-type=module -e '
    import { createRbac } from "@acegalaxy/lib-notion-rbac";   // app không phải JS: import từ /tmp/lib-notion-rbac/index.js
@@ -32,9 +32,13 @@ Nguồn API duy nhất: `node_modules/@acegalaxy/lib-notion-rbac/README.md` (đ�
      if (!(await rbac.identity(e))) await rbac.addGuest(e.split("@")[0], e, { by, note: "owner mặc định" });
      await rbac.assign((await rbac.identity(e)).id, owner.id, { by, reason: "owner mặc định" });
      console.log(e, [...(await rbac.access(e)).perms].join(","));
-   }'
+   }
+   const basic = (await rbac.roles()).find((r) => r.name === "basic"), bot = "kane.automation@gmail.com";   // app khai roles riêng → role mặc định của app
+   if (!(await rbac.identity(bot))) await rbac.addGuest("kane.automation", bot, { by, note: "account automation, basic" });
+   await rbac.assign((await rbac.identity(bot)).id, basic.id, { by, reason: "account automation, basic" });
+   console.log(bot, [...(await rbac.access(bot)).perms].join(","));'
    ```
-   In ra phải có `manage_roles` cho cả 3. `emailProps`/`statusProp` khác (HR riêng) → sửa theo DB HR của app. App khai `roles` riêng không có role nào giữ `manage_roles` → thêm role `owner` vào rbac.json, chạy lại bước 5.
+   In ra phải có `manage_roles` cho cả 3 owner, `kane.automation@gmail.com` có quyền của role basic (không `manage_roles`). `emailProps`/`statusProp` khác (HR riêng) → sửa theo DB HR của app. App khai `roles` riêng không có role nào giữ `manage_roles` → thêm role `owner` vào rbac.json, chạy lại bước 5.
 6. **Code** (hỏi user cần phần nào): `createRbac` kiểm quyền (`access(email)`), `./login` (Login Center — đăng ký callback trong `ACE_LOGIN_APPS`), `./admin` (console gán role/guest/log). Theo README lib; mỗi phần ≥ 1 test happy + 1 test từ chối (không quyền / ban).
    - **App đã có login khác** (password, OAuth, magic link, SSO…) → GIỮ NGUYÊN, Login Center chỉ THÊM 1 lựa chọn (nút/route riêng). KHÔNG xoá/thay route, session, middleware, user store cũ; mọi cách login cùng ra session cũ của app. Test: login cũ vẫn chạy sau khi tích hợp.
    - **Theme theo app** — trang admin + nút/trang login PHẢI dùng theme sẵn có của web được tích hợp (layout, font, màu, CSS variables, class nút/form, dark mode), KHÔNG để giao diện mặc định của lib lạc tông. Trước khi code: tìm file theme/layout của app (CSS vars, Tailwind config, template base) để tái dùng, không tự đặt bảng màu mới. Admin → truyền `render(page)` bọc `nav`/`main`/`msg` vào layout app (`brand` = tên app); nút "Đăng nhập bằng ACE" dùng class nút sẵn có, cùng cỡ/kiểu với nút login cũ. Trang lỗi đăng nhập (ticket sai, không quyền) → redirect về trang login của app kèm mã lỗi (vd `?staff_error=forbidden`) và hiện bằng component báo lỗi sẵn có, KHÔNG dùng trang HTML trần của `createLogin`. Trang mới cho user (vd trang chỉ xem) dựng bằng layout/component của app, không tự viết CSS riêng. App chưa có theme → giữ mặc định lib. Verify bằng `/ui-preview` (mobile + desktop, light/dark nếu app có).
