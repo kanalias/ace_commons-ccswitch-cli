@@ -1,8 +1,8 @@
 ---
 name: git-conventions
-description: Commit format + cleanup branch/worktree sau merge + auto-push main/working branch qua git-push-safety + merge ≠ deploy
+description: Commit format + cleanup branch/worktree sau merge + auto-push main/working branch qua git-push-safety + merge ≠ deploy + đổi tên remote → hỏi đổi folder local
 status: live
-updated: 2026-10-19
+updated: 2026-10-24
 metadata:
   type: reference
 ---
@@ -32,6 +32,19 @@ Merge + cleanup xong (kể cả branch merge vào là `main` hay `main`) → **t
 3. **Push mọi branch đã nhận merge/ff**: `GIT_PUSH_GATE_OK=1 git push <remote> main main`. Rule này = xác nhận sẵn của user cho bước Push của skill trong luồng này; xong in branch + range commit đã push. KHÔNG force-push. Protected branch deploy (`stable`/`prod`/`release`...) KHÔNG nằm trong luồng này — theo mục dưới.
 
 Không áp khi: user nói "chưa push"/"giữ local", hoặc session khác đang dở trên branch đích ([[git-workflow]] mục Đa session).
+
+## Đổi tên project / remote → hỏi đổi luôn folder local
+
+Đổi tên repo trên remote (rename project, đổi group/path, đổi URL `origin`) → sau khi xong phần remote, **HỎI user** có đổi luôn tên folder local của repo trên máy này cho khớp không. KHÔNG tự đổi (đổi path làm vỡ nhiều thứ ngoài repo).
+
+Câu hỏi phải kèm danh sách chỗ bị ảnh hưởng (grep path cũ trước khi hỏi, chỉ liệt kê chỗ thật sự có):
+
+- Memory Claude Code `~/.claude/projects/<path-encoded>/` — khoá theo path, đổi folder = session mới không thấy memory cũ → phải move dir sang key mới.
+- `*.code-workspace`, `additionalDirectories`, path tuyệt đối trong `.claude/settings*.json`, launchd plist / cron / pm2, skill, docs, script.
+- Worktree đang mở (`git worktree list`) → `git worktree repair` sau khi đổi.
+- Session/terminal/editor đang mở ở path cũ → phải mở lại.
+
+User đồng ý → đổi folder + sửa hết chỗ trên trong cùng lượt (theo "Đổi tên → sweep 1 lần" ở [[general]]), báo danh sách đã sửa. Cập nhật `git remote set-url` nếu chưa làm.
 
 ## Merge ≠ deploy
 
