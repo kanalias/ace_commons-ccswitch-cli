@@ -144,11 +144,23 @@
     },
     {
       "path": ".claude/rules/common/web-favicon.md",
-      "sha256": "14387d255c32ff833049bd3f9aa04b1a75732ae9029de114a4a04460598a8d15"
+      "sha256": "302889a52a873230eb00581fe60a213eacebec62e361be4addcce277584dc5fa"
+    },
+    {
+      "path": ".claude/rules/common/web-ui-datatables.md",
+      "sha256": "ec20b81ed8aa988a3a9f309d9d67232973318de9226c717eee39a6d45ba1b5dd"
     },
     {
       "path": ".claude/rules/common/web-ui-dialogs.md",
       "sha256": "8c7c15103ba8c372470515732f79cc6452ed5b6537bb1ea3c08885569c59eee8"
+    },
+    {
+      "path": ".claude/skills/ace-gen-image/SKILL.md",
+      "sha256": "760790d93932a9b54cefcd99bde7de3d09face9f6c2b4cbd86b8f67417ccebd7"
+    },
+    {
+      "path": ".claude/skills/ace-gen-image/gen.py",
+      "sha256": "a9fa88b601bf2fafd1c6138c4a66d01bb8f853fc7c14ad6fc2dfe245e6ae5d74"
     },
     {
       "path": ".claude/skills/ace-library/SKILL.md",
@@ -156,7 +168,7 @@
     },
     {
       "path": ".claude/skills/ace-notion-rbac/SKILL.md",
-      "sha256": "3eee19e84ceb3e1b8a71eede15a1256e3483035cb9c437a7dd0f3960bbf049be"
+      "sha256": "32153f630d72141b79d98c53c3becae05d1dc811bfef9cd3b482fd6a76c4508f"
     },
     {
       "path": ".claude/skills/audit-claude-md/SKILL.md",
@@ -223,14 +235,6 @@
       "sha256": "7b1231c19c95852c8f0d809cc17b31d2bbd395bf8291d0c7f7c31a79b448af82"
     },
     {
-      "path": ".claude/skills/gen-image/SKILL.md",
-      "sha256": "59cd5c99e1ae38a17ab931ca0180db063145a21c17a1bd5d0e60e7dfdc3f9434"
-    },
-    {
-      "path": ".claude/skills/gen-image/gen.py",
-      "sha256": "a9fa88b601bf2fafd1c6138c4a66d01bb8f853fc7c14ad6fc2dfe245e6ae5d74"
-    },
-    {
       "path": ".claude/skills/git-cleanup-branch/SKILL.md",
       "sha256": "f42291b264619c57cc1337a484babcf2024ac68851bfc2921faff2a9629d293c"
     },
@@ -252,7 +256,7 @@
     },
     {
       "path": ".claude/skills/git-push-safety/SKILL.md",
-      "sha256": "e3afebf80894a9a36acd37f4a85dbf80698d08b5aad8bdb5ce0b64681fc0b26e"
+      "sha256": "be23900ffca792466de97f7537a96fdcd470acf9e16afb89544944f3d9898474"
     },
     {
       "path": ".claude/skills/orchestrate/SKILL.md",
@@ -264,11 +268,11 @@
     },
     {
       "path": ".claude/skills/production-deploy-rsync/SKILL.md",
-      "sha256": "d88b123740cb4878b6e652d0740fd9ee6c4cbb810276ca1e5c96cb7a7bd5a9cd"
+      "sha256": "60fb120cb87e45e15547b0bc4bb02becef9b416394c12d75bdb01ba9ee6ab35c"
     },
     {
       "path": ".claude/skills/production-deploy/SKILL.md",
-      "sha256": "6f1d0448f640d826417e24eedb1ee2e0a935167f54d84be62e9ab7d0090f4a49"
+      "sha256": "10bb38ce039b61854da98aa7a617901cbe3b02d404d2017e0fbf63112a219e81"
     },
     {
       "path": ".claude/skills/production-reboot/SKILL.md",

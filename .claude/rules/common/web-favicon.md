@@ -30,7 +30,7 @@ Task làm/sửa website, admin UI, landing page → check favicon. Tự gen (kh�
 ## Cách gen
 
 1. Suy nội dung từ project: tên app, mục đích, màu chủ đạo (CSS variable/theme), logo brand có sẵn trong repo → có logo thì dựng favicon từ logo đó, không gen mới.
-2. Không có logo → ưu tiên **SVG tay** (chữ cái/biểu tượng đơn giản + màu theme): nhẹ, nét ở mọi size, không tốn quota. Chỉ dùng skill `gen-image` khi cần hình minh hoạ phức tạp.
+2. Không có logo → ưu tiên **SVG tay** (chữ cái/biểu tượng đơn giản + màu theme): nhẹ, nét ở mọi size, không tốn quota. Chỉ dùng skill `ace-gen-image` khi cần hình minh hoạ phức tạp.
 3. Xuất tối thiểu: `favicon.svg` + `favicon.ico` (hoặc PNG 32×32) + `apple-touch-icon.png` 180×180. Raster từ SVG bằng tool có sẵn (`rsvg-convert`, `magick`, `sips`) — không thêm dependency.
 4. Đặt đúng chỗ framework phục vụ static (`public/`, `static/`, `src/main/resources/static/`, `app/icon.*` của Next) + khai `<link rel="icon">` / manifest `icons`. Thay thế file default thì xoá file default cũ.
 5. Verify: mở trang (hoặc `curl -I` path icon) → 200 + đúng `Content-Type`. Service có nhiều port (vd admin tách riêng) → chỉ gắn ở port có UI.
