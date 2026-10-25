@@ -167,10 +167,6 @@
       "sha256": "c9596b0beddbbb255c587e8572122589662e1fd1c20e5d0203457cab051a7315"
     },
     {
-      "path": ".claude/skills/ace-notion-rbac/SKILL.md",
-      "sha256": "32153f630d72141b79d98c53c3becae05d1dc811bfef9cd3b482fd6a76c4508f"
-    },
-    {
       "path": ".claude/skills/audit-claude-md/SKILL.md",
       "sha256": "d1935bdf446f5f5185410ed4cc5713eff387aabd3b36ca583e060357f754f0c4"
     },
