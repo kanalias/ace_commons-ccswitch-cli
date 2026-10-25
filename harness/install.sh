@@ -703,7 +703,7 @@ migrate_legacy_commands
 # Same hash-based ownership check as migrate_legacy_commands above: remove
 # only if the file is still exactly what WE installed last time (per previous
 # manifest); keep + warn if the user modified it or we can't prove ownership.
-LEGACY_SKILL_NAMES=(auto-commit audit-git-leak lazy-load-health resume-orchestration gen-image)
+LEGACY_SKILL_NAMES=(auto-commit audit-git-leak lazy-load-health resume-orchestration gen-image ace-notion-rbac)
 legacy_skill_target() {
   case "$1" in
     auto-commit) echo "git-commit-auto" ;;
@@ -711,6 +711,7 @@ legacy_skill_target() {
     lazy-load-health) echo "audit-context-memory" ;;
     resume-orchestration) echo "orchestrate" ;;
     gen-image) echo "ace-gen-image" ;;  # renamed 2026-10-24
+    ace-notion-rbac) echo "ace-rbac-notion" ;;  # renamed 2026-10-25
   esac
 }
 # Every file in the legacy dir (SKILL.md + helpers like gen.py) must match the
