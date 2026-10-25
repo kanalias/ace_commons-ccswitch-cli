@@ -1,6 +1,6 @@
 ---
 name: ace-notion-rbac
-description: Tích hợp phân quyền Notion (`@acegalaxy/lib-notion-rbac`) vào project ACE Galaxy — cài lib theo tag, rbac.json tối thiểu chỉ cần prefix, env chuẩn, dựng bảng trong 1 page container Notion (dry-run → --apply), gán owner mặc định lanhnk@acegalaxy.co + lanhnk@suga.vn + contact@acegalaxy.co, tuỳ chọn nối Login Center + trang admin (admin bắt buộc có tab Tài liệu + nút AI giải thích qua /ace-ai-explain), bắt buộc Audit Scan (leak + chặn quyền) trước push/deploy. App không phải JS (Java, Go, Python…) → tự viết bản port access + verify ticket theo ngôn ngữ project. Dùng /ace-notion-rbac [prefix], hoặc khi user nói "thêm phân quyền", "tích hợp rbac", "notion rbac", "phân quyền cho app".
+description: Tích hợp phân quyền Notion (`@acegalaxy/lib-notion-rbac`) vào project ACE Galaxy — cài lib theo tag, rbac.json tối thiểu chỉ cần prefix, env chuẩn, dựng bảng trong 1 page container Notion (dry-run → --apply), gán cố định owner lanhnk@acegalaxy.co + kane.lanhnguyen@gmail.com, admin contact@acegalaxy.co + lanhnk@suga.vn, basic kane.automation@gmail.com (owner + admin dùng mọi chức năng, admin chỉ không đụng owner), tuỳ chọn nối Login Center + trang admin (admin bắt buộc có tab Tài liệu + nút AI giải thích qua /ace-ai-explain), bắt buộc Audit Scan (leak + chặn quyền) trước push/deploy. App không phải JS (Java, Go, Python…) → tự viết bản port access + verify ticket theo ngôn ngữ project. Dùng /ace-notion-rbac [prefix], hoặc khi user nói "thêm phân quyền", "tích hợp rbac", "notion rbac", "phân quyền cho app".
 user-invocable: true
 ---
 
@@ -11,8 +11,9 @@ Nguồn API duy nhất: `node_modules/@acegalaxy/lib-notion-rbac/README.md` (đ�
 ## Các bước
 
 0. **Ngôn ngữ app** — JS/TS (Node ≥ 20, Cloudflare Worker) → làm từ bước 1. Ngôn ngữ khác (Java, Kotlin, Go, Python…) → lib JS không nạp được, làm theo mục "App không phải JS" bên dưới.
-1. **Cài lib** — tag mới nhất: `git ls-remote --tags git@github.com:acegalaxy-co/lib-notion-rbac.git | tail -1`. Khai `"@acegalaxy/lib-notion-rbac": "github:acegalaxy-co/lib-notion-rbac#vX.Y.Z"` (≥ v0.7.0), cài + kiểm lockfile theo skill `ace-library`.
-2. **`rbac.json`** ở root app — tối thiểu `{ "prefix": "<Prefix>" }`. Prefix: tên project, chữ/số, bắt đầu bằng chữ, ≤ 12 ký tự; gợi ý từ tên folder, user sửa được. Mặc định lib: quyền `add`/`approve`/`remove`/`manage_roles`, role `basic` (Default)/`admin`/`owner`/`ban`. Chỉ khai `perms`/`roles` khi app cần khác (khai là THAY hẳn bộ mặc định). Mã quyền KHÔNG tiền tố app.
+1. **Cài lib** — tag mới nhất: `git ls-remote --tags git@github.com:acegalaxy-co/lib-notion-rbac.git | tail -1`. Khai `"@acegalaxy/lib-notion-rbac": "github:acegalaxy-co/lib-notion-rbac#vX.Y.Z"` (≥ v0.12.0 — có `manage_owners`), cài + kiểm lockfile theo skill `ace-library`.
+2. **`rbac.json`** ở root app — tối thiểu `{ "prefix": "<Prefix>" }`. Prefix: tên project, chữ/số, bắt đầu bằng chữ, ≤ 12 ký tự; gợi ý từ tên folder, user sửa được. Mặc định lib: quyền `add`/`approve`/`remove`/`manage_roles`/`manage_owners`, role `basic` (Default)/`admin`/`owner`/`ban`. Chỉ khai `perms`/`roles` khi app cần khác (khai là THAY hẳn bộ mặc định). Mã quyền KHÔNG tiền tố app.
+   - **Owner / admin (BẮT BUỘC, user chốt 2026-10-25):** `owner` và `admin` đều được **dùng mọi chức năng** của app. `admin` = mọi quyền trừ `manage_owners` (dưới owner 1 bậc: không thay đổi / kickout owner, không sửa role owner — lib `./admin` tự chặn server-side). `owner` = mọi quyền + `manage_owners`. App khai `roles` riêng → role `admin` liệt kê MỌI quyền của app + `manage_roles`; role `owner` = như admin + `manage_owners`; thêm quyền mới cho app → thêm vào cả 2 role. Ngoại lệ: quyền **truy cập hạ tầng** (vd `warp` = vào mạng công ty qua Zero Trust) KHÔNG phải chức năng app → không tự thêm vào admin/owner, cấp riêng.
 3. **Env** — thêm vào `.env.example` (tên + comment, không value): `NOTION_PAGE_RBAC_ID` (page container), `NOTION_TOKEN_RBAC` (token integration), `NOTION_DB_HR_ID` (DB HR dùng chung). Project đã có biến cùng mục đích tên khác → khai `containerEnv`/`tokenEnv`/`hrDbEnv` trong rbac.json trỏ biến đó, không tạo biến trùng. Value vào `.env` → viết sẵn lệnh idempotent cho user (skill `copy-data-cmd`), KHÔNG tự đọc/in token.
 4. **Container** — user tạo 1 page Notion cho phần mềm (vd "Cloudflare IP Whitelist"), share cho integration của token, lấy id vào `NOTION_PAGE_RBAC_ID`.
 5. **Dựng bảng** — dry-run, in plan cho user:
@@ -20,25 +21,16 @@ Nguồn API duy nhất: `node_modules/@acegalaxy/lib-notion-rbac/README.md` (đ�
    node --env-file=.env node_modules/@acegalaxy/lib-notion-rbac/setup.js rbac.json
    ```
    User đồng ý → chạy lại thêm `--apply` (ghi Notion = outward, hỏi trước). Chạy lại an toàn.
-5b. **Owner mặc định** — ngay sau `--apply`, gán role `owner` (role giữ `manage_roles`) cho **`lanhnk@acegalaxy.co`, `lanhnk@suga.vn`, `contact@acegalaxy.co`** (cố định mọi app, không hỏi lại) + role `basic` cho account automation **`kane.automation@gmail.com`** (Gmail, không có trong HR → Guest). Email không có trong HR Working → thêm vào Guest Authen trước. Idempotent (`assign` bật lại dòng cũ, không tạo trùng):
-   ```bash
-   node --env-file=.env --input-type=module -e '
-   import { createRbac } from "@acegalaxy/lib-notion-rbac";   // app không phải JS: import từ /tmp/lib-notion-rbac/index.js
-   const s = JSON.parse((await import("node:fs")).readFileSync("rbac.json", "utf8")), E = (k, d) => process.env[s[k] || d];
-   const rbac = createRbac({ token: E("tokenEnv", "NOTION_TOKEN_RBAC"), container: E("containerEnv", "NOTION_PAGE_RBAC_ID"), prefix: s.prefix,
-     hr: { db: E("hrDbEnv", "NOTION_DB_HR_ID"), emailProps: ["Person", "Email Company", "Google Drive"], statusProp: "Status", statusOk: ["Working"] } });
-   const owner = (await rbac.roles()).find((r) => r.perms.includes("manage_roles") && !r.ban), by = "setup:ace-notion-rbac";
-   for (const e of ["lanhnk@acegalaxy.co", "lanhnk@suga.vn", "contact@acegalaxy.co"]) {
-     if (!(await rbac.identity(e))) await rbac.addGuest(e.split("@")[0], e, { by, note: "owner mặc định" });
-     await rbac.assign((await rbac.identity(e)).id, owner.id, { by, reason: "owner mặc định" });
-     console.log(e, [...(await rbac.access(e)).perms].join(","));
-   }
-   const basic = (await rbac.roles()).find((r) => r.name === "basic"), bot = "kane.automation@gmail.com";   // app khai roles riêng → role mặc định của app
-   if (!(await rbac.identity(bot))) await rbac.addGuest("kane.automation", bot, { by, note: "account automation, basic" });
-   await rbac.assign((await rbac.identity(bot)).id, basic.id, { by, reason: "account automation, basic" });
-   console.log(bot, [...(await rbac.access(bot)).perms].join(","));'
+5b. **Người cố định (mọi app, không hỏi lại)** — khai trong `rbac.json`, setup tự gán (nhân sự Working → Member, không thì tạo Guest Authen), idempotent:
+   ```json
+   "owners": ["lanhnk@acegalaxy.co", "kane.lanhnguyen@gmail.com"],
+   "admins": ["contact@acegalaxy.co", "lanhnk@suga.vn"],
+   "basics": ["kane.automation@gmail.com"]
    ```
-   In ra phải có `manage_roles` cho cả 3 owner, `kane.automation@gmail.com` có quyền của role basic (không `manage_roles`). `emailProps`/`statusProp` khác (HR riêng) → sửa theo DB HR của app. App khai `roles` riêng không có role nào giữ `manage_roles` → thêm role `owner` vào rbac.json, chạy lại bước 5.
+   - `owners` → role `owner`; `admins` → role `admin`; `basics` → role `basic` (account automation Gmail, thiếu → login Login Center bị đá vòng về `/auth/start`). App đặt tên role khác → `ownerRole` / `adminRole` / `basicRole`.
+   - Cần env cột email HR (`NOTION_PROP_HR_EMAIL`, vd `Person,Email Company,Google Drive`; tên biến đổi được bằng `hrEmailEnv`). Chạy lại bước 5 (dry-run → `--apply`).
+   - Kiểm: `access(email)` — 2 owner có `manage_owners`; 2 admin có mọi quyền app trừ `manage_owners`; `kane.automation@gmail.com` chỉ quyền basic. Lưu ý 2 email cùng 1 dòng HR (vd `lanhnk@suga.vn` + `kane.lanhnguyen@gmail.com`) = cùng 1 người → quyền gộp theo dòng HR.
+   - **App đã dựng trước v0.12.0**: setup KHÔNG sửa role đã có → trên Notion thêm quyền `manage_owners` (Permissions) vào role `owner`, cho role `admin` đủ mọi quyền của app + `manage_roles`; người đang là owner mà không nằm trong `owners` → GIỮ NGUYÊN (không tự hạ quyền), chỉ báo user danh sách để user quyết.
 6. **Code** (hỏi user cần phần nào): `createRbac` kiểm quyền (`access(email)`), `./login` (Login Center — đăng ký callback trong `ACE_LOGIN_APPS`), `./admin` (console gán role/guest/log). Theo README lib; mỗi phần ≥ 1 test happy + 1 test từ chối (không quyền / ban).
    - **App đã có login khác** (password, OAuth, magic link, SSO…) → GIỮ NGUYÊN, Login Center chỉ THÊM 1 lựa chọn (nút/route riêng). KHÔNG xoá/thay route, session, middleware, user store cũ; mọi cách login cùng ra session cũ của app. Test: login cũ vẫn chạy sau khi tích hợp.
    - **Theme theo app** — trang admin + nút/trang login PHẢI dùng theme sẵn có của web được tích hợp (layout, font, màu, CSS variables, class nút/form, dark mode), KHÔNG để giao diện mặc định của lib lạc tông. Trước khi code: tìm file theme/layout của app (CSS vars, Tailwind config, template base) để tái dùng, không tự đặt bảng màu mới. Admin → truyền `render(page)` bọc `nav`/`main`/`msg` vào layout app (`brand` = tên app); nút "Đăng nhập bằng ACE" dùng class nút sẵn có, cùng cỡ/kiểu với nút login cũ. Trang lỗi đăng nhập (ticket sai, không quyền) → redirect về trang login của app kèm mã lỗi (vd `?staff_error=forbidden`) và hiện bằng component báo lỗi sẵn có, KHÔNG dùng trang HTML trần của `createLogin`. Trang mới cho user (vd trang chỉ xem) dựng bằng layout/component của app, không tự viết CSS riêng. App chưa có theme → giữ mặc định lib. Verify bằng `/ui-preview` (mobile + desktop, light/dark nếu app có).
@@ -57,8 +49,8 @@ Nguồn API duy nhất: `node_modules/@acegalaxy/lib-notion-rbac/README.md` (đ�
    - **Tab "Cấu trúc thư mục" (BẮT BUỘC khi app deploy lên server)** — mục menu admin (quyền `manage_roles`), bấm vào mở trang cây thư mục của bản deploy để dễ theo dõi: mỗi root 1 card (source code đã deploy, data, các dir asset/build…), đường dẫn lấy từ config/env của server (không hardcode). Chỉ xem tên + dung lượng file + số mục mỗi thư mục, KHÔNG đọc nội dung file; dùng `<details>` gập/mở, không cần JS. Ẩn hẳn dotfile, `.env*`, `*.pem/*.key/*.p12`, tên chứa `secret/token/credential/password` (cả thư mục `secrets/`); thư mục nặng (`node_modules`, `venv`, `__pycache__`, `vendor`) chỉ đếm mục, không duyệt; giới hạn độ sâu (vd 4 cấp) + số mục mỗi thư mục (vd 60, phần dư ghi "+N mục nữa"); không follow symlink. Mọi tên đi qua `esc`. Có mục tương ứng trong Tài liệu + registry AI (`data` chỉ trả số mục/tên thư mục cấp 1). Test: owner thấy cây, file nhạy cảm không xuất hiện, thư mục nặng không mở, role không quyền 403. Mẫu: anim-gen `web/admin.mjs` (`walkTree`, section `tree`).
 8. **Audit Scan TRƯỚC push + LÚC deploy (BẮT BUỘC, không skip — rule P0 [[rbac-security]], các skill `git-push-safety`/`production-deploy*` tự chạy lại mỗi lần)** — RBAC chạm login, session, admin, data nhân sự → lộ thông tin là rủi ro chính. Chạy trên toàn bộ diff tích hợp (`git diff <base>..HEAD`), bước nào fail → DỪNG, sửa, chạy lại; KHÔNG push/deploy:
    - `/audit-git-leak` (gitleaks + sensitive scan) + `/check-hardcode` + subagent `secret-scanner` trên range commit.
-   - Không commit: `.env*`, token, id page/DB Notion thật (chỉ qua env), output dry-run/`--apply` của setup.js, dump HR/email nhân sự (ngoài 3 email owner cố định).
-   - Chặn quyền: mọi route `./admin`, API admin, `/api/ai/explain`, trang chỉ xem → không login/không quyền/`ban` phải ra 401/403/redirect, kể cả gọi API trực tiếp (không chỉ ẩn nút). Có test từ chối tương ứng (bước 6).
+   - Không commit: `.env*`, token, id page/DB Notion thật (chỉ qua env), output dry-run/`--apply` của setup.js, dump HR/email nhân sự (ngoài các email cố định ở bước 5b).
+   - Chặn quyền: mọi route `./admin`, API admin, `/api/ai/explain`, trang chỉ xem → không login/không quyền/`ban` phải ra 401/403/redirect, kể cả gọi API trực tiếp (không chỉ ẩn nút). Admin thử đổi/kickout owner → bị từ chối. Có test từ chối tương ứng (bước 6).
    - Không lộ qua response: trang lỗi/JSON lỗi không trả stack, token, id Notion, email người khác; cookie phiên không chứa quyền; log không in token/ticket. Staff chỉ thấy phần cơ bản ([[staff-view-no-sensitive]]).
    - Login cũ vẫn chạy (bước 6); lỗi Notion → fail closed (từ chối), không mở quyền.
    - Sau deploy: probe live bằng `curl` không cookie vào route admin/API → phải bị chặn; theo [[deploy-security]]. In bảng kết quả audit (mục / PASS-FAIL / bằng chứng) cho user trước khi push.
@@ -71,6 +63,7 @@ Không bọc Node sidecar, không gate bằng proxy khi app tự kiểm quyền 
    - Java: `ace_ace_matching-service` → `mm-director/src/main/java/co/acegalaxy/mm/director/security/` `NotionRbac.java` (access) + `AceLoginTicket.java` (verify ticket), test cùng tên `*Test.java`; Login Center chạy song song user/pass cũ.
 2. **Clone lib đúng tag** làm nguồn sự thật (không cài vào project): `git clone --depth 1 --branch vX.Y.Z git@github.com:acegalaxy-co/lib-notion-rbac.git /tmp/lib-notion-rbac`. Đọc `README.md` (mục Permission rules), `index.js` (`access`), `login.js` (`verifyTicket`, cookie phiên).
 3. **Chỉ port phần app dùng**, mặc định 2 phần:
+   - Owner shield (nếu port có UI sửa quyền): người thiếu `manage_owners` không sửa dòng/role của owner — như lib `./admin` v0.12.0.
    - `access(email)` → `{ found, kind, perms, banned }`: HR Working (mọi email trong `emailProps`) hoặc Guest Authen; Default role chỉ cho staff; Map Roles `Active` + `ExpiresAt` trống/còn hạn; Role/Permission `Active` tắt → không tính; `Ban` thắng hết. Cache đọc như lib (quyết định quyền ≤ 30s, hiển thị ≤ 10 phút; ghi qua app xoá cache), lỗi Notion → throw + không cache, caller từ chối (fail closed).
    - `verifyTicket` (nếu dùng Login Center): Ed25519 trên `p`, `v=1`, `iss=ace-login`, `aud=appId`, `exp > now`, `iat ≤ now+30s`, `kind ∈ staff|guest`, `sub` có `@`, `nonce` UUIDv4 chưa dùng (giữ ~2 phút). Phiên = cookie HMAC chứa email + hạn, KHÔNG nhét quyền vào cookie.
    - Console admin (`./admin`) KHÔNG port — sửa role/guest thẳng trên Notion (tối thiểu có link "Mở trên Notion ↗" ở trang admin, bước 6). Cần UI thật → hỏi user trước.
