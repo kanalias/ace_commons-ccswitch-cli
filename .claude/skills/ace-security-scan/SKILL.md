@@ -29,6 +29,7 @@ bash "$SKILL_DIR/scan.sh" <mode> [path]
 - Report Markdown in ra stdout + lưu `~/.ace-security-scan/<timestamp>-<mode>.md` (dir 0700, file 0600). Đổi chỗ lưu: `ACE_SECSCAN_OUT`.
 - Thêm thư mục cần kiểm quyền `.env*`/`*.pem` (others-read): `ACE_SECSCAN_ENV_ROOTS="<dir1> <dir2>"`.
 - Dòng cuối `SUMMARY: critical=N warn=N info=N ok=N`.
+- Cài/đồng bộ bản global (`~/.claude/skills`): `bash <ccswitch>/install-global-skills.sh` — sửa template xong chạy lại.
 - Tool tuỳ chọn thiếu (semgrep, osv-scanner, trivy) → script ghi `info` kèm lệnh `brew install`. **KHÔNG tự cài** — hỏi user trước (cài = thêm dependency, theo `dep-ladder-check` nếu có).
 
 ## Bước 2 — phân tích + báo cáo (tiếng Việt)

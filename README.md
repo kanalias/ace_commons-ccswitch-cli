@@ -30,6 +30,8 @@ Repo này gồm 4 phần độc lập:
 3. **[`install-auto-compact.sh`](#phần-3--auto-compact-window)** — chỉnh mốc `autoCompactWindow` (khi nào Claude Code tự nén context) hoặc tắt hẳn tính năng, qua `~/.claude/settings.json` (hoặc `./.claude/settings.json` cho riêng project).
 4. **[`install-optimize-claude.sh`](#phần-4--optimize-claude)** — đọc `.env` (repo root), ghi `~/.claude/settings.json` để tắt tính năng nặng (`CLAUDE_DISABLE_WORKFLOWS`) + deny tool built-in không dùng (`CLAUDE_DENY_TOOLS`, bỏ schema tool khỏi context) nhằm giảm context window.
 
+Ngoài 4 phần trên: **`install-global-skills.sh`** — đồng bộ skill dùng chung mọi project (mặc định `ace-security-scan`) từ `harness/templates/skills` vào `~/.claude/skills`; bản global lệch → backup `.trash/` rồi ghi đè; skill có token `@@..@@` bị từ chối. Sửa skill trong template xong → chạy lại script này.
+
 Phần 1 tự detect OS (macOS/Linux chạy bash trực tiếp; Windows qua Git Bash/WSL/Cygwin tự gọi PowerShell) — không cần chọn `.sh` hay `.ps1` thủ công. Phần 2 — delegate wrapper bash-only, Windows cần WSL/Git-Bash, không chạy CMD/PowerShell thuần. Phần 3 và 4 — thuần bash + `jq`, không có bản `.ps1`, chạy trên Windows cần Git Bash/WSL.
 
 ---
@@ -494,6 +496,7 @@ ccswitch-cli-claude/
 │
 ├── install-auto-compact.sh       # Phần 3 — set/auto/off/on/status autoCompactWindow, đứng riêng
 ├── install-optimize-claude.sh    # Phần 4 — CLAUDE_DISABLE_WORKFLOWS + CLAUDE_DENY_TOOLS từ .env, đứng riêng
+├── install-global-skills.sh      # đồng bộ skill template → ~/.claude/skills (global)
 │
 ├── scripts/delegate/             # bản wrapper THẬT dùng trong repo này (đồng bộ với harness/templates/scripts/delegate/)
 ├── .claude/                      # harness bản THẬT của repo này (agents, hooks, skills, rules)
