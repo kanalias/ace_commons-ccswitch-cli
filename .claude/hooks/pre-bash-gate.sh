@@ -135,6 +135,36 @@ if ! echo "$cmd" | grep -Eq 'GIT_PUSH_GATE_OK=1'; then
   fi
 fi
 
+# ── 1.1) private-branch gate (everyone, KHÔNG bypass) ───────────────────────
+# Nhánh trong <project>/.claude/private-branches.txt (`<branch> <remote> <url-substr>`)
+# chỉ được push tới đúng <remote>. Chặn sớm `git push <remote-khác> …<branch>…` và
+# `git push <remote-khác> --all|--mirror|--tags` (kéo theo nhánh riêng). Lớp cuối là
+# .git/hooks/pre-push + ruleset GitHub — gate này chỉ để báo sớm, rõ ràng.
+pb_list="${CLAUDE_PROJECT_DIR:-}/.claude/private-branches.txt"
+if [ -r "$pb_list" ] && printf '%s\n' "$cmd" | grep -Eq '(^|[;&|]|[[:space:]])git([[:space:]]+-[^[:space:]]+([[:space:]]+[^[:space:]-]+)?)*[[:space:]]+push([[:space:]]|$)'; then
+  while IFS=' ' read -r pb_br pb_remote pb_url || [ -n "$pb_br" ]; do
+    case "$pb_br" in ""|\#*) continue ;; esac
+    while IFS= read -r seg; do
+      printf '%s' "$seg" | grep -Eq '(^|[[:space:]])git([[:space:]]+-[^[:space:]]+([[:space:]]+[^[:space:]-]+)?)*[[:space:]]+push([[:space:]]|$)' || continue
+      # remote = từ đầu tiên không bắt đầu bằng '-' sau "push"
+      pb_target=$(printf '%s' "$seg" | sed -E 's/.*[[:space:]]push[[:space:]]+//' | tr ' ' '\n' | grep -v '^-' | head -1)
+      [ -n "$pb_target" ] || continue
+      [ "$pb_target" = "$pb_remote" ] && continue
+      case "$pb_target" in *"$pb_url"*) continue ;; esac
+      if printf '%s' "$seg" | grep -Eq "(^|[[:space:]:])$pb_br([[:space:]:]|$)|[[:space:]](--all|--mirror|--tags)([[:space:]]|$)"; then
+        echo "$(ts) BLOCK private-branch push ($pb_br → $pb_target) agent=${agent_id:-main} → ${cmd:0:120}" >> "$LOG" 2>/dev/null || true
+        cat >&2 <<EOF
+🛑 private-branch-gate: nhánh riêng tư "$pb_br" CHỈ push lên remote "$pb_remote" ($pb_url). Lệnh đang push tới "$pb_target".
+   Command: ${cmd:0:160}
+   Không có bypass. Đúng: GIT_PUSH_GATE_OK=1 git push $pb_remote $pb_br
+   Rule: .claude/rules/project/private-branch-kane.md
+EOF
+        exit 2
+      fi
+    done < <(printf '%s\n' "$cmd" | tr ';|&' '\n\n\n')
+  done < "$pb_list"
+fi
+
 # ── 1.5) serial-test gate (everyone) ────────────────────────────────────────
 # bats ≥2 file / glob mà không -j = tuần tự, phí core (rules/project/test-parallel.md).
 # Chỉ xét ĐOẠN lệnh bats thật (command-word `bats` tới ;/&/|) — không đếm chuỗi

@@ -6,6 +6,8 @@ user-invocable: true
 
 # /ace-gen-image — Generator ảnh dùng chung
 
+> **Nhóm skill bảo mật (`ace-*`)** — nguồn phát triển là nhánh `ace-skill` của repo ccswitch, CHỈ push lên remote `kane` (repo private `kanalias/ccswitch-kane`). KHÔNG push nhánh `ace-skill` lên `origin` (public). Gate: `.claude/private-branches.txt` + `.git/hooks/pre-push` + ruleset GitHub. Xem rule `private-branch-kane`.
+
 ## Các bước
 
 1. **Prompt**: mô tả chủ thể (EN). Style mặc định navy/isometric + "no text, no logos" tự nối; `--style "<s>"` thay, `--no-style` bỏ.

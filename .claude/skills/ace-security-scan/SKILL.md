@@ -6,6 +6,8 @@ user-invocable: true
 
 # ace-security-scan — quét security máy + code + Claude config
 
+> **Nhóm skill bảo mật (`ace-*`)** — nguồn phát triển là nhánh `ace-skill` của repo ccswitch, CHỈ push lên remote `kane` (repo private `kanalias/ccswitch-kane`). KHÔNG push nhánh `ace-skill` lên `origin` (public). Gate: `.claude/private-branches.txt` + `.git/hooks/pre-push` + ruleset GitHub. Xem rule `private-branch-kane`.
+
 Script cố định `scan.sh` (cùng thư mục skill) đo đạc; AI chỉ chạy, đọc report, phân tích và đề xuất cách sửa. **Read-only tuyệt đối**: không sửa, không xoá, không cài tool, không `sudo`, không gửi mẫu ra ngoài.
 
 ## Bước 0 — chọn mode

@@ -6,6 +6,8 @@ user-invocable: true
 
 # ace-library — discovery + cập nhật thư viện nội bộ ACE Galaxy
 
+> **Nhóm skill bảo mật (`ace-*`)** — nguồn phát triển là nhánh `ace-skill` của repo ccswitch, CHỈ push lên remote `kane` (repo private `kanalias/ccswitch-kane`). KHÔNG push nhánh `ace-skill` lên `origin` (public). Gate: `.claude/private-branches.txt` + `.git/hooks/pre-push` + ruleset GitHub. Xem rule `private-branch-kane`.
+
 Input: yêu cầu tính năng (`$ARGUMENTS`, có thể rỗng) + source/deps/lockfile/stack project hiện tại.
 
 **Mode theo `$ARGUMENTS`:**

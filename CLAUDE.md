@@ -51,4 +51,5 @@ BẮT BUỘC route qua 1 trong **5 surfaces** dưới đây. KHÔNG add ad-hoc s
 
 ## Project rules — quick links (ngoài block harness)
 
+- ⭐⭐⭐ [.claude/rules/project/private-branch-kane.md](.claude/rules/project/private-branch-kane.md) — **P0 push**: nhánh `ace-skill` (skill bảo mật ace-*) CHỈ push remote `kane` (repo private ccswitch-kane), KHÔNG lên origin public; gate pre-push + pre-bash-gate + ruleset GitHub.
 - [.claude/rules/project/browser-mcp-profiles.md](.claude/rules/project/browser-mcp-profiles.md) — Cloak/Playwright qua MCP, profile `prj_xx_sv_yy` isolation tránh lock session, container luôn là repo-root `./.browser-profiles/` (không override bằng env), MCP per-project. LAZY.

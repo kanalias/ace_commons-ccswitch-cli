@@ -6,6 +6,8 @@ user-invocable: true
 
 # /ace-notion-rbac — phân quyền Notion cho 1 phần mềm
 
+> **Nhóm skill bảo mật (`ace-*`)** — nguồn phát triển là nhánh `ace-skill` của repo ccswitch, CHỈ push lên remote `kane` (repo private `kanalias/ccswitch-kane`). KHÔNG push nhánh `ace-skill` lên `origin` (public). Gate: `.claude/private-branches.txt` + `.git/hooks/pre-push` + ruleset GitHub. Xem rule `private-branch-kane`.
+
 Nguồn API duy nhất: `node_modules/@acegalaxy/lib-notion-rbac/README.md` (đọc sau khi cài). Skill chỉ giữ các bước, KHÔNG chép API vào đây.
 
 ## Các bước

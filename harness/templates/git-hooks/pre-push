@@ -1,8 +1,37 @@
 #!/usr/bin/env bash
-# Pre-push: scan secrets bằng gitleaks trước khi push (chặn key/token lên GitHub public).
-# Bypass có chủ đích: GITLEAKS_SKIP=1 git push
+# Pre-push: (1) private-branch gate — nhánh ghi trong .claude/private-branches.txt CHỈ được
+# push tới remote có URL khớp (KHÔNG bypass); (2) scan secrets bằng gitleaks (bypass có
+# chủ đích: GITLEAKS_SKIP=1 trước lệnh push).
+# git gọi: pre-push <remote-name> <remote-url>; stdin: <local-ref> <local-sha> <remote-ref> <remote-sha>
 set -uo pipefail
 
+REMOTE_NAME="${1:-}"; REMOTE_URL="${2:-}"
+ROOT="$(git rev-parse --show-toplevel)"
+LIST="${PRIVATE_BRANCHES_FILE:-$ROOT/.claude/private-branches.txt}"
+
+# ── 1) private-branch gate (không bypass) ───────────────────────────────────
+if [ -r "$LIST" ]; then
+  refs=$(cat)   # tiêu thụ stdin 1 lần
+  while IFS=' ' read -r lref lsha rref rsha; do
+    [ -n "${rref:-}" ] || continue
+    while IFS=' ' read -r br allow_remote allow_url || [ -n "$br" ]; do
+      case "$br" in ""|\#*) continue ;; esac
+      hit=0
+      [ "$rref" = "refs/heads/$br" ] && hit=1
+      [ "$lref" = "refs/heads/$br" ] && hit=1          # push <br>:<tên-khác>
+      [ "$hit" = 1 ] || continue
+      case "$REMOTE_URL" in *"$allow_url"*) continue ;; esac
+      cat >&2 <<MSG
+🛑 private-branch-gate: nhánh riêng tư "$br" CHỈ được push lên remote "$allow_remote" ($allow_url).
+   Đang push: $lref → $REMOTE_NAME ($REMOTE_URL) ref $rref
+   Rule: .claude/rules/project/private-branch-kane.md — không có bypass. Đúng: push remote "$allow_remote" nhánh "$br".
+MSG
+      exit 1
+    done < "$LIST"
+  done <<< "$refs"
+fi
+
+# ── 2) gitleaks ─────────────────────────────────────────────────────────────
 [ "${GITLEAKS_SKIP:-}" = "1" ] && { echo "⚠️  gitleaks skipped (GITLEAKS_SKIP=1)" >&2; exit 0; }
 
 if ! command -v gitleaks >/dev/null 2>&1; then
@@ -10,13 +39,12 @@ if ! command -v gitleaks >/dev/null 2>&1; then
   exit 0
 fi
 
-ROOT="$(git rev-parse --show-toplevel)"
 echo "🔍 gitleaks scan trước push…" >&2
 if gitleaks detect --source "$ROOT" --redact -v; then
   echo "✅ gitleaks: no leaks — cho phép push." >&2
   exit 0
 else
   echo "❌ gitleaks phát hiện secret — CHẶN push." >&2
-  echo "   Xử lý leak, hoặc GITLEAKS_SKIP=1 git push nếu chắc chắn false-positive." >&2
+  echo "   Xử lý leak, hoặc GITLEAKS_SKIP=1 nếu chắc chắn false-positive." >&2
   exit 1
 fi

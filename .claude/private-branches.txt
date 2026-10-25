@@ -1,0 +1,3 @@
+# Nhánh riêng tư — CHỈ được push lên đúng remote ghi ở đây (gate: .git/hooks/pre-push + .claude/hooks/pre-bash-gate.sh).
+# Format: <branch> <remote-name> <remote-url-substring>
+ace-skill kane kanalias/ccswitch-kane

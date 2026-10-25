@@ -6,6 +6,8 @@ user-invocable: true
 
 # /ace-ai-explain — Nút "Hỏi AI" chuẩn chung
 
+> **Nhóm skill bảo mật (`ace-*`)** — nguồn phát triển là nhánh `ace-skill` của repo ccswitch, CHỈ push lên remote `kane` (repo private `kanalias/ccswitch-kane`). KHÔNG push nhánh `ace-skill` lên `origin` (public). Gate: `.claude/private-branches.txt` + `.git/hooks/pre-push` + ruleset GitHub. Xem rule `private-branch-kane`.
+
 Không có lib: mỗi site tự cài theo contract dưới (Node + Java khác ngôn ngữ, phần dùng chung < 100 dòng). Contract này là nguồn duy nhất — đổi prompt/schema thì sửa upstream `harness/templates/skills/ace-ai-explain/SKILL.md` (repo harness), `install.sh update-all`, rồi sync các site.
 
 **Bản tham chiếu (copy từ đây, đừng viết lại từ đầu):**
