@@ -9,9 +9,9 @@ user-invocable: true
 ## Các bước
 
 1. **Prompt**: mô tả chủ thể (EN). Style mặc định navy/isometric + "no text, no logos" tự nối; `--style "<s>"` thay, `--no-style` bỏ.
-2. **Chạy** (≈1 phút/ảnh; nhiều ảnh → mỗi ảnh 1 lệnh background song song):
+2. **Chạy** (≈1 phút/ảnh; nhiều ảnh → mỗi ảnh 1 lệnh background song song): `$SKILL_DIR` = thư mục chứa SKILL.md này (global `~/.claude/skills/ace-gen-image`, project `.claude/skills/ace-gen-image`).
    ```
-   python3 .claude/skills/ace-gen-image/gen.py "<prompt>" \
+   python3 "$SKILL_DIR/gen.py" "<prompt>" \
      [--size 1200x628 --size 1080x1080 ...] [--out <dir>] [--name img] \
      [--title "..."] [--subtitle "..."] [--footer "..."] [--logo path/logo.png]
    ```
