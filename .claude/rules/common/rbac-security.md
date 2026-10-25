@@ -18,7 +18,7 @@ paths:
   - "**/deploy*"
   - ".claude/skills/production-*/**"
   - ".claude/skills/git-push-safety/**"
-  - ".claude/skills/ace-notion-rbac/**"
+  - ".claude/skills/ace-rbac-notion/**"
 metadata:
   type: reference
 ---

@@ -16,7 +16,7 @@ Repo này có 2 remote với quyền đọc khác nhau:
 | `origin` | github.com `kanalias/ace_commons-ccswitch-cli` | **PUBLIC** + collaborator | `main`, `feat/*`, `fix/*`, `chore/*` |
 | `kane` | github.com `kanalias/ccswitch-kane` | **chỉ kanalias** (private, 0 collaborator) | `ace-skill` |
 
-Git không có quyền đọc theo nhánh → nội dung riêng tư PHẢI nằm ở repo private riêng. Nhánh `ace-skill` chứa nhóm skill bảo mật `ace-*` (`ace-security-scan`, `ace-notion-rbac`, `ace-ai-explain`, `ace-library`, `ace-gen-image`, và skill ace-* thêm sau).
+Git không có quyền đọc theo nhánh → nội dung riêng tư PHẢI nằm ở repo private riêng. Nhánh `ace-skill` chứa nhóm skill bảo mật `ace-*` (`ace-security-scan`, `ace-rbac-notion`, `ace-ai-explain`, `ace-library`, `ace-gen-image`, và skill ace-* thêm sau).
 
 ## 3 tầng skill
 
