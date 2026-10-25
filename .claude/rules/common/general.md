@@ -38,6 +38,7 @@ Quy tắc chung, áp MỌI supplier (danh sách mở, không giới hạn: Anthr
 - Cần thêm/sửa giá trị trong file mà AI không có quyền hoặc bị chặn (`.env*`, `secrets/`, file trên server, file ngoài workspace) → KHÔNG chỉ mô tả "bạn thêm dòng X vào file Y". Viết sẵn lệnh/script hoàn chỉnh trong 1 code block để user copy chạy ngay (theo skill `copy-data-cmd`).
 - Lệnh phải idempotent: chạy lại không nhân đôi dòng (vd `grep -q '^KEY=' f || echo 'KEY=…' >> f`, hoặc thay thế nếu đã có). Kèm bước nạp lại nếu cần (restart service, `--update-env`).
 - Giá trị là secret mà AI không biết → để placeholder `<điền-token>` rõ ràng, KHÔNG tự đọc/in secret ([[secrets-no-printout]]).
+- **Mọi lệnh đưa user copy chạy** (chat, docs, skill, README) PHẢI chạy được từ bất kỳ thư mục nào: mở đầu `cd <path tuyệt đối repo> && …` hoặc gọi script bằng path tuyệt đối. KHÔNG viết path tương đối trần kiểu `bash install.sh` — terminal user không đứng sẵn trong repo.
 
 ## Link → luôn clickable
 
