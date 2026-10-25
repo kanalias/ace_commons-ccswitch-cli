@@ -6,7 +6,10 @@
 set -euo pipefail
 
 GLOBAL_SKILLS="ace-security-scan"
-SRC="$(cd "$(dirname "$0")" && pwd)/harness/templates/skills"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+SRC="$ROOT/harness/templates/skills"
+# tầng ace: overlay private (HARNESS_ACE_DIR hoặc harness/templates-ace) — skill ace-* nằm ở đây, không ở template public
+ACE_SRC="${HARNESS_ACE_DIR:-$ROOT/harness/templates-ace}/skills"
 DEST="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills"
 
 case "${1:-}" in -h|--help) sed -n '2,5p' "$0"; exit 0 ;; esac
@@ -15,16 +18,17 @@ case "${1:-}" in -h|--help) sed -n '2,5p' "$0"; exit 0 ;; esac
 mkdir -p "$DEST"
 rc=0
 for n in $names; do
-  if [ ! -f "$SRC/$n/SKILL.md" ]; then echo "✗ $n: không có trong harness/templates/skills" >&2; rc=1; continue; fi
-  if grep -rqE '@@[A-Z_]+@@' "$SRC/$n"; then echo "✗ $n: có token @@..@@ — cài theo project bằng install-harness.sh" >&2; rc=1; continue; fi
+  S="$SRC"; [ -f "$S/$n/SKILL.md" ] || S="$ACE_SRC"
+  if [ ! -f "$S/$n/SKILL.md" ]; then echo "✗ $n: không có trong harness/templates/skills (cũng không có overlay ace: $ACE_SRC)" >&2; rc=1; continue; fi
+  if grep -rqE '@@[A-Z_]+@@' "$S/$n"; then echo "✗ $n: có token @@..@@ — cài theo project bằng install-harness.sh" >&2; rc=1; continue; fi
   if [ -d "$DEST/$n" ]; then
-    if diff -rq "$SRC/$n" "$DEST/$n" >/dev/null 2>&1; then echo "= $n: đã mới nhất"; continue; fi
+    if diff -rq "$S/$n" "$DEST/$n" >/dev/null 2>&1; then echo "= $n: đã mới nhất"; continue; fi
     mkdir -p "$DEST/.trash"
     bak="$DEST/.trash/$n-$(date +%Y%m%d-%H%M%S)"
     mv "$DEST/$n" "$bak"
     echo "↻ $n: backup bản cũ → $bak"
   fi
-  cp -R "$SRC/$n" "$DEST/$n"
+  cp -R "$S/$n" "$DEST/$n"
   echo "✓ $n → $DEST/$n"
 done
 exit $rc

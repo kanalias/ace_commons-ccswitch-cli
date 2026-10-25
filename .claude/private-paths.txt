@@ -1,0 +1,4 @@
+# Path riêng tư — commit chứa path này CHỈ được push tới remote có URL khớp (gate: .git/hooks/pre-push, không bypass).
+# Format: <path-prefix> <url-substr>
+harness/templates-ace kanalias/ccswitch-kane
+.claude/skills/ace- kanalias/ccswitch-kane

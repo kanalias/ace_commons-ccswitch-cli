@@ -30,7 +30,7 @@ Repo này gồm 4 phần độc lập:
 3. **[`install-auto-compact.sh`](#phần-3--auto-compact-window)** — chỉnh mốc `autoCompactWindow` (khi nào Claude Code tự nén context) hoặc tắt hẳn tính năng, qua `~/.claude/settings.json` (hoặc `./.claude/settings.json` cho riêng project).
 4. **[`install-optimize-claude.sh`](#phần-4--optimize-claude)** — đọc `.env` (repo root), ghi `~/.claude/settings.json` để tắt tính năng nặng (`CLAUDE_DISABLE_WORKFLOWS`) + deny tool built-in không dùng (`CLAUDE_DENY_TOOLS`, bỏ schema tool khỏi context) nhằm giảm context window.
 
-Ngoài 4 phần trên: **`install-global-skills.sh`** — đồng bộ skill dùng chung mọi project (mặc định `ace-security-scan`) từ `harness/templates/skills` vào `~/.claude/skills`; bản global lệch → backup `.trash/` rồi ghi đè; skill có token `@@..@@` bị từ chối. Sửa skill trong template xong → chạy lại script này.
+Ngoài 4 phần trên: **`install-global-skills.sh`** — đồng bộ skill dùng chung mọi project (mặc định `ace-security-scan`, lấy từ overlay tầng ace `harness/templates-ace` hoặc `HARNESS_ACE_DIR`; thiếu overlay → báo lỗi rõ) từ `harness/templates/skills` vào `~/.claude/skills`; bản global lệch → backup `.trash/` rồi ghi đè; skill có token `@@..@@` bị từ chối. Sửa skill trong template xong → chạy lại script này.
 
 Phần 1 tự detect OS (macOS/Linux chạy bash trực tiếp; Windows qua Git Bash/WSL/Cygwin tự gọi PowerShell) — không cần chọn `.sh` hay `.ps1` thủ công. Phần 2 — delegate wrapper bash-only, Windows cần WSL/Git-Bash, không chạy CMD/PowerShell thuần. Phần 3 và 4 — thuần bash + `jq`, không có bản `.ps1`, chạy trên Windows cần Git Bash/WSL.
 
@@ -275,7 +275,7 @@ Delegate wrapper là **bash-only** — Windows cần WSL hoặc Git Bash (không
 | **guard hooks** | `HARNESS_GROUP_GUARD` | `.claude/protected-paths.txt` (preserve, danh sách path chặn lệnh xoá trong `pre-bash-gate.sh`) + `.claude/hooks/{pre-edit-orchestrator-gate,pre-bash-orchestrator-gate,pre-edit-secret-scan,pre-edit-service-alert-gate}.sh` (wire `PreToolUse` cho `Edit`/`Write`/`MultiEdit`/`Bash`; service-alert-gate chặn gọi thẳng Telegram Bot API) |
 | **quality hooks** | `HARNESS_GROUP_QUALITY` | `.claude/hooks/pre-read-inject-dir-doc.sh` (wire `PreToolUse` cho `Read`/`Edit`/`Write`/`MultiEdit`; im lặng trừ khi `env.HARNESS_DIR_DOC_ROOTS` được set) + `.claude/hooks/post-edit-syntax-check.sh` (wire `PostToolUse`) + `session-start-banner.sh` (wire `SessionStart`) + `pre-commit-deploy-doc.sh` (nhắc `/deploy-doc` khi commit, advisory) |
 | **commands** | `HARNESS_GROUP_COMMANDS` | `.claude/skills/*/SKILL.md` (20 skill, gọi qua `/<name>`; gồm `recap`, `rotate-secret`, `seo`, `audit-presence`) |
-| **skills** | `HARNESS_GROUP_SKILLS` | `.claude/skills/{ace-library,ace-ai-explain,ace-notion-rbac,check-hardcode,dep-ladder-check,diagram,fix-ledger,frontend-design,ace-gen-image,ace-security-scan,orchestrate,research,ui-preview,web-browse}/SKILL.md` (14 skill; ace-gen-image kèm `gen.py`, ace-security-scan kèm `scan.sh`, frontend-design kèm `LICENSE.txt`; ui-preview chạy trong subagent `.claude/agents/browser-uipreview.md` — Playwright MCP inline, profile `<repo>/.browser-profiles/prj_<slug>_sv_uipreview`, không đụng `.mcp.json`; web-browse chạy trong subagent `.claude/agents/browser-web.md` — CloakBrowser MCP inline, lệnh khởi chạy qua `@@CLOAK_MCP_CMD@@` = env `HARNESS_CLOAK_MCP_CMD` → `command -v cloakbrowsermcp` → literal `cloakbrowsermcp`, lưu trong manifest `installEnv`) |
+| **skills** | `HARNESS_GROUP_SKILLS` | `.claude/skills/{check-hardcode,dep-ladder-check,diagram,fix-ledger,frontend-design,orchestrate,research,ui-preview,web-browse}/SKILL.md` (9 skill; frontend-design kèm `LICENSE.txt`; ui-preview chạy trong subagent `.claude/agents/browser-uipreview.md` — Playwright MCP inline, profile `<repo>/.browser-profiles/prj_<slug>_sv_uipreview`, không đụng `.mcp.json`; web-browse chạy trong subagent `.claude/agents/browser-web.md` — CloakBrowser MCP inline, lệnh khởi chạy qua `@@CLOAK_MCP_CMD@@` = env `HARNESS_CLOAK_MCP_CMD` → `command -v cloakbrowsermcp` → literal `cloakbrowsermcp`, lưu trong manifest `installEnv`) |
 | **rules** | `HARNESS_GROUP_RULES` | `.claude/rules/common/*.md` (11 invariant guardrail — always overwrite) + `.claude/rules/project/{git-workflow,skill-superpowers,test-parallel,browser-mcp-profiles,processes-layout,module-md,social-posting-safety}.md` (giữ nguyên nếu đã tồn tại) + rule có điều kiện: `system-ai-gateway.md` (chỉ khi `@acegalaxy/lib-ai-gateway` là key của `dependencies`/`devDependencies`/`peerDependencies`/`optionalDependencies` trong `package.json` gốc — `name`/URL/script không tính), `system-ott.md` (khi có `@acegalaxy/lib-ott-gateway`), `fork-isolation.md` (khi git remote `upstream` tồn tại) — rule bị bỏ qua không ghi manifest, không xoá file sẵn có |
 | **PII guard (opt-in, mặc định N)** | `HARNESS_GROUP_PII` | `.claude/hooks/{pre-pii-guard.sh,pii-scan.pl,pre-pii-guard.test.sh}` — chặn SĐT/CCCD/email cá nhân/địa chỉ VN/GPS trong edit, bash, mcp, diff push |
 | **git pre-push hook** | `HARNESS_GROUP_GITHOOKS` | `.git/hooks/pre-push` (gitleaks secret scan) — bỏ qua nếu target không phải git repo |
@@ -378,6 +378,12 @@ Chạy `scripts/delegate/doctor.sh` trong project đích trước — báo rõ C
 Đúng hành vi — Phần 2 bash-only. Chạy qua Git Bash hoặc WSL.
 
 ---
+
+### Skill 3 tầng (common · ace · local)
+
+- **common**: `harness/templates/skills/` — public, `install.sh` cài mặc định.
+- **ace** (skill nội bộ ACE Galaxy, tên `ace-*`): overlay `harness/templates-ace/skills/` chỉ tồn tại trên nhánh private `ace-skill` (repo private `kanalias/ccswitch-kane`). Trỏ tay bằng `HARNESS_ACE_DIR=<dir>`; không có overlay thì bỏ qua ace-*, không lỗi.
+- **local**: skill project tự tạo trong `.claude/skills/<name>/` — installer KHÔNG ghi đè, KHÔNG xoá (kể cả lần cài đầu); muốn lấy bản harness: `HARNESS_ADOPT_FILES=.claude/skills/<name>/SKILL.md`.
 
 ## Phần 3 — auto-compact window
 
@@ -490,7 +496,7 @@ ccswitch-cli-claude/
 │       ├── agents/delegate-{codex,deepseek,gemini,sonnet}.md
 │       ├── scripts/delegate/               # wrapper script (_common, run-aider-deepseek, run-codex, run-gemini, doctor + lib/)
 │       ├── hooks/{pre-edit-orchestrator-gate,pre-bash-orchestrator-gate,pre-edit-secret-scan,post-edit-syntax-check,session-start-banner}.sh
-│       ├── skills/*/SKILL.md               # 36 skill (gồm 20 skill gọi qua `/<name>`, thay cho slash command cũ)
+│       ├── skills/*/SKILL.md               # 38 skill common (không gồm ace-*; ace-* ở overlay `templates-ace/` chỉ nhánh private)
 │       ├── rules/{common,project}/*.md     # common (11 guardrail) + project (git-workflow, skill-superpowers, test-parallel, browser-mcp-profiles, processes-layout, module-md, social-posting-safety + có điều kiện system-ai-gateway, system-ott, fork-isolation)
 │       └── git-hooks/pre-push              # gitleaks scan trước push (cài vào .git/hooks/ project đích)
 │

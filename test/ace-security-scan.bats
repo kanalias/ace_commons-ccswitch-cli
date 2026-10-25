@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# harness/templates/skills/ace-security-scan/scan.sh — quét read-only máy/code/cấu hình Claude.
+# harness/templates-ace/skills/ace-security-scan/scan.sh (overlay private; skip khi không có) — quét read-only máy/code/cấu hình Claude.
 # Contract: báo rule + file:line / tên biến, KHÔNG BAO GIỜ in giá trị secret ra stdout hay report.
 
 load test_helper.bash
@@ -7,7 +7,8 @@ load test_helper.bash
 setup() {
   setup_fake_home
   ROOT="$(repo_root)"
-  SCRIPT="$ROOT/harness/templates/skills/ace-security-scan/scan.sh"
+  SCRIPT="${HARNESS_ACE_DIR:-$ROOT/harness/templates-ace}/skills/ace-security-scan/scan.sh"
+  [ -f "$SCRIPT" ] || skip "không có overlay ace (nhánh public)"
   export ACE_SECSCAN_OUT="$BATS_TEST_TMPDIR/out"
   # Token giả dựng lúc chạy (không nằm literal trong repo → không kích hook secret-scan)
   FAKE_TOKEN="ghp_$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 36)"

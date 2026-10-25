@@ -7,12 +7,16 @@ setup() {
   setup_fake_home
   ROOT="$(repo_root)"
   SCRIPT="$ROOT/install-global-skills.sh"
+  # tầng ace nằm ngoài template public → dùng overlay giả để test cơ chế, không phụ thuộc nhánh private
+  export HARNESS_ACE_DIR="$BATS_TEST_TMPDIR/ace"
+  mkdir -p "$HARNESS_ACE_DIR/skills/ace-security-scan"
+  printf -- '---\nname: ace-security-scan\ndescription: fake\n---\n' >"$HARNESS_ACE_DIR/skills/ace-security-scan/SKILL.md"
 }
 
 @test "install-global-skills: default installs ace-security-scan, rerun is no-op" {
   run bash "$SCRIPT"
   [ "$status" -eq 0 ]
-  diff -rq "$ROOT/harness/templates/skills/ace-security-scan" "$HOME/.claude/skills/ace-security-scan"
+  diff -rq "$HARNESS_ACE_DIR/skills/ace-security-scan" "$HOME/.claude/skills/ace-security-scan"
   run bash "$SCRIPT"
   [[ "$output" == *"= ace-security-scan: đã mới nhất"* ]]
   [ ! -d "$HOME/.claude/skills/.trash" ]
@@ -23,8 +27,15 @@ setup() {
   echo old >"$HOME/.claude/skills/ace-security-scan/SKILL.md"
   run bash "$SCRIPT" ace-security-scan
   [ "$status" -eq 0 ]
-  diff -rq "$ROOT/harness/templates/skills/ace-security-scan" "$HOME/.claude/skills/ace-security-scan"
+  diff -rq "$HARNESS_ACE_DIR/skills/ace-security-scan" "$HOME/.claude/skills/ace-security-scan"
   grep -qx old "$HOME"/.claude/skills/.trash/ace-security-scan-*/SKILL.md
+}
+
+@test "install-global-skills: ace skill without overlay fails clearly" {
+  export HARNESS_ACE_DIR="$BATS_TEST_TMPDIR/none"
+  run bash "$SCRIPT" ace-security-scan
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"overlay ace"* ]]
 }
 
 @test "install-global-skills: unknown skill fails" {

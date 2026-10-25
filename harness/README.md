@@ -61,6 +61,10 @@ Reinstall là sync, không phải reset project đích. Review installer plan v�
 diff sau khi nâng cấp. Giữ runtime state, secret, và config đặc thù máy ngoài
 phạm vi template phân phối; `.DS_Store` bị ignore và KHÔNG được ship.
 
+## Skill 3 tầng
+
+`templates/skills/` = common (public). Tầng ace (`ace-*`, nội bộ) nằm ở overlay `HARNESS_ACE_DIR` (mặc định `harness/templates-ace`, chỉ có trên nhánh private); thiếu overlay thì bỏ qua. Skill local trong `.claude/skills/` của project không bao giờ bị ghi đè/xoá; `HARNESS_ADOPT_FILES` để chủ động lấy bản harness. Test: `bats test/skill-tiers.bats`.
+
 ## Load rule native so với enforcement
 
 Claude Code cung cấp discovery **native** cho rule Markdown, đệ quy dưới

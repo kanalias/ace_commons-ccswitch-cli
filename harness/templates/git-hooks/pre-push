@@ -10,8 +10,8 @@ ROOT="$(git rev-parse --show-toplevel)"
 LIST="${PRIVATE_BRANCHES_FILE:-$ROOT/.claude/private-branches.txt}"
 
 # ── 1) private-branch gate (không bypass) ───────────────────────────────────
+refs=$(cat)   # tiêu thụ stdin 1 lần (dùng cho cả 2 gate)
 if [ -r "$LIST" ]; then
-  refs=$(cat)   # tiêu thụ stdin 1 lần
   while IFS=' ' read -r lref lsha rref rsha; do
     [ -n "${rref:-}" ] || continue
     while IFS=' ' read -r br allow_remote allow_url || [ -n "$br" ]; do
@@ -28,6 +28,25 @@ if [ -r "$LIST" ]; then
 MSG
       exit 1
     done < "$LIST"
+  done <<< "$refs"
+fi
+
+# ── 1b) private-path gate: path trong .claude/private-paths.txt chỉ push tới remote khớp (không bypass) ──
+PLIST="${PRIVATE_PATHS_FILE:-$ROOT/.claude/private-paths.txt}"
+if [ -r "$PLIST" ] && [ -n "${refs:-}" ]; then
+  while IFS=' ' read -r lref lsha rref rsha; do
+    [ -n "${lsha:-}" ] && [ "${lsha//0/}" != "" ] || continue          # bỏ qua delete ref
+    while IFS=' ' read -r pp allow_url || [ -n "$pp" ]; do
+      case "$pp" in ""|\#*) continue ;; esac
+      case "$REMOTE_URL" in *"$allow_url"*) continue ;; esac
+      if git ls-tree -r --name-only "$lsha" 2>/dev/null | grep -q "^$pp"; then
+        cat >&2 <<MSG
+🛑 private-path-gate: ref $lref chứa path riêng tư "$pp*" — CHỈ được push lên remote khớp "$allow_url".
+   Đang push tới: $REMOTE_NAME ($REMOTE_URL). Rule: .claude/rules/project/private-branch-kane.md — không có bypass.
+MSG
+        exit 1
+      fi
+    done < "$PLIST"
   done <<< "$refs"
 fi
 

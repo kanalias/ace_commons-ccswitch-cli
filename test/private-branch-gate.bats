@@ -64,3 +64,17 @@ gate() { bash -c 'printf "%s" "$1" | bash "$2"' _ "$(jq -nc --arg c "$1" '{tool_
   run bash -c "cd '$CLAUDE_PROJECT_DIR' && git init -q . && echo 'refs/heads/ace-skill 1111 refs/heads/main 0000' | PRIVATE_BRANCHES_FILE='$CLAUDE_PROJECT_DIR/.claude/private-branches.txt' PATH='$BATS_TEST_TMPDIR/nobin:/usr/bin:/bin' bash '$PREPUSH' origin git@github.com:kanalias/ace_commons-ccswitch-cli.git"
   [ "$status" -eq 1 ]
 }
+
+# ── private-path gate (pre-push 1b) ─────────────────────────────────────────
+@test "pre-push: commit chua harness/templates-ace -> origin public -> exit 1; -> kane -> qua" {
+  mkdir -p "$BATS_TEST_TMPDIR/nobin"
+  printf 'harness/templates-ace kanalias/ccswitch-kane\n' >"$BATS_TEST_TMPDIR/pp.txt"
+  : >"$BATS_TEST_TMPDIR/empty.txt"
+  cd "$CLAUDE_PROJECT_DIR" && git init -q . && git config user.email t@t && git config user.name t
+  mkdir -p harness/templates-ace/skills/x && echo a >harness/templates-ace/skills/x/SKILL.md
+  git add harness && git commit -qm t && sha=$(git rev-parse HEAD)
+  run bash -c "echo 'refs/heads/main $sha refs/heads/main 0000' | PRIVATE_BRANCHES_FILE='$BATS_TEST_TMPDIR/empty.txt' PRIVATE_PATHS_FILE='$BATS_TEST_TMPDIR/pp.txt' PATH='$BATS_TEST_TMPDIR/nobin:/usr/bin:/bin' bash '$PREPUSH' origin git@github.com:kanalias/ace_commons-ccswitch-cli.git"
+  [ "$status" -eq 1 ]; [[ "$output" == *private-path-gate* ]]
+  run bash -c "echo 'refs/heads/main $sha refs/heads/main 0000' | PRIVATE_BRANCHES_FILE='$BATS_TEST_TMPDIR/empty.txt' PRIVATE_PATHS_FILE='$BATS_TEST_TMPDIR/pp.txt' PATH='$BATS_TEST_TMPDIR/nobin:/usr/bin:/bin' bash '$PREPUSH' kane git@github.com:kanalias/ccswitch-kane.git"
+  [ "$status" -eq 0 ]
+}

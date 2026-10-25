@@ -33,7 +33,8 @@
 #   HARNESS_GROUP_GUARD          y/n — guard hooks, no prompt        (default: Y)
 #   HARNESS_GROUP_QUALITY        y/n — quality hooks, no prompt      (default: Y)
 #   HARNESS_GROUP_COMMANDS       y/n — audit-claude-md + audit-context-memory + audit-dependency + audit-vietnamese + clean-up-project + doctor-memory + git-cleanup-branch + git-commit + git-commit-describe + git-force-snapshot + git-push-safety + task-loop-feature + update-claude + update-codex + update-gemini + update-deepseek workflow skills (slash-invocable /<name>), no prompt (default: Y)
-#   HARNESS_GROUP_SKILLS         y/n — ace-library + ace-ai-explain + ace-notion-rbac + check-hardcode + dep-ladder-check + diagram + fix-ledger + frontend-design + ace-gen-image + ace-security-scan + orchestrate + research + ui-preview + web-browse skills (+ browser-uipreview/browser-web subagents), no prompt (default: Y)
+#   HARNESS_ACE_DIR              overlay dir tầng ace (chứa skills/ace-*; default: harness/templates-ace nếu có, else bỏ qua). Tầng local (skill tự tạo trong project) KHÔNG bao giờ bị ghi đè/xoá
+#   HARNESS_GROUP_SKILLS         y/n — check-hardcode + dep-ladder-check + diagram + fix-ledger + frontend-design + orchestrate + research + ui-preview + web-browse skills (+ browser-uipreview/browser-web subagents), no prompt (default: Y)
 #   HARNESS_GROUP_RULES          y/n — rules: common/ (11 invariant guardrails, always overwrite) + project/ (git-workflow, browser-mcp-profiles, module-md, social-posting-safety, ... — kept if exist; system-ai-gateway/system-ott/fork-isolation only when their trigger is present in the target) , no prompt (default: Y)
 #   HARNESS_GROUP_GITHOOKS       y/n — git pre-push hook (gitleaks secret scan) into .git/hooks/, no prompt (default: Y; skipped if target not a git repo)
 #   HARNESS_GROUP_PII            y/n — OPT-IN pre-pii-guard hook (blocks VN phone/CCCD/personal email/address/GPS in edits, bash, mcp, push diff) + pii-scan.pl + self-test, no prompt (default: N)
@@ -57,6 +58,10 @@ set -euo pipefail
 
 HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 TEMPLATES_DIR="$HARNESS_DIR/templates"
+# Tầng ace (skill nội bộ ACE Galaxy, nguồn private): overlay dir chứa skills/<name>/. Không đặt + không có
+# harness/templates-ace → bỏ qua ace-*, KHÔNG lỗi. Explicit HARNESS_ACE_DIR được lưu vào installEnv (update-all).
+ACE_DIR="${HARNESS_ACE_DIR:-}"
+if [ -z "$ACE_DIR" ] && [ -d "$HARNESS_DIR/templates-ace/skills" ]; then ACE_DIR="$HARNESS_DIR/templates-ace"; fi
 ACTION="install"
 case "${1:-}" in uninstall|--uninstall) ACTION="uninstall" ;; update-all) ACTION="update-all" ;; "") ;; *) echo "Usage: $0 [uninstall|--uninstall|update-all]" >&2; exit 2 ;; esac
 MANIFEST_REL=".claude/harness-manifest.json"
@@ -470,13 +475,13 @@ adopt_requested() { # HARNESS_ADOPT_FILES = CSV of dest paths (relative to proje
 WRITTEN=()
 SYNC_WRITTEN=()
 PRESERVE_PATHS=()
-install_file() { # install_file <src-rel-under-templates/> <dest-rel-under-route/> [mode]
+install_file() { # install_file <src-rel-under-root/> <dest-rel-under-route/> [mode] [src-root; default TEMPLATES_DIR]
   # mode (default ""): honor should_overwrite / HARNESS_OVERWRITE (legacy behavior for all callers)
   #   sync     → always overwrite (source-of-truth wins), ignores should_overwrite
   #   preserve → hard-keep: if dest exists, never overwrite (protects per-repo customization),
   #              independent of HARNESS_OVERWRITE=all
   local src_rel="$1" dest_rel="$2" mode="${3:-}"
-  local src="$TEMPLATES_DIR/$src_rel" dest="$ROUTE_DIR/$dest_rel"
+  local src="${4:-$TEMPLATES_DIR}/$src_rel" dest="$ROUTE_DIR/$dest_rel"
   mkdir -p "${dest%/*}"
   if [ "$mode" = "preserve" ] && [ -e "$dest" ]; then
     PRESERVE_PATHS+=("$dest_rel")
@@ -495,6 +500,15 @@ install_file() { # install_file <src-rel-under-templates/> <dest-rel-under-route
       echo "NOTE: $dest_rel exists and is not harness-managed — kept. To adopt the harness version: HARNESS_ADOPT_FILES=$dest_rel (or delete the file) and re-run install.sh" >&2
       return 0
     fi
+  fi
+  # tầng local: skill đã có trong project mà harness chưa từng ghi (lần cài đầu, chưa có manifest) → giữ,
+  # không để HARNESS_OVERWRITE=all đè skill project tự tạo. Muốn lấy bản harness: HARNESS_ADOPT_FILES.
+  if [ "$HAVE_PREV" -eq 0 ] && [[ "$dest_rel" == .claude/skills/* ]] && [ -e "$dest" ] && ! adopt_requested "$dest_rel" \
+     && ! cmp -s "$src" "$dest"; then
+    PRESERVE_PATHS+=("$dest_rel")
+    echo "  • $dest_rel (kept — local skill)"
+    echo "NOTE: $dest_rel exists (local skill) — kept. To adopt the harness version: HARNESS_ADOPT_FILES=$dest_rel and re-run install.sh" >&2
+    return 0
   fi
   if [ "$mode" != "sync" ] && [ -e "$dest" ] && ! should_overwrite "$dest_rel"; then
     PRESERVE_PATHS+=("$dest_rel")
@@ -599,7 +613,7 @@ fi
 # Group membership is derived from the skill's own name (no separate list to
 # keep in sync):
 #   production-* / deploy-doc                              → SEL_DEPLOY
-#   ace-library / ace-ai-explain / ace-notion-rbac / check-hardcode / dep-ladder-check / diagram / fix-ledger / frontend-design / ace-gen-image / ace-security-scan / orchestrate / research / ui-preview / web-browse → SEL_SKILLS (skill-only, never had a command;
+#   check-hardcode / dep-ladder-check / diagram / fix-ledger / frontend-design / orchestrate / research / ui-preview / web-browse → SEL_SKILLS (skill-only, never had a command;
 #                                                                               orchestrate also covers resume-orchestration)
 #   everything else (former slash-commands)                → SEL_COMMANDS
 if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -eq 1 ] || [ "$SEL_DEPLOY" -eq 1 ]; then
@@ -609,7 +623,7 @@ if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -e
     group_flag=0
     case "$skill_name" in
       production-*|deploy-doc) group_flag="$SEL_DEPLOY" ;;
-      ace-library|ace-ai-explain|ace-notion-rbac|check-hardcode|dep-ladder-check|diagram|fix-ledger|frontend-design|ace-gen-image|ace-security-scan|orchestrate|research|ui-preview|web-browse) group_flag="$SEL_SKILLS" ;;
+      check-hardcode|dep-ladder-check|diagram|fix-ledger|frontend-design|orchestrate|research|ui-preview|web-browse) group_flag="$SEL_SKILLS" ;;
       *) group_flag="$SEL_COMMANDS" ;;
     esac
     [ "$group_flag" -eq 1 ] || continue
@@ -618,6 +632,16 @@ if [ "$SEL_COMMANDS" -eq 1 ] || [ "$SEL_SKILLS" -eq 1 ] || [ "$SEL_SUBAGENTS" -e
       install_file "$skill_rel" ".claude/$skill_rel"
     done < <(find "$skill_dir" -type f | sort)
   done < <(find "$TEMPLATES_DIR/skills" -mindepth 1 -maxdepth 1 -type d | sort)
+  # tầng ace: overlay private (HARNESS_ACE_DIR) — cùng group SEL_SKILLS; thiếu overlay → bỏ qua
+  if [ "$SEL_SKILLS" -eq 1 ]; then
+    if [ -n "$ACE_DIR" ] && [ -d "$ACE_DIR/skills" ]; then
+      while IFS= read -r skill_file; do
+        install_file "${skill_file#$ACE_DIR/}" ".claude/${skill_file#$ACE_DIR/}" "" "$ACE_DIR"
+      done < <(find "$ACE_DIR/skills" -type f ! -name .DS_Store | sort)
+    else
+      echo "NOTE: không có overlay tầng ace (HARNESS_ACE_DIR) — bỏ qua skill ace-*" >&2
+    fi
+  fi
   # /ui-preview runs in this subagent (context: fork) — MCP tool defs never load in main
   [ "$SEL_SKILLS" -eq 1 ] && install_file "agents/browser-uipreview.md" ".claude/agents/browser-uipreview.md"
   # /web-browse runs in this subagent (context: fork) — Cloak MCP defs never load in main
@@ -1117,12 +1141,12 @@ install_env_json() {
     --arg gh "$(yn $SEL_GITHOOKS)" --arg dep "$(yn $SEL_DEPLOY)" --arg pii "$(yn $SEL_PII)" \
     --arg dh "$DEPLOY_SSH_HOST" --arg ds "$DEPLOY_SERVICE" --arg dp "$DEPLOY_PATH" \
     --arg db "${HARNESS_DEPLOY_BRANCH:-}" --arg dr "$DEPLOY_REMOTE" --arg dc "$DEPLOY_HEALTHCHECK" \
-    --arg cloak "$CLOAK_MCP_CMD" \
+    --arg cloak "$CLOAK_MCP_CMD" --arg ace "${HARNESS_ACE_DIR:-}" \
     '{HARNESS_CORE_DIRS:$core,HARNESS_RISK_DIRS:$risk,HARNESS_PROJECT_SLUG:$slug,HARNESS_BRANCH:$branch,HARNESS_TEST_CMD:$test,
       HARNESS_GROUP_SUBAGENTS:$sub,HARNESS_GROUP_GUARD:$guard,HARNESS_GROUP_QUALITY:$qual,HARNESS_GROUP_COMMANDS:$cmds,
       HARNESS_GROUP_SKILLS:$skills,HARNESS_GROUP_RULES:$rules,HARNESS_GROUP_GITHOOKS:$gh,HARNESS_GROUP_DEPLOY:$dep,HARNESS_GROUP_PII:$pii,
       HARNESS_DEPLOY_SSH_HOST:$dh,HARNESS_DEPLOY_SERVICE:$ds,HARNESS_DEPLOY_PATH:$dp,HARNESS_DEPLOY_BRANCH:$db,
-      HARNESS_DEPLOY_REMOTE:$dr,HARNESS_DEPLOY_HEALTHCHECK:$dc,HARNESS_CLOAK_MCP_CMD:$cloak}'
+      HARNESS_DEPLOY_REMOTE:$dr,HARNESS_DEPLOY_HEALTHCHECK:$dc,HARNESS_CLOAK_MCP_CMD:$cloak,HARNESS_ACE_DIR:$ace}'
 }
 write_manifest
 grep -qxF -- "$ROUTE_DIR" "$REGISTRY" 2>/dev/null || printf '%s\n' "$ROUTE_DIR" >> "$REGISTRY"
