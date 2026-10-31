@@ -31,8 +31,10 @@
 #                           #   env (settings.json untouched). Open N terminals + spawn N targets =
 #                           #   N vendors running IN PARALLEL. NOTE: same 9router account = shared quota.
 #   ccswitch check          # probe router health (all profiles) + verify subscription OAuth credential
-#   ccswitch fallback       # active router profile if healthy, else fall back to subscription
-#                           #   (only when an OAuth login exists; otherwise keeps the router)
+#   ccswitch fallback       # priority: router hosts (.ccswitch-hosts: 9router → 9router2 …) → subscription
+#                           #   TTY asks when the active host is down; subscription only with an OAuth login
+#   ccswitch hosts [add <url>]  # list failover hosts + health / append a backup host
+#   ccswitch use-host <url> # point all router profiles at <url>, then apply
 #   ccswitch set-key [p]    # prompt (hidden) for a new key, write it into profile p (default claude), then apply
 #   ccswitch set-host <url> [p]  # write a new base URL into profile p (default claude), then apply
 #   ccswitch update [src]   # sync ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN from profile src (default
@@ -67,6 +69,10 @@ PROFILES="$CLAUDE_DIR/profiles"
 # successful settings.json write (apply() / clear_env()). Read by check-router.sh and
 # setup.sh so they never silently override what the user last picked.
 MARKER="$CLAUDE_DIR/.ccswitch-target"
+# ordered router base URLs, one per line — line 1 = primary (9router), then backups (9router2…).
+# Written by setup.sh from .env (AI_9ROUTER_BASE_URL + AI_9ROUTER_BASE_URL_BACKUP) or `ccswitch hosts add`.
+# Failover priority: hosts in file order → subscription.
+HOSTS_FILE="$CLAUDE_DIR/.ccswitch-hosts"
 
 # real profile files; subscription is env-clear, not a file.
 ORDER=(claude codex deepseek kimi gemini)
@@ -141,6 +147,12 @@ is_router_url() {
   local target_host prof f base host
   target_host=$(_host_of "$url")
   [ -n "$target_host" ] || return 1
+  if [ -f "$HOSTS_FILE" ]; then
+    while IFS= read -r base; do
+      host=$(_host_of "$base")
+      [ -n "$host" ] && [ "$host" = "$target_host" ] && return 0
+    done < <(grep -vE '^[[:space:]]*(#|$)' "$HOSTS_FILE" 2>/dev/null)
+  fi
   for prof in claude codex deepseek kimi gemini; do
     f="$PROFILES/$prof.json"
     [ -f "$f" ] && [ -r "$f" ] || continue
@@ -350,6 +362,152 @@ active_router_profile() {
   esac
 }
 
+# probe_url <base> [token] — probe() for an arbitrary router base URL; echoes http code.
+probe_url() {
+  local base="${1:-}" tok="${2:-}" code
+  [ -n "$base" ] || { echo "000"; return; }
+  code=$(curl -s -m 4 "${base%/}/models" ${tok:+-H "Authorization: Bearer $tok"} \
+    -o /dev/null -w "%{http_code}" 2>/dev/null || true)
+  [ -n "$code" ] && echo "$code" || echo "000"
+}
+
+# router_hosts — failover order: hosts file lines, then claude profile's host if not listed (deduped).
+router_hosts() {
+  local h seen=" "
+  while IFS= read -r h; do
+    h=$(printf '%s' "$h" | tr -d '[:space:]')
+    [ -n "$h" ] || continue
+    case "$seen" in *" $h "*) continue ;; esac
+    seen="$seen$h "
+    echo "$h"
+  done < <(
+    [ -f "$HOSTS_FILE" ] && grep -vE '^[[:space:]]*(#|$)' "$HOSTS_FILE" 2>/dev/null
+    jq -r '.ANTHROPIC_BASE_URL // empty' "$PROFILES/claude.json" 2>/dev/null
+  )
+}
+
+# hosts_add <url> — append <url> to the failover list (no-op if listed). A missing file is seeded
+# with the current host first, so the primary keeps priority over the newly added backup.
+hosts_add() {
+  local url="${1:-}" tmp
+  [ -n "$url" ] || die "usage: ccswitch hosts add <url>"
+  tmp="$HOSTS_FILE.tmp.$$"
+  { router_hosts; echo "$url"; } | awk 'NF && !seen[$0]++' > "$tmp" && mv "$tmp" "$HOSTS_FILE"
+}
+
+# use_host <url> [reason] — point every router profile (shared host) at <url>. Does NOT apply to
+# settings.json — callers apply. Always prints a visible notice: a host change must reach the user.
+use_host() {
+  local url="${1:-}" reason="${2:-}"
+  [ -n "$url" ] || die "usage: ccswitch use-host <url>"
+  local old p f base n=0 known
+  old=$(jq -r '.ANTHROPIC_BASE_URL // empty' "$PROFILES/claude.json" 2>/dev/null || true)
+  hosts_add "$url"
+  known=" $(router_hosts | while IFS= read -r h; do _host_of "$h"; done | tr '\n' ' ')"
+  for p in "${ORDER[@]}"; do
+    f="$PROFILES/$p.json"
+    [ -f "$f" ] || continue
+    base=$(jq -r '.ANTHROPIC_BASE_URL // empty' "$f" 2>/dev/null || true)
+    # only profiles on a failover-list host — kimi direct-endpoint (moonshot) keeps its own host
+    case "$known" in *" $(_host_of "$base") "*) ;; *) continue ;; esac
+    cp "$f" "$f.bak"
+    jq --arg u "$url" '.ANTHROPIC_BASE_URL = $u' "$f.bak" > "$f.tmp" && mv "$f.tmp" "$f" \
+      || { rm -f "$f.tmp"; die "failed to write host into $f (see $f.bak)"; }
+    n=$((n + 1))
+  done
+  echo "🔀 ĐÃ ĐỔI HOST router: ${old:-?} → $url  ($n profile${reason:+; lý do: $reason})"
+}
+
+can_prompt() { [ -t 0 ] && [ -z "${CCSWITCH_NO_PROMPT:-}" ]; }
+
+# router_down_menu <profile> <code> — TTY only: router of <profile> is down, ask the user.
+# Default = first healthy host by priority, else subscription. Sets MENU_RESULT=host|subscription|keep.
+MENU_RESULT=""
+router_down_menu() {
+  local t="$1" code="$2" tok cur h c i=0 def="" ans
+  local -a opts=()
+  tok=$(jq -r '.ANTHROPIC_AUTH_TOKEN // empty' "$PROFILES/$t.json" 2>/dev/null || true)
+  cur=$(jq -r '.ANTHROPIC_BASE_URL // empty' "$PROFILES/$t.json" 2>/dev/null || true)
+  echo "⚠️  router '$t' ($cur) lỗi HTTP $code. Chọn (ưu tiên: host chính → host dự phòng → subscription):"
+  while IFS= read -r h; do
+    [ "$h" = "$cur" ] && continue
+    c=$(probe_url "$h" "$tok"); i=$((i + 1)); opts+=("$h")
+    [ -z "$def" ] && [ "$c" = "200" ] && def="$i"
+    echo "  $i) đổi host → $h  [$c $([ "$c" = 200 ] && echo OK || echo DOWN)]"
+  done < <(router_hosts)
+  echo "  h) nhập host khác"
+  echo "  s) subscription (OAuth)"
+  echo "  k) giữ nguyên"
+  [ -n "$def" ] || def="s"
+  printf "▸ chọn [%s]: " "$def"
+  read -r ans || ans=""
+  ans="${ans:-$def}"
+  case "$ans" in
+    s|S) apply subscription; MENU_RESULT=subscription ;;
+    k|K) echo "→ giữ nguyên '$t' ($cur)"; MENU_RESULT=keep ;;
+    h|H)
+      printf "▸ base URL (vd https://router.example.com/v1): "
+      read -r h || h=""
+      [ -n "$h" ] || die "no URL entered — unchanged."
+      use_host "$h" "user nhập, router $cur lỗi $code"; MENU_RESULT=host ;;
+    *)
+      { [[ "$ans" =~ ^[0-9]+$ ]] && [ "$ans" -ge 1 ] && [ "$ans" -le "${#opts[@]}" ]; } \
+        || die "lựa chọn không hợp lệ: $ans"
+      use_host "${opts[$((ans - 1))]}" "router $cur lỗi $code"; MENU_RESULT=host ;;
+  esac
+}
+
+# fallback — priority: hosts in order (9router → 9router2 …) → subscription.
+do_fallback() {
+  local cur_base t tok h c first_ok="" cur_code=""
+  # IMPORTANT: fallback never PROMOTES subscription -> router. On subscription there is no active
+  # router profile — applying active_router_profile's default (claude) would silently flip the
+  # user's own choice back onto 9router. So: no env block -> no-op.
+  cur_base=$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$SETTINGS" 2>/dev/null || true)
+  if [ -z "$cur_base" ]; then
+    echo "→ on subscription — fallback never promotes to a router; nothing to do"
+    return 0
+  fi
+  t=$(active_router_profile)
+  tok=$(jq -r '.ANTHROPIC_AUTH_TOKEN // empty' "$PROFILES/$t.json" 2>/dev/null || true)
+  while IFS= read -r h; do
+    c=$(probe_url "$h" "$tok")
+    [ "$h" = "$cur_base" ] && cur_code="$c"
+    [ "$c" = "200" ] && { first_ok="$h"; break; }
+  done < <(router_hosts)
+
+  if [ "$first_ok" = "$cur_base" ]; then
+    # already healthy -> do NOT rewrite settings.json (no apply, no ping); nothing changed.
+    echo "→ router healthy: $t (no change)"
+    return 0
+  fi
+  if [ -n "$first_ok" ] && [ -z "$cur_code" ]; then
+    # a higher-priority host (vd 9router chính) is back → return to it.
+    use_host "$first_ok" "host ưu tiên cao hơn đã sống lại"
+    apply "$t"; return
+  fi
+  [ -n "$cur_code" ] || cur_code=$(probe_url "$cur_base" "$tok")
+  if can_prompt; then
+    router_down_menu "$t" "$cur_code"
+    [ "$MENU_RESULT" = "host" ] && apply "$t"
+    return 0
+  fi
+  if [ -n "$first_ok" ]; then
+    use_host "$first_ok" "router $cur_base lỗi $cur_code"
+    apply "$t"; return
+  fi
+  # Demote only into a harbor that exists. A headless host with no OAuth login (server
+  # running `claude -p` jobs) would turn a 2-minute router restart into a permanent
+  # "Not logged in" — fallback never promotes back. Keep the router: it recovers on its own.
+  if ! has_subscription_cred; then
+    echo "⚠️  $t down ($cur_code), no healthy backup host, and NO OAuth credential — subscription would be \"Not logged in\"."
+    echo "   Keeping router '$t' (no change). To enable the safe-harbor: run 'claude' + /login."
+    return 0
+  fi
+  echo "  $t down ($cur_code), no healthy backup host → safe-harbor: subscription (OAuth)"
+  apply subscription
+}
+
 # set-key [profile] — prompt (hidden) for a new key, write it into the profile, then apply.
 # claude/codex/deepseek/kimi/gemini share ONE 9router key — fill the same token into all five
 # router profiles. subscription is env-clear (rejected below).
@@ -500,7 +658,15 @@ case "${1:-status}" in
     # all are profile files routing through 9router (differ only by model prefix).
     t="$1"
     c=$(probe "$t")
-    [ "$c" = "200" ] || echo "⚠️  '$t' health=$c (not 200) — switching anyway, may be down"
+    if [ "$c" != "200" ]; then
+      if can_prompt; then
+        # router down → ask: backup host / other host / subscription / keep
+        router_down_menu "$t" "$c"
+        [ "$MENU_RESULT" = "subscription" ] && exit 0
+      else
+        echo "⚠️  '$t' health=$c (not 200) — switching anyway, may be down"
+      fi
+    fi
     apply "$t" ;;
   subscription|original|direct|clear)
     # all resolve to subscription (env-clear -> Claude Code OAuth login)
@@ -511,38 +677,29 @@ case "${1:-status}" in
     done
     echo "  subscription: $(probe_subscription)" ;;
   fallback)
-    # Keep the currently-active router profile if healthy (don't force claude when the user is on
-    # deepseek). Resolve active target from settings.json's model prefix; default claude.
-    # `subscription` is the guaranteed SAFE-HARBOR terminal: removes the env block so Claude Code
-    # uses its own OAuth login — always reachable, no key/probe. Claude never stays stuck on a
-    # dead router. All profiles share one router, so a router outage means subscription.
-    #
-    # IMPORTANT: fallback only ever DEMOTES router -> subscription; it never PROMOTES
-    # subscription -> router. On subscription there is no active router profile — probing
-    # `active_router_profile`'s default (claude) and applying it would silently flip the
-    # user's own choice back onto 9router. So: no env block -> no-op.
+    # Priority: router hosts in order (.ccswitch-hosts: 9router → 9router2 …) → subscription.
+    # TTY → asks the user when the active host is down; non-TTY (SessionStart hook) → follows
+    # the priority on its own. Every host change prints a visible notice. See do_fallback().
+    do_fallback ;;
+  hosts)
+    case "${2:-list}" in
+      add) hosts_add "${3:-}"; echo "✅ added to failover list: ${3}" ;;
+      list)
+        tok=$(jq -r '.ANTHROPIC_AUTH_TOKEN // empty' "$PROFILES/claude.json" 2>/dev/null || true)
+        cur=$(jq -r '.ANTHROPIC_BASE_URL // empty' "$PROFILES/claude.json" 2>/dev/null || true)
+        echo "router hosts (failover order → subscription):"
+        i=0
+        while IFS= read -r h; do
+          i=$((i + 1)); c=$(probe_url "$h" "$tok")
+          echo "  $i) $h  [$c $([ "$c" = 200 ] && echo OK || echo DOWN)]$([ "$h" = "$cur" ] && echo '  ◀ profiles đang dùng')"
+        done < <(router_hosts) ;;
+      *) die "usage: ccswitch hosts [list|add <url>]" ;;
+    esac ;;
+  use-host)
+    use_host "${2:-}" "user chọn"
     cur_base=$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$SETTINGS" 2>/dev/null || true)
-    if [ -z "$cur_base" ]; then
-      echo "→ on subscription — fallback never promotes to a router; nothing to do"
-      exit 0
-    fi
-    t=$(active_router_profile)
-    c=$(probe "$t")
-    if [ "$c" = "200" ]; then
-      # already healthy -> do NOT rewrite settings.json (no apply, no ping); nothing changed.
-      echo "→ router healthy: $t (no change)"
-      exit 0
-    fi
-    # Demote only into a harbor that exists. A headless host with no OAuth login (server
-    # running `claude -p` jobs) would turn a 2-minute router restart into a permanent
-    # "Not logged in" — fallback never promotes back. Keep the router: it recovers on its own.
-    if ! has_subscription_cred; then
-      echo "⚠️  $t down ($c) but NO OAuth credential on this machine — subscription would be \"Not logged in\"."
-      echo "   Keeping router '$t' (no change). To enable the safe-harbor: run 'claude' + /login."
-      exit 0
-    fi
-    echo "  $t down ($c) → safe-harbor: subscription (OAuth)"
-    apply subscription ;;
+    if [ -n "$cur_base" ]; then apply "$(active_router_profile)"
+    else echo "   (đang ở subscription — chạy 'ccswitch claude' để dùng host mới)"; fi ;;
   spawn)
     # launch a separate instance pinned to the target via process env (settings.json untouched);
     # forward any remaining args to claude. Open multiple terminals to run vendors in parallel.
@@ -602,8 +759,12 @@ TARGETS (switch-in-place; RESTART Claude Code after — env loads at launch)
 COMMANDS
   status  (default)   show active target (by model prefix) + health + subscription
   check               probe health of every router profile + verify subscription
-  fallback            keep active router if healthy, else drop to subscription
-                      (needs an OAuth login on this machine; without one the router is kept)
+  fallback            priority: router hosts in order (9router → 9router2 …) → subscription
+                      TTY: asks when the active host is down; hook/no TTY: follows priority
+                      (subscription needs an OAuth login; without one the router is kept)
+  hosts [list]        failover host list + health   (~/.claude/.ccswitch-hosts)
+  hosts add <url>     append a backup router host
+  use-host <url>      point ALL router profiles at <url> (shared host), then apply
   spawn <target> [..] launch a SEPARATE pinned instance (settings.json untouched)
   set-key [profile]   paste a key (hidden) into a profile, then apply  (default: claude)
   set-host <url> [p]  write a base URL into a profile, then apply      (default: claude)
@@ -634,5 +795,5 @@ EOF
     echo "  subscription: $(probe_subscription)"
     echo "profiles: $(ls "$PROFILES" 2>/dev/null | sed 's/\.json//' | tr '\n' ' ')" ;;
   *)
-    die "usage: ccswitch [claude|codex|deepseek|kimi|gemini|subscription|spawn <target>|check|fallback|set-key [profile]|set-host <url> [profile]|update [src]|install <name>|clear|status|help]" ;;
+    die "usage: ccswitch [claude|codex|deepseek|kimi|gemini|subscription|spawn <target>|check|fallback|hosts [add <url>]|use-host <url>|set-key [profile]|set-host <url> [profile]|update [src]|install <name>|clear|status|help]" ;;
 esac

@@ -84,6 +84,8 @@ Installer sẽ:
 ```bash
 AI_9ROUTER_BASE_URL=https://9router.proxy.example.com/v1
 AI_9ROUTER_API_KEY=<your-9router-key>
+# optional: host dự phòng (chung key), failover 9router → 9router2 → subscription
+AI_9ROUTER_BASE_URL_BACKUP=https://9router2.proxy.example.com/v1
 
 # optional: Kimi direct-endpoint mode (bypass 9router, dùng endpoint Kimi thật)
 KIMI_API_KEY_FORCE_SUBSCRIPTION=1
@@ -133,7 +135,9 @@ ccswitch gemini         # → Gemini qua 9router (Antigravity)
 ccswitch subscription   # → gỡ env block, dùng OAuth subscription login
 ccswitch spawn <target> # → mở 1 instance RIÊNG ghim target đó (settings.json không đổi)
 ccswitch check          # probe health các profile + verify subscription OAuth
-ccswitch fallback       # giữ target đang active nếu router healthy; router chết → subscription
+ccswitch fallback       # 9router → 9router2 (host dự phòng) → subscription; có TTY thì hỏi trước khi đổi
+ccswitch hosts          # liệt kê host failover + health   (ccswitch hosts add <url> để thêm)
+ccswitch use-host <url> # đổi host cho mọi router profile — luôn báo "🔀 ĐÃ ĐỔI HOST"
                         #   (chỉ khi máy có OAuth login; không có → giữ nguyên router)
 ccswitch set-key [t]    # nhập key mới (ẩn) cho target t (default claude) rồi apply
 ccswitch set-host <url> [t]  # ghi base URL vào profile t (default claude) rồi apply

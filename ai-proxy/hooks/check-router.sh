@@ -15,6 +15,7 @@ CLAUDE_DIR="$HOME/.claude"
 SETTINGS="$CLAUDE_DIR/settings.json"
 CCSWITCH="$CLAUDE_DIR/ccswitch.sh"
 PROFILES="$CLAUDE_DIR/profiles"
+HOSTS_FILE="$CLAUDE_DIR/.ccswitch-hosts"   # failover order: 9router → 9router2 … (see ccswitch.sh)
 
 command -v jq >/dev/null 2>&1 || exit 0
 
@@ -43,6 +44,12 @@ is_router_url() {
   local target_host prof f base host
   target_host=$(_host_of "$url")
   [ -n "$target_host" ] || return 1
+  if [ -f "$HOSTS_FILE" ]; then
+    while IFS= read -r base; do
+      host=$(_host_of "$base")
+      [ -n "$host" ] && [ "$host" = "$target_host" ] && return 0
+    done < <(grep -vE '^[[:space:]]*(#|$)' "$HOSTS_FILE" 2>/dev/null)
+  fi
   for prof in claude codex deepseek kimi gemini; do
     f="$PROFILES/$prof.json"
     [ -f "$f" ] && [ -r "$f" ] || continue
@@ -82,10 +89,18 @@ fi
 {
   echo "━━━ ccswitch ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "▶ Endpoint đang chạy: ${name}${base:+  ($base${model:+, $model})}"
-  echo "  Fallback (khi router chết): <router hiện tại> → subscription (OAuth)"
+  if [ -f "$HOSTS_FILE" ]; then
+    echo "  Fallback (khi router chết): $(grep -vE '^[[:space:]]*(#|$)' "$HOSTS_FILE" | sed -E 's#^https?://##; s#/.*##' | paste -sd'>' - | sed 's/>/ → /g') → subscription (OAuth)"
+    primary=$(grep -vE '^[[:space:]]*(#|$)' "$HOSTS_FILE" | head -1)
+    if [ -n "$base" ] && [ -n "$primary" ] && [ "$base" != "$primary" ] && is_router_url "$base"; then
+      echo "  ⚠️  đang chạy HOST DỰ PHÒNG ($base), host chính: $primary"
+    fi
+  else
+    echo "  Fallback (khi router chết): <router hiện tại> → subscription (OAuth)"
+  fi
   echo "    • claude/codex/deepseek/kimi/gemini chung 1 router + 1 key (9router)"
   echo "    • subscription = safe-harbor: gỡ env → Claude Code dùng OAuth login (luôn về được)"
-  echo "  Lệnh: ccswitch [check | claude | codex | deepseek | kimi | gemini | subscription | fallback | clear]"
+  echo "  Lệnh: ccswitch [check | hosts | use-host <url> | claude | codex | deepseek | kimi | gemini | subscription | fallback | clear]"
   echo "        đổi endpoint xong → RESTART Claude Code (env nạp lúc khởi động)"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 } >&2
@@ -131,6 +146,14 @@ if [ "$rc" -eq 0 ] && [ "$new_base" = "$settings_base" ]; then
   : # fallback kept the router (no OAuth login to fall back to) — nothing to reload
 elif [ "$rc" -eq 0 ]; then
   echo "   ↻ restart Claude Code (quit + reopen) / Reload Window để nạp endpoint mới." >&2
+  # Endpoint changed → the user MUST be told (stderr of an exit-0 hook is not shown).
+  # systemMessage is displayed to the user; additionalContext asks Claude to repeat it.
+  if [ -n "$new_base" ]; then
+    msg="ccswitch: router ${settings_base} lỗi (HTTP ${code}) → ĐÃ ĐỔI HOST sang ${new_base}. Restart Claude Code để dùng host mới. Đổi lại: ccswitch use-host <url> | ccswitch subscription"
+  else
+    msg="ccswitch: router ${settings_base} lỗi (HTTP ${code}), không có host dự phòng sống → ĐÃ CHUYỂN sang subscription (OAuth). Restart Claude Code. Đổi host: ccswitch use-host <url>"
+  fi
+  jq -nc --arg m "$msg" '{systemMessage: $m, hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: ("Báo ngay cho user (nguyên văn ý chính): " + $m)}}' 
 else
   echo "   ❌ fallback lỗi — kiểm tra router; subscription (gỡ env) luôn về được, thử: ccswitch subscription." >&2
 fi

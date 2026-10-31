@@ -126,7 +126,10 @@ ccswitch deepseek     # switch → DeepSeek qua 9router (ds/*)
 ccswitch kimi         # switch → Kimi qua 9router (kimi/*)
 ccswitch subscription # gỡ block env → Claude Code OAuth subscription login
 ccswitch check        # probe health các profile (claude/codex/deepseek/kimi) + verify subscription
-ccswitch fallback     # giữ target đang active nếu router healthy; router chết → subscription (safe-harbor)
+ccswitch fallback     # thứ tự ưu tiên: host trong ~/.claude/.ccswitch-hosts (9router → 9router2 …) → subscription
+                       #   có TTY → host đang dùng lỗi thì HỎI (host dự phòng / nhập host khác / subscription / giữ nguyên)
+ccswitch hosts [add <url>]  # liệt kê host failover + health / thêm host dự phòng
+ccswitch use-host <url>     # đổi host cho MỌI router profile (chung host) rồi apply — luôn in "🔀 ĐÃ ĐỔI HOST"
                        #   chỉ hạ khi máy CÓ OAuth credential; không có → giữ nguyên router + cảnh báo
 ccswitch set-key [p]  # nhập key mới (ẩn) cho profile p (mặc định claude; claude/codex/deepseek/kimi share CHUNG 1 token — chạy set-key lại cho các target còn lại với CÙNG giá trị, hoặc dùng `ccswitch update` để sync) rồi apply
 ccswitch update [src] # đồng bộ ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN từ profile src (mặc định claude)
@@ -207,7 +210,13 @@ export CCSWITCH_NO_AUTO=1
 
 ## 6. Fallback chain & safe-harbor (KHÔNG để Claude chết)
 
-Thứ tự: **router hiện tại (claude/codex/deepseek) → subscription**.
+Thứ tự: **host chính (9router) → host dự phòng (9router2 …) → subscription**.
+
+- Danh sách host: `~/.claude/.ccswitch-hosts` (1 URL/dòng, dòng 1 = host chính). `setup.sh` ghi từ `.env` `AI_9ROUTER_BASE_URL` + `AI_9ROUTER_BASE_URL_BACKUP` (nhiều host: phân cách dấu phẩy); hoặc `ccswitch hosts add <url>`.
+- Đổi host = đổi `ANTHROPIC_BASE_URL` của mọi router profile (chung token), giữ nguyên profile đang active (claude/codex/…). Profile host ngoài danh sách (kimi direct-endpoint) không bị đụng.
+- Có TTY (`ccswitch fallback`, `ccswitch <target>` khi probe ≠ 200) → hiện menu hỏi user; mặc định = host sống đầu tiên theo thứ tự, không còn host sống → subscription. Tắt hỏi: `CCSWITCH_NO_PROMPT=1`.
+- Không TTY (hook SessionStart) → tự đi theo thứ tự; đang ở host dự phòng mà host chính sống lại → tự quay về host chính.
+- **Mọi lần đổi host đều báo user**: CLI in `🔀 ĐÃ ĐỔI HOST router: <cũ> → <mới>`; hook trả JSON `systemMessage` (hiện cho user) + `additionalContext`; banner đầu session cảnh báo khi đang chạy host dự phòng.
 
 - **router (claude/codex/deepseek)**: giữ target đang active nếu probe **200** (fallback không ép về claude khi bạn đang ở codex/deepseek).
 - **`subscription` = SAFE-HARBOR cuối cùng**: nếu router chết, `fallback` **luôn apply `subscription`** = gỡ block `env` khỏi `settings.json`. Không probe, không cần key. Claude Code quay về **OAuth subscription login gốc** → luôn về được, không bao giờ kẹt trên router chết. (4 target chung 1 router 9router → router chết là cả 4 chết.)
@@ -444,6 +453,7 @@ Không có test nào đụng `$HOME` hay `.claude/` thật của máy chạy CI/
 
 ## 11. Changelog
 
+- **2026-10-31** — **Failover host router: 9router → 9router2 → subscription.** `~/.claude/.ccswitch-hosts` + lệnh `hosts`/`use-host`; `fallback` hỏi user khi có TTY, hook tự failover + báo user qua `systemMessage`. Chưa port sang `ccswitch.ps1`. Test: `test/ccswitch-host-failover.bats`.
 - **2026-07-31** — **Xoá `check-session-limit.sh` — hook advisory vô dụng.** Hook in cảnh báo ra stderr nên model không đọc được (chỉ user thấy trong terminal, không vào context) — không tạo tác dụng gate thật. Đồng thời proxy đo transcript-size sai lệch sau auto-compact (transcript reset nhưng hook vẫn cộng dồn theo file cũ), và nội dung cảnh báo trùng lặp hoàn toàn với rule `token-budget.md` (đã always-load, cùng ngưỡng ~200K). Xoá hẳn thay vì sửa lại: rule đã cover, hook chỉ là lớp advisory thừa. Files: xoá `.claude/hooks/check-session-limit.sh` + `harness/templates/hooks/check-session-limit.sh`; gỡ wiring `UserPromptSubmit` khỏi `.claude/settings.json`; gỡ nhóm cài `SEL_SESSIONLIMIT`/`HARNESS_GROUP_SESSIONLIMIT` + toàn bộ logic liên quan khỏi `harness/install.sh`; cập nhật `CLAUDE.md` + README.md + MECHANISM.md (bỏ reference hook, giữ nguyên changelog lịch sử 2026-07-20).
 - **2026-07-27** — **Đồng bộ README + MECHANISM với state hiện tại + `kimi` 9router-native.** (1) `kimi` giờ là router-target thứ 4 chung base 9router + chung token (`ORDER=(claude codex deepseek kimi)`, model prefix `kimi/*`), bỏ local adapter làm default — direct-endpoint mode (`api.moonshot.ai/anthropic`) còn lại như optional qua `.env` `KIMI_API_KEY_FORCE_SUBSCRIPTION=1` (refactor d8f30a4). Docs cập nhật: 5 target (4 router + subscription), 4 profile, `claude-km` spawn alias, bảng model prefix `cc/`/`cx/`/`ds/`/`kimi/`. (2) README restructure 5-part → 4-part: ccswitch endpoint switcher / harness / auto-compact-window / optimize-claude; gỡ 2 phần cũ (`install-claude-memory.sh`+`ai-memory-rules/`, `install-git-hooks.sh`+`dev-hooks/`) — đã fold vào harness group RULES + GITHOOKS. (3) MECHANISM §3 file tree viết lại: 4 install script, harness templates, `.claude/` 6 hook/12 command/6 skill; §8.8 bats table đồng bộ counts thật **130 test / 9 file**. Files: `README.md` + `MECHANISM.md` (docs-only, không đụng code). Verify: `grep -c '^@test' test/*.bats` = 130/9, hostname canonical `9router.proxy.example.com` khớp `ai-proxy/ccswitch.sh`.
 - **2026-07-22** — **Fix `setup.ps1` — 3 bug parity vs `setup.sh` chặn cài đặt Windows non-interactive.** (1) `[Environment]::UserInteractive` luôn trả `True` kể cả khi stdin bị pipe/redirect (verified thật qua `pwsh`) → script tưởng nhầm session tương tác, gọi `Read-Host -AsSecureString` treo vô thời hạn dưới piped stdin, không bao giờ tới đoạn wire settings.json/statusLine/đăng ký PowerShell profile function. Đổi sang `[Console]::IsInputRedirected` (đúng: `True` khi non-interactive). (2) Xoá code set `.model = "sonnet"` (dòng 186-195 cũ) — tái lập bug cũ đã cố ý bỏ ở `setup.sh` (stale model pin sau khi đổi endpoint), thay bằng comment parity giống hệt bash. (3) `.env` proxy flow lỗi thời — `.ps1` vẫn hỏi `[Y/n]` khi có đủ `AI_9ROUTER_BASE_URL`+`AI_9ROUTER_API_KEY`, trong khi `setup.sh` đã đổi sang unconditional-apply (không hỏi, `.env` luôn là source of truth) từ trước — đồng bộ lại logic. Files: `ai-proxy/setup.ps1` + `test/setup-ps1-parity.bats` (4 test mới, skip nếu máy không có `pwsh`). Verify: `bats test/*.bats` (137/137 pass).

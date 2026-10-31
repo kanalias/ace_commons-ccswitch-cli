@@ -206,6 +206,20 @@ fi
 apply_kimi_env
 unset ENV_PRO_KEY KIMI_ENV_KEY
 
+# 2c. router failover order (~/.claude/.ccswitch-hosts): .env AI_9ROUTER_BASE_URL first, then
+#     AI_9ROUTER_BASE_URL_BACKUP (comma/space separated), then any host already listed. Used by
+#     ccswitch fallback + check-router.sh: 9router → 9router2 … → subscription.
+if [ "$USE_ENV_PRO" -eq 1 ]; then
+  HOSTS_FILE="$CLAUDE_DIR/.ccswitch-hosts"
+  ENV_PRO_BACKUP=$(env_pro_val AI_9ROUTER_BASE_URL_BACKUP)
+  {
+    echo "$ENV_PRO_HOST"
+    printf '%s\n' $(printf '%s' "$ENV_PRO_BACKUP" | tr ',' ' ')
+    [ -f "$HOSTS_FILE" ] && grep -vE '^[[:space:]]*(#|$)' "$HOSTS_FILE" || true  # pipefail-safe
+  } | awk 'NF && !seen[$0]++' > "$HOSTS_FILE.tmp" && mv "$HOSTS_FILE.tmp" "$HOSTS_FILE"
+  echo "  ✓ router failover order → $HOSTS_FILE: $(paste -sd' ' "$HOSTS_FILE") → subscription"
+fi
+
 # 3. ensure settings.json exists + wire SessionStart hook (upsert by basename, not full-string
 #    match) — a stale entry pointing at a different path/wording for check-router.sh would
 #    otherwise never get cleaned up and re-installs would pile up duplicate hook entries.

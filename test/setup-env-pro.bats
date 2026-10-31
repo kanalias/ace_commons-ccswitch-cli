@@ -51,6 +51,29 @@ setup() {
   done
 }
 
+@test "non-interactive: .env AI_9ROUTER_BASE_URL_BACKUP writes failover order primary → backups" {
+  write_fake_env_pro "$TEST_HOST" "$TEST_KEY"
+  echo "AI_9ROUTER_BASE_URL_BACKUP=https://fake-proxy2.test/v1,https://fake-proxy3.test/v1" >> "$STAGE/.env"
+  run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 1p "$HOME/.claude/.ccswitch-hosts")" = "$TEST_HOST" ]
+  [ "$(sed -n 2p "$HOME/.claude/.ccswitch-hosts")" = "https://fake-proxy2.test/v1" ]
+  [ "$(sed -n 3p "$HOME/.claude/.ccswitch-hosts")" = "https://fake-proxy3.test/v1" ]
+  # re-run is idempotent (no duplicate lines)
+  bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null" >/dev/null 2>&1
+  [ "$(wc -l < "$HOME/.claude/.ccswitch-hosts" | tr -d ' ')" = "3" ]
+}
+
+@test "non-interactive: .env without backup keeps primary first in failover order" {
+  mkdir -p "$HOME/.claude"
+  printf '%s\n%s\n' "https://fake-proxy2.test/v1" "$TEST_HOST" > "$HOME/.claude/.ccswitch-hosts"
+  write_fake_env_pro "$TEST_HOST" "$TEST_KEY"
+  run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 1p "$HOME/.claude/.ccswitch-hosts")" = "$TEST_HOST" ]
+  [ "$(sed -n 2p "$HOME/.claude/.ccswitch-hosts")" = "https://fake-proxy2.test/v1" ]
+}
+
 @test "non-interactive: .env is ignored when AI_9ROUTER_API_KEY is missing" {
   write_fake_env_pro "$TEST_HOST" ""
   run bash -c "cd '$STAGE' && bash ai-proxy/setup.sh </dev/null"
