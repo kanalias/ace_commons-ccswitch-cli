@@ -291,3 +291,11 @@ Tạo / dùng profile → cập nhật dòng (nhất là `last-used`). Không c�
 - ❌ `COPY .browser-profiles` vào Dockerfile (cookie bake vào image layer + phình image).
 - ❌ Copy profile macOS → container Linux rồi tưởng còn session (cookie không giải mã được — dùng `state.json`).
 - ❌ Export `state.json` khi browser còn mở profile đó (lock → đọc ra bản corrupt).
+
+## Chạy nền — KHÔNG giành focus (BẮT BUỘC)
+
+- Ưu tiên headless (`--headless=new`, Playwright `--headless`, `cloak_launch` mặc định `headless=true`). Không `bringToFront`, `Target.activateTarget`, `open -a`, AppleScript.
+- Chrome dùng chung cần cửa sổ (extension VPN, login): KHÔNG minimize/ẩn (Cocos bị throttle, `evaluate` treo). Đẩy ra ngoài màn hình: CDP `Browser.setWindowBounds` left=-1380, 1400x900, `windowState:'normal'`, ngay sau khi mở tab.
+- Thao tác bằng chuột/phím ảo (CDP `Input.dispatch*`, Playwright `click/keyboard`), không input thật.
+- Chỉ hiện cửa sổ khi login/captcha/2FA hoặc kẹt: báo rõ lý do, xong đẩy ra ngoài lại.
+- Gate profile cài global ở `~/.claude/hooks/pre-browser-profile-gate.sh` (mọi repo); `headless=false` bị hỏi bởi `~/.claude/hooks-cloak-headed-ask.sh`.
