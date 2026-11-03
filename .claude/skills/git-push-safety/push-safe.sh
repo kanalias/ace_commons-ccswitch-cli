@@ -287,7 +287,7 @@ if [ "$rc" -ne 0 ]; then
     # Server-side race (e.g. "cannot lock ref ... is at <our sha>") can fail the
     # push after the ref already moved; accept only if ls-remote shows our tip.
     LANDED=$(GIT_SSH_COMMAND="$SSH_CMD" git ls-remote "$REMOTE" "refs/heads/$BRANCH" 2>/dev/null | awk '{print $1; exit}')
-    if [ "$LANDED" = "$HEAD_SHA" ] && ! grep -Eq 'rejected|non-fast-forward|pre-push' "$PUSH_LOG"; then
+    if [ "$LANDED" = "$HEAD_SHA" ] && ! grep -Eq '\[rejected\]|non-fast-forward|pre-push' "$PUSH_LOG"; then
       echo "WARN: git push exit $rc but remote $BRANCH already at $HEAD_SHA — treating as pushed" >&2
     else
       stop "git push failed (exit $rc, see output above)"
