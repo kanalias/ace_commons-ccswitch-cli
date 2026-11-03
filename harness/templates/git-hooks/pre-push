@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pre-push: (1) private-branch gate — nhánh ghi trong .claude/private-branches.txt CHỈ được
 # push tới remote có URL khớp (KHÔNG bypass); (2) scan secrets bằng gitleaks (bypass có
-# chủ đích: GITLEAKS_SKIP=1 trước lệnh push).
+# chủ đích: GITLEAKS_SKIP=1 trước lệnh push) — chỉ quét commit sắp push; full: GITLEAKS_FULL=1.
 # git gọi: pre-push <remote-name> <remote-url>; stdin: <local-ref> <local-sha> <remote-ref> <remote-sha>
 set -uo pipefail
 
@@ -50,7 +50,11 @@ MSG
   done <<< "$refs"
 fi
 
-# ── 2) gitleaks ─────────────────────────────────────────────────────────────
+# ── 2) gitleaks — CHỈ commit sắp push, KHÔNG quét lại toàn bộ history ────────
+# Mỗi ref: <remote-sha>..<local-sha>. Nhánh mới / remote-sha chưa có ở local →
+# <local-sha> --not --remotes (commit đã lên bất kỳ remote nào = đã quét ở lần push trước).
+# Full history chỉ khi yêu cầu rõ: GITLEAKS_FULL=1 git push …  (hoặc /git-push-safety --full).
+# File > GITLEAKS_MAX_MB (mặc định 10) bị bỏ qua — asset nhị phân, không phải chỗ chứa secret.
 [ "${GITLEAKS_SKIP:-}" = "1" ] && { echo "⚠️  gitleaks skipped (GITLEAKS_SKIP=1)" >&2; exit 0; }
 
 if ! command -v gitleaks >/dev/null 2>&1; then
@@ -58,12 +62,35 @@ if ! command -v gitleaks >/dev/null 2>&1; then
   exit 0
 fi
 
-echo "🔍 gitleaks scan trước push…" >&2
-if gitleaks detect --source "$ROOT" --redact -v; then
-  echo "✅ gitleaks: no leaks — cho phép push." >&2
-  exit 0
-else
-  echo "❌ gitleaks phát hiện secret — CHẶN push." >&2
+scan() { nice -n 10 gitleaks git --no-banner --redact -v --max-target-megabytes "${GITLEAKS_MAX_MB:-10}" ${1:+--log-opts="$1"} "$ROOT"; }
+leak() {
+  echo "❌ gitleaks phát hiện secret ($1) — CHẶN push." >&2
   echo "   Xử lý leak, hoặc GITLEAKS_SKIP=1 nếu chắc chắn false-positive." >&2
   exit 1
+}
+
+if [ "${GITLEAKS_FULL:-}" = "1" ]; then
+  echo "🔍 gitleaks FULL history (GITLEAKS_FULL=1)…" >&2
+  scan "" || leak "full history"
+  echo "✅ gitleaks: no leaks — cho phép push." >&2
+  exit 0
 fi
+
+n=0
+while IFS=' ' read -r lref lsha rref rsha; do
+  [ -n "${lsha:-}" ] && [ "${lsha//0/}" != "" ] || continue          # delete ref → không có gì để quét
+  if [ -n "${rsha:-}" ] && [ "${rsha//0/}" != "" ] && git cat-file -e "$rsha^{commit}" 2>/dev/null; then
+    range="$rsha..$lsha"
+  else
+    range="$lsha --not --remotes"
+  fi
+  # shellcheck disable=SC2086
+  c=$(git rev-list --count $range 2>/dev/null || echo 0)
+  [ "$c" -gt 0 ] || continue
+  echo "🔍 gitleaks: $lref → $c commit sắp push ($range)…" >&2
+  scan "$range" || leak "$lref"
+  n=$((n + c))
+done <<< "${refs:-}"
+
+[ "$n" -gt 0 ] && echo "✅ gitleaks: $n commit sạch — cho phép push." >&2 || echo "✅ gitleaks: không có commit mới cần quét." >&2
+exit 0

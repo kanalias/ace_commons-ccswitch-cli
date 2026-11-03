@@ -1,6 +1,6 @@
 ---
 name: git-push-safety
-description: "Chạy test, gitleaks, sensitive-content scan; chỉ push nếu cả 3 pass. `--scan-only` chỉ scan, không test/push. Dùng khi \"audit git leak\", \"check leak trước khi push\", hoặc trước mọi lệnh push GitHub."
+description: "Chạy test, gitleaks (chỉ commit sắp push), sensitive-content scan; chỉ push nếu cả 3 pass. `--scan-only` chỉ scan, không test/push; `--full` quét toàn bộ history. Dùng khi \"audit git leak\", \"check leak trước khi push\", hoặc trước mọi lệnh push GitHub."
 disable-model-invocation: true
 user-invocable: true
 ---
@@ -41,20 +41,52 @@ Chạy lệnh đã phát hiện (song song với bước 2, 3). Nếu bất kỳ
 (exit code khác 0), DỪNG — không push. Báo tên test fail. Không tự fix hay
 retry — báo lỗi rõ ràng và hỏi user cách xử lý tiếp.
 
-## 2. gitleaks scan
+## 2. gitleaks scan — chỉ phạm vi push, MỘT lần
 
-Chạy: `gitleaks detect --source "$(git rev-parse --show-toplevel)" --redact -v`
+**Không full scan history** trừ khi user yêu cầu rõ (`--full`). Commit đã lên
+remote = đã quét ở lần push trước; quét lại toàn bộ history mỗi lần push rất nặng
+(repo game vài GB).
 
-Nếu gitleaks chưa cài, DỪNG và báo user cài đặt — không
-im lặng skip. Đề xuất lệnh theo platform của họ:
+**Chế độ push (mặc định): KHÔNG tự chạy gitleaks ở bước này.** Hook
+`.git/hooks/pre-push` (harness) quét đúng các commit sắp push ở bước 4
+(`<remote-sha>..<local-sha>`, nhánh mới `<sha> --not --remotes`) — chạy gitleaks ở
+đây nữa là quét 2 lần. Bước này chỉ kiểm điều kiện:
+
+```bash
+command -v gitleaks >/dev/null || echo MISSING-gitleaks
+grep -q 'GITLEAKS_FULL' "$(git rev-parse --git-path hooks)/pre-push" 2>/dev/null || echo MISSING-hook
+```
+
+- `MISSING-gitleaks` → DỪNG, báo user cài (xem dưới). Không im lặng skip.
+- `MISSING-hook` (hook chưa cài / bản cũ quét full) → báo user chạy lại harness
+  `install.sh update`; trong lúc chờ, tự quét phạm vi push 1 lần bằng lệnh `--scan-only`
+  bên dưới thay cho hook.
+- Bước 4 push mà hook báo `❌ gitleaks phát hiện secret` → push đã bị chặn: DỪNG,
+  hiện finding đã redact, không push lại.
+
+**Chế độ `--scan-only`** (không push → không có hook): quét commit chưa lên remote +
+thay đổi chưa commit, không quét history cũ:
+
+```bash
+ROOT="$(git rev-parse --show-toplevel)"
+[ "$(git rev-list --count HEAD --not --remotes)" -gt 0 ] &&
+  nice -n 10 gitleaks git --no-banner --redact -v --max-target-megabytes 10 --log-opts="HEAD --not --remotes" "$ROOT"
+git diff HEAD | gitleaks stdin --no-banner --redact -v
+```
+
+**`--full`** (chỉ khi user yêu cầu rõ "full scan", "quét toàn bộ history"):
+`--scan-only --full` → `nice -n 10 gitleaks git --no-banner --redact -v "$ROOT"`;
+push `--full` → push với `GITLEAKS_FULL=1` để hook quét toàn bộ (không chạy thêm ở bước này).
+
+Nếu gitleaks chưa cài, DỪNG và báo user cài đặt. Đề xuất lệnh theo platform của họ:
 
 - macOS: `brew install gitleaks`
 - Linux: package manager của distro (`apt install gitleaks`, `pacman -S gitleaks`, …)
 - Windows: `scoop install gitleaks` hoặc `choco install gitleaks`
 - OS nào có Go: `go install github.com/gitleaks/gitleaks/v8@latest`
 
-(Khác với advisory pre-push hook, command này nên coi scanner bị thiếu
-là hard stop, vì user đã yêu cầu rõ ràng push có gate.)
+(Khác với advisory pre-push hook, command này coi scanner bị thiếu là hard stop,
+vì user đã yêu cầu rõ ràng push có gate.)
 
 Nếu gitleaks tìm thấy bất kỳ leak nào, DỪNG. Hiện finding đã redact và không
 tiếp tục. Không dùng `GITLEAKS_SKIP=1` thay mặt user — bypass đó
@@ -135,7 +167,8 @@ chỉ in ra rồi push. Không bao giờ force-push như một phần của comm
 này trừ khi request của user trong conversation này yêu cầu rõ ràng force
 push.
 
-Push với prefix `GIT_PUSH_GATE_OK=1 git push ...` — token này báo cho hook
+Push với prefix `GIT_PUSH_GATE_OK=1 git push ...` (thêm `GITLEAKS_FULL=1` chỉ khi
+`--full`) — hook pre-push quét gitleaks phạm vi push lúc này (bước 2). Token báo cho hook
 `pre-bash-gate.sh` biết pipeline an toàn đã chạy xong. Raw `git push`
 (không prefix) sẽ bị hook chặn. Chỉ thêm token SAU khi bước 1-3 pass và user
 đã confirm ở trên — không bao giờ prefix sẵn để lách gate.
