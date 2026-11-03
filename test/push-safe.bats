@@ -94,6 +94,12 @@ gate() { bash -c 'printf "%s" "$1" | bash "$2"' _ "$(jq -nc --arg c "$1" '{tool_
   [ "$status" -ne 0 ]; [[ "$output" == *forbidden* ]]
 }
 
+@test "script: tracked .env.prod.example / .env.aws.example -> allowed" {
+  echo X= > .env.prod.example; echo X= > .env.aws.example; git add -f .env.prod.example .env.aws.example; git commit -qm envex
+  run sh "$SCRIPT" origin main
+  [ "$status" -eq 0 ]; [[ "$output" == *"PUSH-SAFE OK"* ]]
+}
+
 @test "script: push non-current branch tip" {
   git branch side
   git checkout -qb work

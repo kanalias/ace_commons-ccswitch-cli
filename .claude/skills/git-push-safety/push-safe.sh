@@ -207,7 +207,7 @@ fi
 
 FORBIDDEN=$(git ls-files \
   | grep -E '(^|/)\.env([.][A-Za-z0-9_.-]*)?$|\.pem$|\.key$|(^|/)(id_rsa|id_ed25519|id_ecdsa|id_dsa)$|security_envs' \
-  | grep -Ev '(^|/)\.env\.(example|sample|template)$' || true)
+  | grep -Ev '(^|/)\.env([.][A-Za-z0-9_-]+)*\.(example|sample|template)$' || true)
 [ -z "$FORBIDDEN" ] || stop "forbidden tracked path(s) (.env*/*.pem/*.key/private key/security_envs): $FORBIDDEN"
 
 echo "no oversized/forbidden files found"
@@ -284,7 +284,14 @@ if [ "$rc" -ne 0 ]; then
     SSH_CMD="ssh -o ProxyJump=$PUSH_SAFE_PROXY_JUMP -o BatchMode=yes -o ConnectTimeout=60"
     GIT_SSH_COMMAND="$SSH_CMD" git push "$REMOTE" "$BRANCH" || stop "git push failed (also via ProxyJump=$PUSH_SAFE_PROXY_JUMP)"
   else
-    stop "git push failed (exit $rc, see output above)"
+    # Server-side race (e.g. "cannot lock ref ... is at <our sha>") can fail the
+    # push after the ref already moved; accept only if ls-remote shows our tip.
+    LANDED=$(GIT_SSH_COMMAND="$SSH_CMD" git ls-remote "$REMOTE" "refs/heads/$BRANCH" 2>/dev/null | awk '{print $1; exit}')
+    if [ "$LANDED" = "$HEAD_SHA" ] && ! grep -Eq 'rejected|non-fast-forward|pre-push' "$PUSH_LOG"; then
+      echo "WARN: git push exit $rc but remote $BRANCH already at $HEAD_SHA — treating as pushed" >&2
+    else
+      stop "git push failed (exit $rc, see output above)"
+    fi
   fi
 fi
 
