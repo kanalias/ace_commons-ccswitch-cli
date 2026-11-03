@@ -131,6 +131,8 @@ elif [ -f Cargo.toml ]; then
   cargo test || stop "tests failed (cargo test)"
 else
   echo "NOTE: no standard test command detected (test/*.bats, package.json scripts.test, pytest config, go.mod, Cargo.toml) — automated tests skipped (skill step 1: do not guess). Run repo-specific tests by hand if this push touches them." >&2
+  ADHOC=$(git ls-files 2>/dev/null | grep -E '(^|/)[^/]+\.test\.(sh|mjs|js|ts)$' | grep -v node_modules | head -10 || true)
+  [ -z "$ADHOC" ] || echo "NOTE: ad-hoc test files found (not wired to one command) — run by hand if this push touches them: $(printf '%s' "$ADHOC" | tr '\n' ' ')" >&2
 fi
 
 # ── c) gitleaks on the push range only ──────────────────────────────────────
