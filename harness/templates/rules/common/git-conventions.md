@@ -28,8 +28,8 @@ Xong tính năng → merge vào `@@BRANCH@@` → cleanup worktree + branch NGAY 
 Merge + cleanup xong (kể cả branch merge vào là `main` hay `@@BRANCH@@`) → **tự push luôn**, không hỏi lại:
 
 1. **Đồng bộ branch chính (`main`, theo `origin/HEAD`) và branch dev `@@BRANCH@@` về cùng SHA, chỉ fast-forward**: merge vào `@@BRANCH@@` → `git fetch . @@BRANCH@@:main`; merge vào `main` → `git fetch . main:@@BRANCH@@` (branch đang checkout → `git merge --ff-only <kia>`). `@@BRANCH@@` = `main` → chỉ 1 branch. Không ff được (diverged) → DỪNG, báo user, KHÔNG tự merge/rebase.
-2. **Chạy quy trình `/git-push-safety`** (đọc `.claude/skills/git-push-safety/SKILL.md`, làm đúng các bước): tests + gitleaks + sensitive scan. Bước nào fail → DỪNG, không push.
-3. **Push mọi branch đã nhận merge/ff**: `GIT_PUSH_GATE_OK=1 git push <remote> main @@BRANCH@@`. Rule này = xác nhận sẵn của user cho bước Push của skill trong luồng này; xong in branch + range commit đã push. KHÔNG force-push. Protected branch deploy (`stable`/`prod`/`release`...) KHÔNG nằm trong luồng này — theo mục dưới.
+2. **Chạy quy trình `/git-push-safety`** (`.claude/skills/git-push-safety/SKILL.md`): script `push-safe.sh` tự chạy tests + gitleaks + sensitive scan + file lớn/cấm. Bước nào fail → DỪNG, không push.
+3. **Push mọi branch đã nhận merge/ff**: `cd <repo> && sh .claude/skills/git-push-safety/push-safe.sh <remote> main` (rồi `… <remote> @@BRANCH@@` nếu khác). Push qua script KHÔNG cần hỏi user (user đã chốt); xong in branch + range commit đã push. KHÔNG force-push. Protected branch deploy (`stable`/`prod`/`release`...) KHÔNG nằm trong luồng này — theo mục dưới.
 
 Không áp khi: user nói "chưa push"/"giữ local", hoặc session khác đang dở trên branch đích ([[git-workflow]] mục Đa session).
 

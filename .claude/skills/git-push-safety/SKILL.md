@@ -1,10 +1,32 @@
 ---
 name: git-push-safety
-description: "Chạy test, gitleaks (chỉ commit sắp push), sensitive-content scan; chỉ push nếu cả 3 pass. `--scan-only` chỉ scan, không test/push; `--full` quét toàn bộ history. Dùng khi \"audit git leak\", \"check leak trước khi push\", hoặc trước mọi lệnh push GitHub."
+description: "Chạy test, gitleaks (chỉ commit sắp push), sensitive-content scan; chỉ push nếu cả 3 pass — qua script `push-safe.sh`, không hỏi confirm. `--scan-only` chỉ scan, không test/push; `--full` quét toàn bộ history. Dùng khi \"audit git leak\", \"check leak trước khi push\", hoặc trước mọi lệnh push GitHub."
 disable-model-invocation: true
 user-invocable: true
 ---
-> **Confirmation gate:** Gọi lệnh rõ ràng không phải là xác nhận. Trước bất kỳ hành động phá huỷ, thay đổi production, hoặc publish ra remote nào, liệt kê rõ target, scope, và tác động; hỏi user xác nhận rõ ràng trong conversation này và chờ. Giữ nguyên mọi xác nhận chặt hơn theo từng workflow bên dưới.
+> **Push KHÔNG cần hỏi confirm (user đã chốt):** chế độ push = chạy script
+> `push-safe.sh` bên dưới — script tự chạy đủ bước 1–3 + kiểm file lớn/cấm, pass mới push,
+> rồi verify `ls-remote`. Không hỏi user trước khi push. Vẫn cấm force-push / `--all` /
+> `--mirror` / `--tags`, vẫn tôn trọng gate nhánh riêng tư (`.claude/private-branches.txt`).
+> Hành động phá huỷ khác (xoá branch/remote, rewrite history, force-push): gọi lệnh không phải là xác nhận —
+> liệt kê target + tác động, hỏi user xác nhận rõ và chờ.
+
+## Cách chạy (mặc định) — `push-safe.sh`
+
+```bash
+cd <repo tuyệt đối> && sh .claude/skills/git-push-safety/push-safe.sh [--full] <remote> <branch>
+```
+
+- Hook `pre-bash-gate.sh` cho qua đúng lệnh này (không nối thêm `git push` thô); raw `git push` vẫn bị chặn.
+- Script: chặn flag nguy hiểm → gate nhánh riêng tư → gitleaks có cài → test auto-detect → gitleaks phạm vi push
+  (để `.git/hooks/pre-push` quét nếu hook harness đã cài, không quét 2 lần) + diff chưa commit → `sensitive-patterns.txt`
+  → file ≥ 95 MB / `.env*`/key tracked → detect RBAC/deploy-surface/README (in ra, agent PHẢI đọc + làm bước 3.5–3.7 nếu
+  báo DETECTED) → push → verify `ls-remote` = SHA. Remote diverged (non-fast-forward) → STOP, không force.
+- Push không kết nối được + đặt `PUSH_SAFE_PROXY_JUMP=<host>` → tự thử lại 1 lần qua `ssh -o ProxyJump=<host>`.
+- Nhiều branch/remote → gọi script lần lượt từng `<remote> <branch>` (remote chính trước).
+- Bước `/check-hardcode` + đọc diff (bước 3) là phán đoán: diff lớn/lạ → chạy trước khi gọi script.
+
+Các mục dưới mô tả chi tiết từng bước (script đã tự động hoá phần cơ học).
 
 ## Chế độ `--scan-only`
 
@@ -157,18 +179,10 @@ xác nhận sửa README (cùng commit hoặc commit riêng) rồi mới push.
 
 ## 4. Push
 
-Chỉ khi bước 1-3 đều pass: hiện cho user chính xác cái gì sắp được push
-(kèm SHA đã scan). Ngay trước lệnh push, kiểm `git rev-parse HEAD` vẫn = SHA đã
-scan (session khác / commit thêm trong lúc chờ confirm → scan lại); push đúng SHA đó
-(`git status`, branch hiện tại, remote) và hỏi xác nhận rõ ràng
-trước khi push. Ngoại lệ: luồng auto-push sau merge + cleanup ([[git-conventions]]
-mục "Auto-push sau merge + cleanup") đã được user xác nhận sẵn → không hỏi lại,
-chỉ in ra rồi push. Không bao giờ force-push như một phần của command
-này trừ khi request của user trong conversation này yêu cầu rõ ràng force
-push.
+Chế độ mặc định: `push-safe.sh` tự push sau khi bước 1–3 pass (không hỏi confirm), push đúng
+SHA đầu branch đã scan, rồi verify `ls-remote`. Không bao giờ force-push trong skill này trừ khi
+user yêu cầu rõ trong conversation hiện tại.
 
-Push với prefix `GIT_PUSH_GATE_OK=1 git push ...` (thêm `GITLEAKS_FULL=1` chỉ khi
-`--full`) — hook pre-push quét gitleaks phạm vi push lúc này (bước 2). Token báo cho hook
-`pre-bash-gate.sh` biết pipeline an toàn đã chạy xong. Raw `git push`
-(không prefix) sẽ bị hook chặn. Chỉ thêm token SAU khi bước 1-3 pass và user
-đã confirm ở trên — không bao giờ prefix sẵn để lách gate.
+`GIT_PUSH_GATE_OK=1 git push ...` là bypass do USER tự ra lệnh riêng — agent không tự thêm prefix
+này để lách script. Hook `.git/hooks/pre-push` vẫn quét gitleaks phạm vi push lúc push
+(`--full` → script đặt `GITLEAKS_FULL=1`).

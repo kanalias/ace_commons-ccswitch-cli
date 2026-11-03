@@ -126,11 +126,25 @@ protected_guard
 [ "$harness_off" = 1 ] && exit 0
 
 # ── 1) git-push gate (everyone) ─────────────────────────────────────────────
-if ! echo "$cmd" | grep -Eq 'GIT_PUSH_GATE_OK=1'; then
-  if echo "$cmd" | grep -Eq '(^|[;&|]|[[:space:]])git([[:space:]]+-[^[:space:]]+([[:space:]]+[^[:space:]-]+)?)*[[:space:]]+push([[:space:]]|$)'; then
+# Allow: `[cd <repo> &&] sh|bash [<path>/].claude/skills/git-push-safety/push-safe.sh <remote> <branch>`
+# — script chạy đủ scan (gitleaks + test + sensitive-patterns + file lớn/cấm +
+# detect RBAC/deploy-surface/README) rồi tự push, KHÔNG cần confirm (user đã
+# chốt). Chỉ cho qua khi KHÔNG nối thêm `git push` thô trong cùng lệnh.
+raw_push_re='(^|[;&|]|[[:space:]])git([[:space:]]+-[^[:space:]]+([[:space:]]+[^[:space:]-]+)?)*[[:space:]]+push([[:space:]]|$)'
+push_safe_re='^[[:space:]]*(cd[[:space:]]+[^;&|]+&&[[:space:]]*)?([A-Z_][A-Z0-9_]*=[^[:space:];&|]*[[:space:]]+)*(sh|bash)[[:space:]]+([^[:space:];&|]*/)?\.claude/skills/git-push-safety/push-safe\.sh([[:space:]]|$)'
+if printf '%s' "$cmd" | grep -Eq "$push_safe_re" \
+   && ! printf '%s' "$cmd" | grep -Eq "$raw_push_re" \
+   && ! printf '%s' "$cmd" | grep -Eq 'GIT_PUSH_GATE_OK=1'; then
+  push_safe_ok=1
+else
+  push_safe_ok=0
+fi
+if [ "$push_safe_ok" = 0 ] && ! echo "$cmd" | grep -Eq 'GIT_PUSH_GATE_OK=1'; then
+  if echo "$cmd" | grep -Eq "$raw_push_re"; then
     echo "🚨 pre-bash-git-push-gate: raw 'git push' bị chặn." >&2
-    echo "Chạy /git-push-safety (test + gitleaks + /check-hardcode + hỏi confirm) thay vì push thẳng." >&2
-    echo "Nếu đã qua gate và user đã confirm, push với prefix: GIT_PUSH_GATE_OK=1 git push ..." >&2
+    echo "Chạy: cd <repo> && sh .claude/skills/git-push-safety/push-safe.sh <remote> <branch>" >&2
+    echo "  (tự chạy đủ scan: gitleaks + test + sensitive-patterns + file lớn/cấm + detect RBAC/deploy-surface, rồi tự push — KHÔNG cần confirm)." >&2
+    echo "GIT_PUSH_GATE_OK=1 git push ... là bypass USER-ORDERED ONLY — agent không tự dùng thay push-safe.sh." >&2
     exit 2
   fi
 fi
